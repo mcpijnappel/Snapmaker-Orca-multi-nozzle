@@ -1,8 +1,8 @@
 ; Upgrade cleanup, run from the install section (via CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS)
 ; only when an existing install was detected. Removes version-specific user data
 ; that must be refreshed on upgrade:
-;   %APPDATA%\Snapmaker_Orca\system   (system configuration)
-;   %APPDATA%\Snapmaker_Orca\ota      (OTA update cache)
+;   %APPDATA%\Snapmaker_Orca_Max\system   (system configuration)
+;   %APPDATA%\Snapmaker_Orca_Max\ota      (OTA update cache)
 ; $APPDATA is resolved under SetShellVarContext current so it points at the
 ; current user's Roaming profile, not machine-wide ProgramData (the installer's
 ; .onInit sets "all" for admin installs).
@@ -69,21 +69,21 @@ Function SnapmakerCleanupUpgradeData
     DetailPrint "Cleaning up upgrade data..."
   SnapmakerCleanup_do:
 
-  StrCpy $0 "$APPDATA\Snapmaker_Orca\system"
+  StrCpy $0 "$APPDATA\Snapmaker_Orca_Max\system"
   IfFileExists "$0\*.*" 0 SnapmakerCleanup_ota
     Push "$0"
     Call SnapmakerDeleteDirRecursive
     RMDir "$0"
   SnapmakerCleanup_ota:
 
-  StrCpy $0 "$APPDATA\Snapmaker_Orca\ota"
+  StrCpy $0 "$APPDATA\Snapmaker_Orca_Max\ota"
   IfFileExists "$0\*.*" 0 SnapmakerCleanup_flutter
     Push "$0"
     Call SnapmakerDeleteDirRecursive
     RMDir "$0"
   SnapmakerCleanup_flutter:
 
-  StrCpy $0 "$APPDATA\Snapmaker_Orca\web\flutter_web"
+  StrCpy $0 "$APPDATA\Snapmaker_Orca_Max\web\flutter_web"
   IfFileExists "$0\*.*" 0 SnapmakerCleanup_done
     Push "$0"
     Call SnapmakerDeleteDirRecursive

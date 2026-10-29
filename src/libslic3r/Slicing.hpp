@@ -274,6 +274,13 @@ double effective_object_layer_height(const std::vector<double> &heights, const s
 // moving another entered height. Ascending, no duplicates.
 std::vector<double> available_extruder_layer_heights(const DynamicPrintConfig &config, size_t extruder);
 
+// Snapmaker Orca Max: sets extruder `extruder`'s preferred layer height to `height` and also every
+// extruder with the same nozzle diameter whose value was Default (0) or equal to `extruder`'s old
+// value, so nozzles of one size share one preferred height unless the user gave one its own.
+// Returns the other extruders changed (0-based). `heights` is resized to the nozzle count.
+std::vector<size_t> link_same_size_layer_heights(std::vector<double> &heights, const std::vector<double> &nozzles,
+                                                 size_t extruder, double height);
+
 // Whether an extruder other than `extruder` has a preferred layer height entered. Without one nothing
 // constrains the grid, so the sidebar offers no list of heights for `extruder`.
 bool other_extruder_has_layer_height(const DynamicPrintConfig &config, size_t extruder);

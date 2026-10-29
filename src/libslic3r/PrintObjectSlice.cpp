@@ -973,6 +973,97 @@ void PrintObject::apply_extruder_layer_heights()
     if (m_layers.size() <= first_idx + 1)
         return;
 
+    // Snapmaker Orca Max ("align_bottoms_to_coarse_layers"): the object is sliced on the finest grid,
+    // so a bottom face (a part starting on support or over air) can lie between two rungs of a coarse
+    // region's ladder (run bottoms at first_idx + n * pitch). Such a region could never step back onto
+    // the ladder with pitch 2 and would end its runs out of step with the other regions of its nozzle
+    // size. Round the face up to the next run bottom instead, as a print sliced with only that nozzle
+    // size would round it: the rows below are dropped (they become a gap over the support, which is
+    // generated later from the updated lslices). Finer regions sharing the face drop the same rows so
+    // the underside stays flush; faces of finer regions alone keep their exact height.
+    if (m_print->config().align_bottoms_to_coarse_layers.value) {
+        const float join   = float(scale_(0.1)); // pieces this close belong to one face
+        const float sliver = float(scale_(0.2)); // narrower overhang rings of a slope are no face
+        std::vector<char> touched(m_layers.size(), 0);
+        for (size_t b = first_idx + 1; b < m_layers.size(); ++ b) {
+            m_print->throw_if_canceled();
+            if (std::abs(m_layers[b]->height - m_layers[first_idx]->height) > EPSILON)
+                continue; // uniform heights only (Print::validate() rejects the rest)
+            const ExPolygons below = m_layers[b - 1]->lslices;
+            struct Piece { size_t region; ExPolygon area; };
+            std::vector<Piece> pieces;
+            for (size_t r = 0; r < this->num_printing_regions(); ++ r) {
+                const SurfaceCollection &slices = m_layers[b]->regions()[r]->slices;
+                if (slices.empty())
+                    continue;
+                for (ExPolygon &piece : opening_ex(diff_ex(to_expolygons(slices.surfaces), below), sliver))
+                    pieces.push_back({ r, std::move(piece) });
+            }
+            if (pieces.empty())
+                continue;
+            // Group touching pieces into faces.
+            std::vector<size_t> face_of(pieces.size());
+            for (size_t i = 0; i < pieces.size(); ++ i)
+                face_of[i] = i;
+            auto root = [&face_of](size_t i) { while (face_of[i] != i) i = face_of[i] = face_of[face_of[i]]; return i; };
+            for (size_t i = 0; i < pieces.size(); ++ i) {
+                const Polygons grown = offset(pieces[i].area, join);
+                for (size_t j = i + 1; j < pieces.size(); ++ j)
+                    if (root(i) != root(j) && ! intersection(grown, to_polygons(pieces[j].area)).empty())
+                        face_of[root(j)] = root(i);
+            }
+            for (size_t f = 0; f < pieces.size(); ++ f) {
+                if (root(f) != f)
+                    continue;
+                size_t           pitch = 1;
+                std::set<size_t> regions;
+                Polygons         face;
+                for (size_t i = 0; i < pieces.size(); ++ i)
+                    if (root(i) == f) {
+                        pitch = std::max<size_t>(pitch, multipliers[pieces[i].region]);
+                        regions.insert(pieces[i].region);
+                        polygons_append(face, to_polygons(pieces[i].area));
+                    }
+                if (pitch <= 1)
+                    continue;
+                const size_t off = (b - first_idx) % pitch;
+                if (off == 0)
+                    continue;
+                const size_t k = pitch - off;
+                if (b + k >= m_layers.size())
+                    continue;
+                face = offset(union_(face), join);
+                // A part thinner than the rows to drop keeps its exact rows: rounding would erase it.
+                if (intersection(face, to_polygons(m_layers[b + k]->lslices)).empty())
+                    continue;
+                for (size_t row = b; row < b + k; ++ row) {
+                    if (std::abs(m_layers[row]->height - m_layers[b]->height) > EPSILON)
+                        break;
+                    bool changed = false;
+                    for (size_t r : regions) {
+                        LayerRegion *layerm = m_layers[row]->regions()[r];
+                        if (layerm->slices.empty())
+                            continue;
+                        const ExPolygons own  = to_expolygons(layerm->slices.surfaces);
+                        // Only what does not stand on the object below the face drops.
+                        const ExPolygons drop = diff_ex(intersection_ex(own, face), below);
+                        if (drop.empty())
+                            continue;
+                        layerm->slices.set(diff_ex(own, drop), stInternal);
+                        changed = true;
+                    }
+                    if (changed) {
+                        m_layers[row]->make_slices();
+                        touched[row] = 1;
+                    }
+                }
+            }
+        }
+        for (size_t row = 0; row < m_layers.size(); ++ row)
+            if (touched[row])
+                BOOST_LOG_TRIVIAL(debug) << "Bottom rounded onto the coarse layers at z " << m_layers[row]->print_z;
+    }
+
     // Runs grow to the full pitch wherever the region exists with a common shape (the intersection
     // of the run's layers), ignoring boundary drift and overhangs: narrow rings a curved or sloped
     // boundary adds or removes per layer are dropped and turn into steps, overhangs inside a run
@@ -1155,12 +1246,21 @@ void PrintObject::apply_extruder_layer_heights()
             // a minimum-length run steps towards it and the following run reaches it.
             if (! walls_only && commit_length >= 2) {
                 const size_t rung_len = mult - (idx - first_idx) % mult;   // rows to the next rung, 1..mult
+                // Nothing of the region right below (not even rows combined into a run above them).
+                const bool column_start = idx == first_idx ||
+                    (m_layers[idx - 1]->regions()[region_id]->slices.empty() && m_layers[idx - 1]->regions()[region_id]->combined_layer_count() != 0);
                 const size_t min_len  = std::max<size_t>(min_run, 2);
                 if (rung_len < commit_length) {
                     if (rung_len >= min_len)
                         commit_length = rung_len;
                     else if (min_len < mult && commit_length > min_len)
                         commit_length = min_len;
+                    else if (rung_len >= min_run && column_start)
+                        // Snapmaker Orca Max: no shorter run can step towards the rung (pitch 2): where
+                        // the region's column starts, print the rows up to it at the object layer
+                        // height, so its runs are in step with the other regions of this pitch. Not
+                        // after a colour-guard break: the run there keeps a band on another region.
+                        commit_length = rung_len;
                 }
             }
             if (commit_length >= 2 && min_run > 1) {
@@ -1677,6 +1777,54 @@ void PrintObject::apply_extruder_layer_heights()
                 if (LayerRegion *layerm = m_layers[l]->regions()[r]; ! layerm->m_combined_away_exposed.empty())
                     layerm->m_combined_away_exposed = diff_ex(layerm->m_combined_away_exposed, printed[l]);
     }
+    // Snapmaker Orca Max: a floating piece with no object material directly below it is a bottom
+    // face of the model, not geometry that combining took away. Where support will carry it, it
+    // prints from its own bottom on the support; dropping it or letting a neighbouring run fill it
+    // would cover its visible face with the neighbour's colour (a QR code inlaid in the underside
+    // of a part printed on support). Support is generated after slicing, so whether it carries the
+    // piece is judged from the support settings and the enforcers and blockers.
+    const bool support_on        = m_config.enable_support.value;
+    const bool support_auto      = is_auto(m_config.support_type.value);
+    const bool support_plate_only = m_config.support_on_build_plate_only.value;
+    bool                  painted_ready = false;
+    std::vector<Polygons> enforcer_layers, blocker_layers;
+    auto painted_at = [](const std::vector<Polygons> &layers, size_t idx) {
+        // A downward face is projected to the first slicing plane above it: layer idx, or the
+        // layer below when the face lies just under idx's slicing plane.
+        Polygons out;
+        if (idx < layers.size())
+            polygons_append(out, layers[idx]);
+        if (idx > 0 && idx - 1 < layers.size())
+            polygons_append(out, layers[idx - 1]);
+        return out;
+    };
+    auto covers_half = [](const Polygons &area, const ExPolygon &piece) {
+        const double piece_area = piece.area();
+        return piece_area > 0. && std::abs(Slic3r::area(intersection(to_polygons(piece), area))) >= 0.5 * piece_area;
+    };
+    auto support_carries = [&](size_t idx, const ExPolygon &piece) -> bool {
+        if (! support_on)
+            return false;
+        if (! painted_ready) {
+            enforcer_layers = this->slice_support_enforcers();
+            blocker_layers  = this->slice_support_blockers();
+            this->project_and_append_custom_facets(false, EnforcerBlockerType::ENFORCER, enforcer_layers);
+            this->project_and_append_custom_facets(false, EnforcerBlockerType::BLOCKER, blocker_layers);
+            painted_ready = true;
+        }
+        if (covers_half(painted_at(enforcer_layers, idx), piece))
+            return true;
+        if (! support_auto || covers_half(painted_at(blocker_layers, idx), piece))
+            return false;
+        if (support_plate_only)
+            // Auto support standing on the plate only: nothing of the object below, down to it.
+            for (size_t l = idx; l-- > 0;)
+                if (! intersection(to_polygons(piece), to_polygons(m_layers[l]->lslices)).empty())
+                    return false;
+        return true;
+    };
+    // Extruders (1-based) whose part bottoms were dropped or filled with nothing under them.
+    std::set<unsigned int> unsupported_bottom_extruders;
     for (size_t idx = first_idx; idx < m_layers.size(); ++ idx) {
         m_print->throw_if_canceled();
         // Only layers around active combining can need work.
@@ -1730,14 +1878,24 @@ void PrintObject::apply_extruder_layer_heights()
                 }
             };
             ExPolygons dropped;
+            const Polygons  object_below = to_polygons(m_layers[idx - 1]->lslices);
+            bool            bottom_lost  = false;
             for (ExPolygon &piece : floating) {
+                // A bottom face of the model (nothing of the object below it, deferred or not).
+                const bool bottom_face = intersection(to_polygons(piece), object_below).empty();
+                if (bottom_face && support_carries(idx, piece))
+                    continue; // prints here, on the support
+                const size_t lost_before = dropped.size() + filled.size();
                 const Polygons nearby = offset(piece, anchor_dist);
                 if (! intersection(nearby, anchors).empty())
                     fill_by_covering_run(piece, nearby);
                 else if (! intersection(nearby, unprinted_now).empty())
                     // Beside or over deferred geometry, with no anchor: would extrude into thin air.
                     dropped.emplace_back(std::move(piece));
+                bottom_lost |= bottom_face && dropped.size() + filled.size() != lost_before;
             }
+            if (bottom_lost)
+                unsupported_bottom_extruders.insert(this->printing_region(region_id).extruder(frExternalPerimeter));
             if (dropped.empty() && filled.empty())
                 continue;
             ExPolygons removed = dropped;
@@ -1759,6 +1917,16 @@ void PrintObject::apply_extruder_layer_heights()
                             row->m_combined_away_exposed = diff_ex(row->m_combined_away_exposed, filled);
             }
         }
+    }
+    if (! unsupported_bottom_extruders.empty()) {
+        std::string extruders;
+        for (unsigned int extruder : unsupported_bottom_extruders)
+            extruders += (extruders.empty() ? "" : ", ") + std::to_string(extruder);
+        this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+            Slic3r::format(L("Object %1%: the bottom of a part printed by extruder %2% has no support under it, so the "
+                             "neighbouring part's thicker layer prints over it and hides its colour. Add support under "
+                             "that part to print its bottom in its own colour."),
+                           this->model_object()->name, extruders));
     }
 }
 

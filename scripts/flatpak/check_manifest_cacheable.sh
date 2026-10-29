@@ -3,7 +3,7 @@
 # module.
 #
 # Usage: check_manifest_cacheable.sh [manifest]
-#        Defaults to io.github.Snapmaker.Snapmaker_Orca.yml next to this script.
+#        Defaults to io.github.mcpijnappel.Snapmaker_Orca_Max.yml next to this script.
 #
 # Exits 0 when none are found, 1 when any are, listing them as file:line, and
 # 2 when the manifest is missing or has no orca_deps module.
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 anchor=orca_deps
-manifest=${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/io.github.Snapmaker.Snapmaker_Orca.yml}
+manifest=${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/io.github.mcpijnappel.Snapmaker_Orca_Max.yml}
 
 module_re='^  - name: '
 dir_re='(^|[-{,[:space:]])type:[[:space:]]*dir([,}[:space:]]|$)'

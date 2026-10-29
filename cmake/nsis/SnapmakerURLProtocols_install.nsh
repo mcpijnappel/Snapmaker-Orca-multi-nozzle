@@ -3,12 +3,12 @@
 ; On 64-bit Windows, 32-bit NSIS must use the 64-bit registry view so the 64-bit app sees these keys.
 SetRegView 64
 
-WriteRegStr HKLM "Software\Classes\snapmaker-orca" "" "URL:Snapmaker Orca"
-WriteRegStr HKLM "Software\Classes\snapmaker-orca" "URL Protocol" ""
-WriteRegStr HKLM "Software\Classes\snapmaker-orca\shell\open\command" "" '"$INSTDIR\snapmaker-orca.exe" "%1"'
+WriteRegStr HKLM "Software\Classes\snapmaker-orca-max" "" "URL:Snapmaker Orca Max"
+WriteRegStr HKLM "Software\Classes\snapmaker-orca-max" "URL Protocol" ""
+WriteRegStr HKLM "Software\Classes\snapmaker-orca-max\shell\open\command" "" '"$INSTDIR\snapmaker-orca-max.exe" "%1"'
 
-WriteRegStr HKLM "Software\Classes\Snapmaker_Orca" "" "URL:Snapmaker Orca"
-WriteRegStr HKLM "Software\Classes\Snapmaker_Orca" "URL Protocol" ""
-WriteRegStr HKLM "Software\Classes\Snapmaker_Orca\shell\open\command" "" '"$INSTDIR\snapmaker-orca.exe" "%1"'
+WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max" "" "URL:Snapmaker Orca Max"
+WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max" "URL Protocol" ""
+WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max\shell\open\command" "" '"$INSTDIR\snapmaker-orca-max.exe" "%1"'
 
 SetRegView 32

@@ -4,7 +4,7 @@ Unicode true
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 
-!define PRODUCT_NAME "Snapmaker Orca"
+!define PRODUCT_NAME "Snapmaker Orca Max"
 !define PRODUCT_PUBLISHER "Snapmaker"
 !define PRODUCT_WEB_SITE "https://github.com/Snapmaker/OrcaSlicer"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
@@ -24,12 +24,12 @@ Unicode true
 !endif
 !define PACK_SOURCE_DIR "${SOURCE_DIR}"
 
-; 64-bit app: use PROGRAMFILES64 so default path is C:\Program Files\Snapmaker_Orca, not (x86)
-!define INSTALL_DIR_RUNTIME "$PROGRAMFILES64\Snapmaker_Orca"
+; 64-bit app: use PROGRAMFILES64 so default path is C:\Program Files\Snapmaker_Orca_Max, not (x86)
+!define INSTALL_DIR_RUNTIME "$PROGRAMFILES64\Snapmaker_Orca_Max"
 InstallDir "${INSTALL_DIR_RUNTIME}"
 
 !ifndef OUTPUT_FILE
-    !define OUTPUT_FILE "Snapmaker_Orca_Windows_Installer_V${VERSION}.exe"
+    !define OUTPUT_FILE "Snapmaker_Orca_Max_Windows_Installer_V${VERSION}.exe"
 !endif
 
 ; License page: show LICENSE.txt from repo root (same dir as this .nsi)
@@ -44,7 +44,7 @@ SetCompressor lzma
 
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
-VIAddVersionKey "Comments" "Snapmaker Orca is an open source slicer for FDM printers"
+VIAddVersionKey "Comments" "Snapmaker Orca Max is an open source slicer for FDM printers"
 VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
 VIAddVersionKey "LegalCopyright" "Copyright (C) ${PRODUCT_PUBLISHER}"
 VIAddVersionKey "FileDescription" "${PRODUCT_DISPLAY_NAME} Installer"
@@ -93,8 +93,8 @@ VIAddVersionKey "OriginalFilename" "${OUTPUT_FILE}"
 
 LangString UNINSTALL_CONFIRM_TEXT ${LANG_SIMPCHINESE} "确定要彻底卸载 ${PRODUCT_DISPLAY_NAME} 及其全部组件吗？"
 LangString UNINSTALL_CONFIRM_TEXT ${LANG_ENGLISH} "Are you sure you want to completely uninstall ${PRODUCT_DISPLAY_NAME} and all of its components?"
-LangString UNINSTALLER_MISSING_TEXT ${LANG_SIMPCHINESE} "检测到本机已安装 Snapmaker Orca，但找不到卸载程序。$\r$\n$\r$\n卸载路径：$R8$\r$\n安装目录：$INSTDIR$\r$\n$\r$\n请先手动删除旧安装目录后再运行本安装程序。"
-LangString UNINSTALLER_MISSING_TEXT ${LANG_ENGLISH} "An existing Snapmaker Orca installation was found, but the uninstaller is missing.$\r$\n$\r$\nUninstaller: $R8$\r$\nInstall dir: $INSTDIR$\r$\n$\r$\nRemove the old folder manually, then run this installer again."
+LangString UNINSTALLER_MISSING_TEXT ${LANG_SIMPCHINESE} "检测到本机已安装 Snapmaker Orca Max，但找不到卸载程序。$\r$\n$\r$\n卸载路径：$R8$\r$\n安装目录：$INSTDIR$\r$\n$\r$\n请先手动删除旧安装目录后再运行本安装程序。"
+LangString UNINSTALLER_MISSING_TEXT ${LANG_ENGLISH} "An existing Snapmaker Orca Max installation was found, but the uninstaller is missing.$\r$\n$\r$\nUninstaller: $R8$\r$\nInstall dir: $INSTDIR$\r$\n$\r$\nRemove the old folder manually, then run this installer again."
 
 Name "${PRODUCT_DISPLAY_NAME}"
 OutFile "${OUTPUT_FILE}"
@@ -114,7 +114,7 @@ Section "Main program" SecMain
     ; PACK_SOURCE_DIR = compile time only. At runtime this File extracts from embedded payload to $INSTDIR.
     File /r /x "*.pdb" /x "*.ilk" /x "*.exp" /x "*.lib" /x "*.obj" /x "*.idb" /x "*.tlog" /x "*.h" /x "*.hpp" /x "*.c" /x "*.cpp" /x "*.cxx" /x "*.cc" /x "*.vcxproj" /x "*.vcxproj.filters" /x "*.sln" /x "*.cmake" /x "*.py" /x "*.md" /x "*.vcxproj.user" /x "CMakeFiles" /x "RelWithDebInfo" /x "Debug" /x "MinSizeRel" /x ".vs" /x "vcpkg_installed" /x "*.dir" /x "include\*" /x "lib\*" "${PACK_SOURCE_DIR}\*.*"
 
-    IfFileExists "$INSTDIR\snapmaker-orca.exe" 0 extract_error
+    IfFileExists "$INSTDIR\snapmaker-orca-max.exe" 0 extract_error
     
     DetailPrint "Creating uninstaller..."
     WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -123,7 +123,7 @@ Section "Main program" SecMain
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\Uninstall.exe"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
-    WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\snapmaker-orca.exe"
+    WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\snapmaker-orca-max.exe"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${VERSION}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
@@ -134,22 +134,22 @@ Section "Main program" SecMain
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_INSTALL_KEY}" "Version" "${VERSION}"
     WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_INSTALL_KEY}" "InstallPath" "$INSTDIR"
 
-    ; URL protocols (same as macOS CFBundleURLSchemes): snapmaker-orca:// and Snapmaker_Orca://
-    DetailPrint "Registering URL protocols (snapmaker-orca, Snapmaker_Orca)..."
+    ; URL protocols (same as macOS CFBundleURLSchemes): snapmaker-orca-max:// and Snapmaker_Orca_Max://
+    DetailPrint "Registering URL protocols (snapmaker-orca-max, Snapmaker_Orca_Max)..."
     SetRegView 64
-    WriteRegStr HKLM "Software\Classes\snapmaker-orca" "" "URL:Snapmaker Orca"
-    WriteRegStr HKLM "Software\Classes\snapmaker-orca" "URL Protocol" ""
-    WriteRegStr HKLM "Software\Classes\snapmaker-orca\shell\open\command" "" '"$INSTDIR\snapmaker-orca.exe" "%1"'
-    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca" "" "URL:Snapmaker Orca"
-    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca" "URL Protocol" ""
-    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca\shell\open\command" "" '"$INSTDIR\snapmaker-orca.exe" "%1"'
+    WriteRegStr HKLM "Software\Classes\snapmaker-orca-max" "" "URL:Snapmaker Orca Max"
+    WriteRegStr HKLM "Software\Classes\snapmaker-orca-max" "URL Protocol" ""
+    WriteRegStr HKLM "Software\Classes\snapmaker-orca-max\shell\open\command" "" '"$INSTDIR\snapmaker-orca-max.exe" "%1"'
+    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max" "" "URL:Snapmaker Orca Max"
+    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max" "URL Protocol" ""
+    WriteRegStr HKLM "Software\Classes\Snapmaker_Orca_Max\shell\open\command" "" '"$INSTDIR\snapmaker-orca-max.exe" "%1"'
     SetRegView 32
 
     DetailPrint "Installation complete!"
     Goto end_section
     
     extract_error:
-        MessageBox MB_OK|MB_ICONSTOP "Installation failed: snapmaker-orca.exe was not found in the package. The installer may be corrupted."
+        MessageBox MB_OK|MB_ICONSTOP "Installation failed: snapmaker-orca-max.exe was not found in the package. The installer may be corrupted."
         Abort
     
     end_section:
@@ -158,14 +158,14 @@ SectionEnd
 Section "Desktop shortcut" SecDesktop
     DetailPrint "Creating desktop shortcut..."
     SetShellVarContext current
-    CreateShortcut "$DESKTOP\Snapmaker Orca.lnk" "$INSTDIR\snapmaker-orca.exe" "" "$INSTDIR\snapmaker-orca.exe" 0
+    CreateShortcut "$DESKTOP\Snapmaker Orca Max.lnk" "$INSTDIR\snapmaker-orca-max.exe" "" "$INSTDIR\snapmaker-orca-max.exe" 0
     SetShellVarContext all
 SectionEnd
 
 Section "Start menu shortcut" SecStartMenu
     DetailPrint "Creating start menu shortcut..."
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Snapmaker Orca.lnk" "$INSTDIR\snapmaker-orca.exe" "" "$INSTDIR\snapmaker-orca.exe" 0
+    CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Snapmaker Orca Max.lnk" "$INSTDIR\snapmaker-orca-max.exe" "" "$INSTDIR\snapmaker-orca-max.exe" 0
     CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
 SectionEnd
 
@@ -184,15 +184,15 @@ Section "Uninstall"
     DetailPrint "Uninstalling ${PRODUCT_NAME}..."
     
     DetailPrint "Checking for running processes..."
-    nsExec::ExecToLog 'taskkill /F /IM snapmaker-orca.exe /T'
+    nsExec::ExecToLog 'taskkill /F /IM snapmaker-orca-max.exe /T'
     Pop $0
-    nsExec::ExecToLog 'taskkill /F /IM Snapmaker_Orca.exe /T'
+    nsExec::ExecToLog 'taskkill /F /IM Snapmaker_Orca_Max.exe /T'
     Pop $0
     Sleep 500
     
     DetailPrint "Removing desktop shortcut..."
     SetShellVarContext current
-    Delete "$DESKTOP\Snapmaker Orca.lnk"
+    Delete "$DESKTOP\Snapmaker Orca Max.lnk"
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     SetShellVarContext all
     
@@ -206,8 +206,8 @@ Section "Uninstall"
     
     DetailPrint "Removing registry entries..."
     SetRegView 64
-    DeleteRegKey HKLM "Software\Classes\snapmaker-orca"
-    DeleteRegKey HKLM "Software\Classes\Snapmaker_Orca"
+    DeleteRegKey HKLM "Software\Classes\snapmaker-orca-max"
+    DeleteRegKey HKLM "Software\Classes\Snapmaker_Orca_Max"
     SetRegView 32
     DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
     DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_INSTALL_KEY}"
@@ -217,17 +217,17 @@ Section "Uninstall"
 SectionEnd
 
 Function LaunchApp
-    ExecShell "open" "$INSTDIR\snapmaker-orca.exe"
+    ExecShell "open" "$INSTDIR\snapmaker-orca-max.exe"
 FunctionEnd
 
-; Prevent overwriting locked DLLs when snapmaker-orca (or legacy Snapmaker_Orca.exe) is still running.
+; Prevent overwriting locked DLLs when snapmaker-orca-max (or legacy Snapmaker_Orca_Max.exe) is still running.
 Function EnsureSnapmakerNotRunning
     snapmaker_check_loop:
-        nsExec::Exec 'cmd.exe /c tasklist /FI "IMAGENAME eq snapmaker-orca.exe" 2>nul | find /i "snapmaker-orca.exe" >nul'
+        nsExec::Exec 'cmd.exe /c tasklist /FI "IMAGENAME eq snapmaker-orca-max.exe" 2>nul | find /i "snapmaker-orca-max.exe" >nul'
         Pop $0
         IntCmp $0 0 snapmaker_in_use snapmaker_try_legacy snapmaker_try_legacy
     snapmaker_try_legacy:
-        nsExec::Exec 'cmd.exe /c tasklist /FI "IMAGENAME eq Snapmaker_Orca.exe" 2>nul | find /i "Snapmaker_Orca.exe" >nul'
+        nsExec::Exec 'cmd.exe /c tasklist /FI "IMAGENAME eq Snapmaker_Orca_Max.exe" 2>nul | find /i "Snapmaker_Orca_Max.exe" >nul'
         Pop $0
         IntCmp $0 0 snapmaker_in_use snapmaker_idle snapmaker_idle
     snapmaker_in_use:
@@ -236,7 +236,7 @@ Function EnsureSnapmakerNotRunning
         SetErrorLevel 7
         Quit
     snapmaker_prompt:
-        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Snapmaker Orca is still running (snapmaker-orca.exe).$\r$\nClose the program, then click Retry, or Cancel to exit the installer." IDRETRY snapmaker_check_loop
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Snapmaker Orca Max is still running (snapmaker-orca-max.exe).$\r$\nClose the program, then click Retry, or Cancel to exit the installer." IDRETRY snapmaker_check_loop
         Abort
     snapmaker_idle:
 FunctionEnd
@@ -244,21 +244,21 @@ FunctionEnd
 ; Sets $R9 to a usable Uninstall.exe path. Aborts if an old install exists without an uninstaller.
 Function FindExistingUninstaller
     StrCpy $R9 ""
-    ReadRegStr $R8 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca" "UninstallString"
+    ReadRegStr $R8 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca_Max" "UninstallString"
     StrCmp $R8 "" 0 find_uninst_have_str
-    ReadRegStr $R8 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca" "UninstallString"
+    ReadRegStr $R8 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca_Max" "UninstallString"
     StrCmp $R8 "" 0 find_uninst_have_str
-    ReadRegStr $R8 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca" "UninstallString"
+    ReadRegStr $R8 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca Max" "UninstallString"
     StrCmp $R8 "" 0 find_uninst_have_str
-    ReadRegStr $R8 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca" "UninstallString"
+    ReadRegStr $R8 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca Max" "UninstallString"
     StrCmp $R8 "" 0 find_uninst_have_str
     IfFileExists "$INSTDIR\Uninstall.exe" 0 find_uninst_check_app
     StrCpy $R8 "$INSTDIR\Uninstall.exe"
     Goto find_uninst_have_str
     find_uninst_check_app:
-        IfFileExists "$INSTDIR\snapmaker-orca.exe" find_uninst_missing find_uninst_check_legacy
+        IfFileExists "$INSTDIR\snapmaker-orca-max.exe" find_uninst_missing find_uninst_check_legacy
     find_uninst_check_legacy:
-        IfFileExists "$INSTDIR\Snapmaker_Orca.exe" find_uninst_missing find_uninst_done
+        IfFileExists "$INSTDIR\Snapmaker_Orca_Max.exe" find_uninst_missing find_uninst_done
     find_uninst_have_str:
         StrCpy $0 $R8 1 0
         StrCmp $0 "$\"" 0 find_uninst_check_last
@@ -297,21 +297,21 @@ Function ReadInstalledVersion
 FunctionEnd
 
 Function ReadInstalledVersionFromView
-    ReadRegStr $R7 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca" "DisplayVersion"
+    ReadRegStr $R7 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca_Max" "DisplayVersion"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca" "DisplayVersion"
+    ReadRegStr $R7 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker_Orca_Max" "DisplayVersion"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca" "DisplayVersion"
+    ReadRegStr $R7 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca Max" "DisplayVersion"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca" "DisplayVersion"
+    ReadRegStr $R7 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Snapmaker Orca Max" "DisplayVersion"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKLM "Software\Snapmaker\Snapmaker_Orca" "Version"
+    ReadRegStr $R7 HKLM "Software\Snapmaker\Snapmaker_Orca_Max" "Version"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKCU "Software\Snapmaker\Snapmaker_Orca" "Version"
+    ReadRegStr $R7 HKCU "Software\Snapmaker\Snapmaker_Orca_Max" "Version"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKLM "Software\Snapmaker\Snapmaker Orca" "Version"
+    ReadRegStr $R7 HKLM "Software\Snapmaker\Snapmaker Orca Max" "Version"
     StrCmp $R7 "" 0 read_ver_view_done
-    ReadRegStr $R7 HKCU "Software\Snapmaker\Snapmaker Orca" "Version"
+    ReadRegStr $R7 HKCU "Software\Snapmaker\Snapmaker Orca Max" "Version"
     read_ver_view_done:
 FunctionEnd
 
@@ -326,12 +326,12 @@ Function .onInit
     StrCmp $R7 "" already_no_ver already_with_ver
     already_with_ver:
         MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
-        "Snapmaker Orca V$R7 is already installed.$\n$\nClick OK to uninstall the old version, or Cancel to abort." \
+        "Snapmaker Orca Max V$R7 is already installed.$\n$\nClick OK to uninstall the old version, or Cancel to abort." \
         /SD IDOK IDOK uninst
         Abort
     already_no_ver:
         MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
-        "Snapmaker Orca is already installed.$\n$\nClick OK to uninstall the old version, or Cancel to abort." \
+        "Snapmaker Orca Max is already installed.$\n$\nClick OK to uninstall the old version, or Cancel to abort." \
         /SD IDOK IDOK uninst
         Abort
 

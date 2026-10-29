@@ -796,6 +796,11 @@ LayerPlan layer_plan(const U1Plate &plate, double layer_height, double second_he
     DynamicPrintConfig config = u1_plate_config(*bundle, plate, {nvtStandard, second_head, nvtStandard, nvtStandard});
     config.set_key_value("layer_height",          new ConfigOptionFloat(layer_height));
     config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0., second_head_layer_height, 0., 0.}));
+    // The profile's tower corner (y 220) is where the plate starts; the application pulls the tower
+    // in by its estimated size, which grows by one change when the finer nozzle finishes each
+    // cycle. Place it as the plate would: clear of the cubes, inside the bed.
+    config.set_key_value("wipe_tower_x", new ConfigOptionFloats({15.}));
+    config.set_key_value("wipe_tower_y", new ConfigOptionFloats({15.}));
     Print print;
     Model model;
     init_two_head_print(print, model, config, 0.1f); // 2 mm

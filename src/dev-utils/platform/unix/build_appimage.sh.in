@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # build_appimage.sh is generated under top-level CMake binary dir (e.g. ./build)
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-APP_IMAGE="@SLIC3R_APP_KEY@_Linux_V@Snapmaker_VERSION@.AppImage"
+APP_IMAGE="@SLIC3R_APP_INSTALL_KEY@_Linux_V@Snapmaker_VERSION@.AppImage"
 
 wget ${APPIMAGETOOLURL} -O ../appimagetool.AppImage
 chmod +x ../appimagetool.AppImage
@@ -16,15 +16,15 @@ fi
 mv @SLIC3R_APP_CMD@ AppRun
 chmod +x AppRun
 
-cp resources/images/@SLIC3R_APP_KEY@_192px.png @SLIC3R_APP_KEY@.png
+cp resources/images/@SLIC3R_APP_KEY@_192px.png @SLIC3R_APP_INSTALL_KEY@.png
 mkdir -p usr/share/icons/hicolor/192x192/apps
-cp resources/images/@SLIC3R_APP_KEY@_192px.png usr/share/icons/hicolor/192x192/apps/@SLIC3R_APP_KEY@.png
+cp resources/images/@SLIC3R_APP_KEY@_192px.png usr/share/icons/hicolor/192x192/apps/@SLIC3R_APP_INSTALL_KEY@.png
 
-cat >io.github.Snapmaker.Snapmaker_Orca.desktop <<EOF
+cat >@SLIC3R_APP_INSTALL_ID@.desktop <<EOF
 [Desktop Entry]
-Name=Snapmaker Orca
+Name=@SLIC3R_APP_INSTALL_NAME@
 Exec=AppRun %F
-Icon=@SLIC3R_APP_KEY@
+Icon=@SLIC3R_APP_INSTALL_KEY@
 Type=Application
 PrefersNonDefaultGPU=true
 X-KDE-RunOnDiscreteGpu=true
@@ -33,16 +33,16 @@ MimeType=model/stl;model/3mf;application/vnd.ms-3mfdocument;application/prs.wave
 EOF
 
 mkdir -p usr/share/applications
-cp io.github.Snapmaker.Snapmaker_Orca.desktop usr/share/applications/
+cp @SLIC3R_APP_INSTALL_ID@.desktop usr/share/applications/
 
 mkdir -p usr/share/metainfo
-META_SRC="${REPO_ROOT}/scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.metainfo.xml"
+META_SRC="${REPO_ROOT}/scripts/flatpak/@SLIC3R_APP_INSTALL_ID@.metainfo.xml"
 if [[ ! -f "${META_SRC}" ]]; then
     echo "Error: missing ${META_SRC}"
     exit 1
 fi
-cp "${META_SRC}" usr/share/metainfo/io.github.Snapmaker.Snapmaker_Orca.metainfo.xml
-cp "${META_SRC}" usr/share/metainfo/io.github.Snapmaker.Snapmaker_Orca.appdata.xml
+cp "${META_SRC}" usr/share/metainfo/@SLIC3R_APP_INSTALL_ID@.metainfo.xml
+cp "${META_SRC}" usr/share/metainfo/@SLIC3R_APP_INSTALL_ID@.appdata.xml
 
 export ARCH=$(uname -m)
 

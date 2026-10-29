@@ -13,7 +13,7 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.snapmaker.snapmaker-orca</string>
+	<string>io.github.mcpijnappel.Snapmaker_Orca_Max</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLongVersionString</key>
@@ -37,8 +37,8 @@
         <string>Snapmaker Orca Downloads</string>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>snapmaker-orca</string>
-		  <string>Snapmaker_Orca</string>
+          <string>snapmaker-orca-max</string>
+		  <string>Snapmaker_Orca_Max</string>
         </array>
       </dict>
     </array>

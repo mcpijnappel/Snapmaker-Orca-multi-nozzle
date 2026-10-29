@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
-    <id>io.github.Snapmaker.Snapmaker_Orca</id>
-    <launchable type="desktop-id">io.github.Snapmaker.Snapmaker_Orca.desktop</launchable>
+    <id>io.github.mcpijnappel.Snapmaker_Orca_Max</id>
+    <launchable type="desktop-id">io.github.mcpijnappel.Snapmaker_Orca_Max.desktop</launchable>
     <provides>
-        <id>io.github.Snapmaker.Snapmaker_Orca.desktop</id>
+        <id>io.github.mcpijnappel.Snapmaker_Orca_Max.desktop</id>
     </provides>
-    <name>Snapmaker_Orca</name>
+    <name>Snapmaker Orca Max</name>
     <summary>Get even more perfect prints!</summary>
     <developer_name>Snapmaker</developer_name>
     <url type="homepage">https://github.com/Snapmaker/OrcaSlicer</url>

@@ -667,6 +667,7 @@ void ToolOrdering::sort_and_build_data(const Print& print, unsigned int first_ex
     this->resolve_mixed_filaments(print.config());
     reorder_extruders_for_minimum_flush_volume(reorder_first_layer);
     this->enforce_mixed_component_order();
+    this->plan_fine_finish_order(print.config());
     m_sorted = true;
 
     double max_layer_height = 0.;
@@ -700,6 +701,7 @@ void ToolOrdering::sort_and_build_data(const Print& print, unsigned int first_ex
         // Orca reorders a second time here (BBS has no such path); re-enforce so the
         // mixed sub-layer component order survives the extra pass.
         this->enforce_mixed_component_order();
+        this->plan_fine_finish_order(print.config());
         this->fill_wipe_tower_partitions(print.config(), object_bottom_z, raft_top_z, max_layer_height);
     }
 
@@ -714,6 +716,7 @@ void ToolOrdering::sort_and_build_data(const PrintObject& object , unsigned int 
     this->resolve_mixed_filaments(object.print()->config());
     reorder_extruders_for_minimum_flush_volume(reorder_first_layer);
     this->enforce_mixed_component_order();
+    this->plan_fine_finish_order(object.print()->config());
     m_sorted = true;
 
     double max_layer_height = calc_max_layer_height(object.print()->config(), object.config().layer_height, used_heads(m_layer_tools, object.print()->config()));
@@ -724,6 +727,7 @@ void ToolOrdering::sort_and_build_data(const PrintObject& object , unsigned int 
         // Orca reorders a second time here (BBS has no such path); re-enforce so the
         // mixed sub-layer component order survives the extra pass.
         this->enforce_mixed_component_order();
+        this->plan_fine_finish_order(object.print()->config());
         this->fill_wipe_tower_partitions(object.print()->config(), object.layers().front()->print_z - object.layers().front()->height, object.slicing_parameters().raft_layers() > 0 ? object.slicing_parameters().raft_contact_top_z : 0., max_layer_height);
     }
 
@@ -1152,6 +1156,11 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
         // What extruders are required to print this object layer?
         for (const LayerRegion *layerm : layer->regions()) {
             const PrintRegion &region = layerm->region();
+            const bool run_top = layerm->combined_layer_count() > 1 && (! layerm->perimeters.entities.empty() || ! layerm->fills.entities.empty());
+            if (run_top)
+                layer_tools.has_run_top = true;
+            // Snapmaker Orca Max: the filaments this region adds print the object (1 based, 0 = don't care).
+            const size_t region_snapshot = layer_tools.extruders.size();
 
             if (! layerm->perimeters.entities.empty()) {
                 bool something_nonoverriddable = true;
@@ -1276,6 +1285,12 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
             }
             if (has_internal_solid || has_top_solid_surface || has_bottom_surface || has_sparse_infill || has_pure_gap_fill)
                 layer_tools.has_object = true;
+            for (size_t i = region_snapshot; i < layer_tools.extruders.size(); ++ i)
+                if (layer_tools.extruders[i] > 0) {
+                    layer_tools.part_extruders.insert(layer_tools.extruders[i] - 1);
+                    if (run_top)
+                        layer_tools.run_top_extruders.insert(layer_tools.extruders[i] - 1);
+                }
         }
 
         // Record mixed slot usage for this object at this layer.
@@ -1460,18 +1475,6 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
 }
 
 
-// The chain the tower plan and the G-code emission walk: a layer starts with the tool still
-// loaded whenever it uses it (GCode::process_layer rotates the layer's extruders to it), so a
-// custom or cyclic sequence never counts a phantom initial toolchange.
-static std::vector<unsigned int> rotate_extruders_to_start_with(const std::vector<unsigned int> &extruders, unsigned int start_extruder)
-{
-    std::vector<unsigned int> rotated = extruders;
-    auto it = std::find(rotated.begin(), rotated.end(), start_extruder);
-    if (it != rotated.end())
-        std::rotate(rotated.begin(), it, rotated.end());
-    return rotated;
-}
-
 void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_t object_bottom_z, coordf_t raft_top_z, coordf_t max_layer_height)
 {
     if (m_layer_tools.empty())
@@ -1482,7 +1485,7 @@ void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_
     for (LayerTools &lt : m_layer_tools) {
         lt.wipe_tower_partitions = lt.extruders.size();
         if (! lt.extruders.empty()) {
-            const std::vector<unsigned int> chain = rotate_extruders_to_start_with(lt.extruders, (unsigned int) last_extruder);
+            const std::vector<unsigned int> chain = lt.chain_from((unsigned int) last_extruder);
             if (last_extruder == size_t(-1) || last_extruder == chain.front())
                 // The first extruder on this layer is equal to the current one, no need to do an initial tool change.
                 -- lt.wipe_tower_partitions;
@@ -1701,7 +1704,7 @@ void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_
         LayerTools& lt = m_layer_tools[i];
         if (! lt.extruders.empty()) {
             lt_last_printing = &lt;
-            loaded_tool      = rotate_extruders_to_start_with(lt.extruders, loaded_tool).back();
+            loaded_tool      = lt.chain_from(loaded_tool).back();
         }
         LayerTools& lt_next = m_layer_tools[i+1];
         if (lt.extruders.empty() || lt_next.extruders.empty()) {
@@ -3274,6 +3277,138 @@ void ToolOrdering::resolve_mixed_filaments(const PrintConfig &config)
         }
 
         prev_print_z = lt.print_z;
+    }
+}
+
+// Snapmaker Orca Max ("fine_nozzle_finishes_cycle"): on a layer where a combined run ends, the
+// filaments printing that run go before the finer filaments printing the object on that layer
+// (coarsest first, finest last), so the fine nozzle closes the cycle and lays its layer against the
+// edge the coarse bead left. Support and tower filaments are not constrained. Within the rule the
+// order with the fewest tool changes over the whole print is picked; ties keep today's
+// (flush-optimised) order. Every layer prints each of its filaments once, so only the first and the
+// last filament of a layer decide the changes: a dynamic programme over the layers, state = the
+// filament left loaded, finds the best chain.
+void ToolOrdering::plan_fine_finish_order(const PrintConfig &config)
+{
+    for (LayerTools &lt : m_layer_tools)
+        lt.pin_extruder_order = false;
+    if (! config.fine_nozzle_finishes_cycle.value || ! has_extruder_layer_heights(config) ||
+        config.toolchange_ordering != ToolChangeOrderingType::Default)
+        return;
+    // The preferred height of a zero based filament's nozzle; 0 (Default) prints the object grid,
+    // the finest height there is.
+    auto height_of = [&config](unsigned int filament) {
+        return config.extruder_layer_height.get_at(Print::width_slot(config, filament + 1));
+    };
+
+    // Per layer: the best order (fewest inversions against today's) for each (first, last) pair.
+    struct Candidate { std::vector<unsigned int> order; size_t inversions; };
+    const size_t n_layers = m_layer_tools.size();
+    std::vector<std::vector<Candidate>> candidates(n_layers);
+    bool any_constraint = false;
+    for (size_t i = 0; i < n_layers; ++ i) {
+        const LayerTools                &lt   = m_layer_tools[i];
+        const std::vector<unsigned int> &base = lt.extruders;
+        if (base.empty())
+            continue;
+        // The first layer (soluble first, user first-layer order), mixed-filament layers and single
+        // filament layers keep their order.
+        if (i == 0 || base.size() < 2 || lt.preserve_extruder_order || ! lt.mixed_sub_layer_groups.empty()) {
+            candidates[i].push_back({ base, 0 });
+            continue;
+        }
+        std::vector<std::pair<unsigned int, unsigned int>> before; // (a, b): a prints before b
+        for (unsigned int a : lt.run_top_extruders)
+            for (unsigned int b : lt.part_extruders)
+                if (a != b && height_of(a) > height_of(b) + EPSILON &&
+                    std::find(base.begin(), base.end(), a) != base.end() && std::find(base.begin(), base.end(), b) != base.end())
+                    before.emplace_back(a, b);
+        any_constraint |= ! before.empty();
+        std::map<unsigned int, size_t> base_pos;
+        for (size_t k = 0; k < base.size(); ++ k)
+            base_pos[base[k]] = k;
+        auto keep = [&](const std::vector<unsigned int> &order) {
+            std::map<unsigned int, size_t> pos;
+            for (size_t k = 0; k < order.size(); ++ k)
+                pos[order[k]] = k;
+            for (const auto &[a, b] : before)
+                if (pos[a] > pos[b])
+                    return;
+            size_t inversions = 0;
+            for (size_t x = 0; x < order.size(); ++ x)
+                for (size_t y = x + 1; y < order.size(); ++ y)
+                    if (base_pos[order[x]] > base_pos[order[y]])
+                        ++ inversions;
+            for (Candidate &c : candidates[i])
+                if (c.order.front() == order.front() && c.order.back() == order.back()) {
+                    if (inversions < c.inversions)
+                        c = { order, inversions };
+                    return;
+                }
+            candidates[i].push_back({ order, inversions });
+        };
+        if (base.size() <= 6) {
+            std::vector<unsigned int> order = base;
+            std::sort(order.begin(), order.end());
+            do keep(order); while (std::next_permutation(order.begin(), order.end()));
+        } else {
+            // Many filaments: today's order sorted so constrained filaments meet the rule, then each
+            // rotation of it that still does.
+            std::vector<unsigned int> order = base;
+            std::stable_sort(order.begin(), order.end(), [&](unsigned int a, unsigned int b) {
+                return lt.run_top_extruders.count(a) && lt.part_extruders.count(b) && height_of(a) > height_of(b) + EPSILON;
+            });
+            for (size_t r = 0; r < order.size(); ++ r) {
+                keep(order);
+                std::rotate(order.begin(), order.begin() + 1, order.end());
+            }
+        }
+        if (candidates[i].empty())
+            candidates[i].push_back({ base, 0 }); // cannot happen: the height sort always meets the rule
+    }
+    if (! any_constraint)
+        return; // nothing to finish: today's order and rotation stay
+
+    // Cost of reaching each layer's candidate: (tool changes, inversions), lexicographic.
+    using Cost = std::pair<size_t, size_t>;
+    const Cost unreachable { std::numeric_limits<size_t>::max(), 0 };
+    std::vector<std::vector<Cost>>   cost(n_layers);
+    std::vector<std::vector<size_t>> from(n_layers); // candidate index on the previous printing layer
+    size_t prev = size_t(-1);
+    for (size_t i = 0; i < n_layers; ++ i) {
+        if (candidates[i].empty())
+            continue;
+        cost[i].assign(candidates[i].size(), unreachable);
+        from[i].assign(candidates[i].size(), size_t(-1));
+        for (size_t c = 0; c < candidates[i].size(); ++ c) {
+            const Candidate &cand = candidates[i][c];
+            if (prev == size_t(-1)) {
+                cost[i][c] = { 0, cand.inversions };
+                continue;
+            }
+            for (size_t p = 0; p < candidates[prev].size(); ++ p) {
+                const Cost &before = cost[prev][p];
+                const Cost  total { before.first + (candidates[prev][p].order.back() != cand.order.front() ? 1 : 0), before.second + cand.inversions };
+                if (total < cost[i][c]) {
+                    cost[i][c] = total;
+                    from[i][c] = p;
+                }
+            }
+        }
+        prev = i;
+    }
+    if (prev == size_t(-1))
+        return;
+    size_t pick = size_t(std::min_element(cost[prev].begin(), cost[prev].end()) - cost[prev].begin());
+    for (size_t i = prev + 1; i -- > 0;) {
+        if (candidates[i].empty())
+            continue;
+        LayerTools &lt = m_layer_tools[i];
+        lt.extruders          = candidates[i][pick].order;
+        lt.pin_extruder_order = lt.extruders.size() > 1;
+        pick = from[i][pick];
+        if (pick == size_t(-1))
+            break;
     }
 }
 

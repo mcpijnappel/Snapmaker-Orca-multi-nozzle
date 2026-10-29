@@ -7318,6 +7318,32 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(false));
 
 
+    // Snapmaker Orca Max: tool order where a combined run ends (ToolOrdering::plan_fine_finish_order).
+    def = this->add("fine_nozzle_finishes_cycle", coBool);
+    def->label = L("Finer nozzle finishes each layer cycle");
+    def->category = L("Others");
+    def->tooltip = L("With preferred layer heights per extruder, a coarse extruder prints one thick layer for every few "
+                     "thin layers of a finer one. On the layer where a thick layer ends, the extruders printing the parts "
+                     "go coarsest first and finest last, so the fine nozzle closes each cycle and lays its layer against "
+                     "the edge the wider bead left. Support and prime tower extruders can go anywhere; within that rule "
+                     "the order with the fewest tool changes is used. When disabled, the extruder already loaded goes "
+                     "first, which can save a tool change on some of these layers.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    // Snapmaker Orca Max: round bottom faces onto the coarse layer steps (PrintObject::align_bottoms_to_coarse_layers).
+    def = this->add("align_bottoms_to_coarse_layers", coBool);
+    def->label = L("Align part bottoms to the thicker layers");
+    def->category = L("Others");
+    def->tooltip = L("With preferred layer heights per extruder, the object is sliced on the finest layer grid, so a part "
+                     "whose bottom lies between two thick layers of its nozzle would print its thick layers out of step "
+                     "with the other parts of that nozzle size, and cost extra tool changes. When enabled, such a bottom "
+                     "(on support or over air) is rounded up to the next thick layer, as a print with only that nozzle "
+                     "size would round it. Finer parts sharing that bottom face round with it, so the underside stays "
+                     "flush. Finer parts with a bottom of their own keep their exact height.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("wipe_tower_no_sparse_layers", coBool);
     def->label = L("No sparse layers (beta)");
     def->tooltip = L("If enabled, the wipe tower will not be printed on layers with no tool changes. "
@@ -11690,9 +11716,32 @@ int DynamicPrintConfig::update_values_from_multi_to_multi_2(const std::vector<st
 
 }
 
-void set_variant_override(ConfigOptionVectorBase &target, const ConfigOptionVectorBase &source,
-                          const std::vector<int> &variant_index, int stride, const VariantOverrideRule &rule)
+void set_variant_override(ConfigOptionVectorBase &target, const ConfigOptionVectorBase &source_in,
+                          const std::vector<int> &variant_index, int stride, const VariantOverrideRule &rule,
+                          const std::string &opt_key)
 {
+    // Snapmaker Orca Max: a line width is flow-independent. An override holding it in some flow
+    // columns only (an edit made in the object tab while the other flow column was shown) gives
+    // its value to the nil columns, so every extruder prints it whatever its flow type.
+    std::unique_ptr<ConfigOptionVectorBase> filled;
+    if (! opt_key.empty() && source_in.nullable() && source_in.size() > 1 &&
+        PerHeadProcess::flow_independent_keys().count(opt_key) > 0) {
+        int  first_set = -1;
+        bool has_nil   = false;
+        for (size_t i = 0; i < source_in.size(); ++i) {
+            if (source_in.is_nil(i))
+                has_nil = true;
+            else if (first_set < 0)
+                first_set = int(i);
+        }
+        if (has_nil && first_set >= 0) {
+            filled.reset(static_cast<ConfigOptionVectorBase *>(source_in.clone()));
+            for (size_t i = 0; i < filled->size(); ++i)
+                if (filled->is_nil(i))
+                    filled->set_at(&source_in, i, size_t(first_set));
+        }
+    }
+    const ConfigOptionVectorBase &source = filled ? *filled : source_in;
     // A single-value object or region override applies to every nozzle variant.
     std::vector<int> indices = variant_index;
     if (source.size() == 1 && !source.is_nil(0))
@@ -12825,7 +12874,7 @@ void update_static_print_config_from_dynamic(ConfigBase& config, const DynamicPr
                 else {
                     ConfigOptionVectorBase* opt_vec_src = static_cast<ConfigOptionVectorBase*>(opt_src);
                     const ConfigOptionVectorBase* opt_vec_dest = static_cast<const ConfigOptionVectorBase*>(opt_dest);
-                    set_variant_override(*opt_vec_src, *opt_vec_dest, variant_index, stride, rule);
+                    set_variant_override(*opt_vec_src, *opt_vec_dest, variant_index, stride, rule, opt);
                 }
             }
         }

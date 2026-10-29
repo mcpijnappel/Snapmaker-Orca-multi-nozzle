@@ -1,4 +1,5 @@
 #include "Process.hpp"
+#include "libslic3r/libslic3r.h" // SLIC3R_APP_INSTALL_CMD
 
 #include <libslic3r/AppConfig.hpp>
 
@@ -40,7 +41,7 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 	wxString path;
 	wxFileName::SplitPath(wxStandardPaths::Get().GetExecutablePath(), &path, nullptr, nullptr, wxPATH_NATIVE);
 	path += "\\";
-	path += (instance_type == NewSlicerInstanceType::Slicer) ? "snapmaker-orca.exe" : "bambu-gcodeviewer.exe";
+	path += (instance_type == NewSlicerInstanceType::Slicer) ? SLIC3R_APP_INSTALL_CMD ".exe" : "bambu-gcodeviewer.exe";
 	std::vector<const wchar_t*> args;
 	args.reserve(4);
 	args.emplace_back(path.wc_str());
@@ -103,7 +104,7 @@ static void start_new_slicer_or_gcodeviewer(const NewSlicerInstanceType instance
 		std::string my_path;
 		if (args.empty()) {
 			// Binary path was not set to the AppImage in the Linux specific block above, call the application directly.
-			my_path = (bin_path.parent_path() / ((instance_type == NewSlicerInstanceType::Slicer) ? "snapmaker-orca" : "bambu-gcodeviewer")).string();
+			my_path = (bin_path.parent_path() / ((instance_type == NewSlicerInstanceType::Slicer) ? SLIC3R_APP_INSTALL_CMD : "bambu-gcodeviewer")).string();
 			args.emplace_back(my_path.c_str());
 		}
 		std::string to_open;

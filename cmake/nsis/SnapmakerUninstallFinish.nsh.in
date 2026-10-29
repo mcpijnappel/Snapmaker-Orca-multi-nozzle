@@ -54,14 +54,14 @@ Var SnapmakerFinTextCtl
 
 Function un.SnapmakerUninstallFinishCreate
   StrCmp $LANGUAGE ${LANG_SIMPCHINESE} 0 SnapmakerFin_l10n_en
-  StrCpy $SnapmakerFinTitle "Snapmaker Orca V@Snapmaker_VERSION@ 已成功从本机卸载。"
+  StrCpy $SnapmakerFinTitle "Snapmaker Orca Max V@Snapmaker_VERSION@ 已成功从本机卸载。"
   StrCpy $SnapmakerFinText "点击【完成】关闭卸载程序"
   StrCpy $SnapmakerFinCheckboxText "删除个人数据"
   GetDlgItem $0 $HWNDPARENT 1
   SendMessage $0 ${WM_SETTEXT} 0 "STR:完成(&F)"
   Goto SnapmakerFin_l10n_done
 SnapmakerFin_l10n_en:
-  StrCpy $SnapmakerFinTitle "Snapmaker Orca V@Snapmaker_VERSION@ has been successfully uninstalled from this computer."
+  StrCpy $SnapmakerFinTitle "Snapmaker Orca Max V@Snapmaker_VERSION@ has been successfully uninstalled from this computer."
   StrCpy $SnapmakerFinText "Click Finish to close the uninstaller"
   StrCpy $SnapmakerFinCheckboxText "Delete personal data"
   GetDlgItem $0 $HWNDPARENT 1
@@ -195,8 +195,8 @@ FunctionEnd
 ; so upgrades never touch user data.
 Function un.SnapmakerDeleteUserData
   SetShellVarContext current
-  RMDir /r "$LOCALAPPDATA\Snapmaker_Orca"
-  RMDir /r "$APPDATA\Snapmaker_Orca"
+  RMDir /r "$LOCALAPPDATA\Snapmaker_Orca_Max"
+  RMDir /r "$APPDATA\Snapmaker_Orca_Max"
 FunctionEnd
 
 ; Called when "Delete personal data" is NOT checked: partial cleanup -- delete
@@ -205,7 +205,7 @@ FunctionEnd
 ; page leave callback -- never in silent (/S) runs, so upgrades never touch user data.
 Function un.SnapmakerDeletePartUserData
   SetShellVarContext current
-  StrCpy $R0 "$LOCALAPPDATA\Snapmaker_Orca"
+  StrCpy $R0 "$LOCALAPPDATA\Snapmaker_Orca_Max"
   IfFileExists "$R0\*.*" 0 SnapmakerDelPart_done
   FindFirst $R1 $R2 "$R0\*.*"
   StrCmp $R2 "" SnapmakerDelPart_close

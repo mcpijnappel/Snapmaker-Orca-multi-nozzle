@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=Snapmaker Orca
+Name=Snapmaker Orca Max
 GenericName=3D Printing Software
-Icon=Snapmaker_Orca
-Exec=snapmaker-orca %U
+Icon=Snapmaker_Orca_Max
+Exec=snapmaker-orca-max %U
 Terminal=false
 Type=Application
 PrefersNonDefaultGPU=true
@@ -11,4 +11,4 @@ MimeType=model/stl;model/3mf;application/vnd.ms-3mfdocument;application/prs.wave
 Categories=Graphics;3DGraphics;Engineering;
 Keywords=3D;Printing;Slicer;slice;3D;printer;convert;gcode;stl;obj;amf;SLA
 StartupNotify=false
-StartupWMClass=snapmaker-orca
+StartupWMClass=snapmaker-orca-max

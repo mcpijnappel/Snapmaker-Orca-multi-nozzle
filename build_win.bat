@@ -794,8 +794,8 @@ REM worked out the same way in either run.
 :summary
     for %%p in ("!DEP_TREE!") do set "dep_full=%%~fp"
     REM The binary only leaves the build tree when it is installed.
-    set "slicer_exe=%build_dir%\src\%build_type%\snapmaker-orca.exe"
-    if "%install_slicer%" == "ON" set "slicer_exe=%build_dir%\Snapmaker_Orca\snapmaker-orca.exe"
+    set "slicer_exe=%build_dir%\src\%build_type%\snapmaker-orca-max.exe"
+    if "%install_slicer%" == "ON" set "slicer_exe=%build_dir%\Snapmaker_Orca\snapmaker-orca-max.exe"
     for %%p in ("!slicer_exe!") do set "slicer_full=%%~fp"
     REM The 2026 generator writes Snapmaker_Orca.slnx, the releases before it
     REM Snapmaker_Orca.sln. A file already there wins, in case an older CMake

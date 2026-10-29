@@ -7,13 +7,13 @@ PRODUCTVERSION @SLIC3R_RC_VERSION@
   BLOCK "040904E4"
   {
    VALUE "CompanyName", "Snapmaker"
-   VALUE "FileDescription", "@SLIC3R_APP_NAME@"
+   VALUE "FileDescription", "@SLIC3R_APP_INSTALL_NAME@"
    VALUE "FileVersion", "@SLIC3R_BUILD_ID@"
-   VALUE "ProductName", "@SLIC3R_APP_NAME@"
+   VALUE "ProductName", "@SLIC3R_APP_INSTALL_NAME@"
    VALUE "ProductVersion", "@SLIC3R_BUILD_ID@"
-   VALUE "InternalName", "@SLIC3R_APP_NAME@"
+   VALUE "InternalName", "@SLIC3R_APP_INSTALL_NAME@"
    VALUE "LegalCopyright", "Copyright © 2024-2026 Snapmaker. All rights reserved."
-   VALUE "OriginalFilename", "Snapmaker_Orca.exe"
+   VALUE "OriginalFilename", "@SLIC3R_APP_INSTALL_CMD@.exe"
   }
  }
  BLOCK "VarFileInfo"

@@ -1415,6 +1415,8 @@ static std::vector<std::string> s_Preset_print_options{
     "enable_tower_interface_cooldown_during_tower",
     "wipe_tower_no_sparse_layers",
     "wipe_tower_sparse_layers_combination",
+    "fine_nozzle_finishes_cycle",
+    "align_bottoms_to_coarse_layers",
     "compatible_printers",
     "compatible_printers_condition",
     "inherits",

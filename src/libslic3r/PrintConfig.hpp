@@ -952,8 +952,11 @@ struct VariantOverrideRule
     std::vector<int> flow_index;
     int              flow_count { 0 };
 };
+// `opt_key` (optional) names the option: a line width override set in some flow columns only is
+// read as set in all of them (widths do not depend on the flow type).
 void set_variant_override(ConfigOptionVectorBase &target, const ConfigOptionVectorBase &source,
-                          const std::vector<int> &variant_index, int stride = 1, const VariantOverrideRule &rule = VariantOverrideRule());
+                          const std::vector<int> &variant_index, int stride = 1, const VariantOverrideRule &rule = VariantOverrideRule(),
+                          const std::string &opt_key = std::string());
 
 // Orca: lays every filament_options_with_variant option out one value per filament variant, as
 // filament_self_index maps the variants to filaments. An option holding one value per filament, or a
@@ -1756,6 +1759,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,              toolchange_cyclic_order))
     ((ConfigOptionBool,                toolchange_cyclic_first_layer))
     ((ConfigOptionBool,                wipe_tower_no_sparse_layers))
+    ((ConfigOptionBool,                fine_nozzle_finishes_cycle))
+    ((ConfigOptionBool,                align_bottoms_to_coarse_layers))
     ((ConfigOptionBool,                wipe_tower_sparse_layers_combination))
     ((ConfigOptionString,              change_filament_gcode))
     ((ConfigOptionString,              change_extrusion_role_gcode))

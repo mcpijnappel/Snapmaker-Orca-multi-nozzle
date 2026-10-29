@@ -8559,7 +8559,8 @@ LayerResult GCode::process_layer(
         gcode += "; local-z phase-b path passes end\n";
     }
 
-    if (nominal_layer_start_extruder >= 0) {
+    // A pinned order (fine_nozzle_finishes_cycle) is printed as planned, not from the loaded tool.
+    if (nominal_layer_start_extruder >= 0 && ! layer_tools.pin_extruder_order) {
         auto it = std::find(layer_extruders.begin(), layer_extruders.end(), unsigned(nominal_layer_start_extruder));
         if (it != layer_extruders.end())
             std::rotate(layer_extruders.begin(), it, layer_extruders.end());

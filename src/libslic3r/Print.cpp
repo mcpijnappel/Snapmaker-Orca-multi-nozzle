@@ -177,16 +177,6 @@ static inline int shared_local_z_extruder_for_wipe_tower(const std::vector<unsig
     return -1;
 }
 
-static std::vector<unsigned int> rotate_extruders_to_start_with(const std::vector<unsigned int> &extruders,
-                                                                unsigned int                      start_extruder)
-{
-    std::vector<unsigned int> rotated = extruders;
-    auto it = std::find(rotated.begin(), rotated.end(), start_extruder);
-    if (it != rotated.end())
-        std::rotate(rotated.begin(), it, rotated.end());
-    return rotated;
-}
-
 static std::vector<LocalZWipeTowerToolchange> collect_local_z_wipe_tower_toolchanges(
     const Print                              &print,
     const std::vector<GCode::LayerToPrint>   &layers,
@@ -784,6 +774,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             // ORCA: layer combining for thicker extruder layer heights happens at the slicing step.
             || opt_key == "extruder_layer_height"
             || opt_key == "extruder_layer_height_exact"
+            || opt_key == "align_bottoms_to_coarse_layers"
             || opt_key == "dithering_z_step_size"
             || opt_key == "dithering_local_z_mode"
             || opt_key == "dithering_local_z_whole_objects"
@@ -867,6 +858,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_extra_flow"
             || opt_key == "wipe_tower_no_sparse_layers"
+            || opt_key == "fine_nozzle_finishes_cycle"
             || opt_key == "wipe_tower_sparse_layers_combination"
             || opt_key == "flush_volumes_matrix"
             || opt_key == "prime_volume"
@@ -6002,10 +5994,10 @@ void Print::_make_wipe_tower()
                 // filament bookkeeping in sync, so the next tower layer plans the switch back.
                 if (!layer_tools.extruders.empty()) {
                     used_filament_ids.insert(layer_tools.extruders.begin(), layer_tools.extruders.end());
-                    for (unsigned int filament_id : rotate_extruders_to_start_with(layer_tools.extruders, current_filament_id))
+                    for (unsigned int filament_id : layer_tools.chain_from(current_filament_id))
                         if (auto nozzle = nozzle_group_result.get_nozzle_for_filament(filament_id, layer_idx))
                             nozzle_recorder.set_nozzle_status(nozzle->group_id, filament_id, nozzle->extruder_id);
-                    current_filament_id = rotate_extruders_to_start_with(layer_tools.extruders, current_filament_id).back();
+                    current_filament_id = layer_tools.chain_from(current_filament_id).back();
                 }
                 continue;
             }
@@ -6019,7 +6011,7 @@ void Print::_make_wipe_tower()
 
             // Mirrors GCode::process_layer, which rotates the layer's filaments to start with
             // the one currently loaded (same as the Type2 branch below).
-            const std::vector<unsigned int> layer_filaments = rotate_extruders_to_start_with(layer_tools.extruders, current_filament_id);
+            const std::vector<unsigned int> layer_filaments = layer_tools.chain_from(current_filament_id);
             for (const auto filament_id : layer_filaments) {
                 if (filament_id == current_filament_id)
                     continue;
@@ -6192,7 +6184,7 @@ void Print::_make_wipe_tower()
                     // a tower slab (fractional support-only layers): emission rotates the
                     // layer to start with the loaded tool, so the last tool is the rotated back.
                     if (!layer_tools.extruders.empty())
-                        current_extruder_id = rotate_extruders_to_start_with(layer_tools.extruders, current_extruder_id).back();
+                        current_extruder_id = layer_tools.chain_from(current_extruder_id).back();
                     continue;
                 }
                 while (layers_to_print_idx + 1 < layers_to_print.size() &&
@@ -6222,7 +6214,7 @@ void Print::_make_wipe_tower()
                 // Mirrors GCode::process_layer, which rotates the layer's extruders to start
                 // with the tool currently loaded.
                 const std::vector<unsigned int> nominal_layer_extruders =
-                    rotate_extruders_to_start_with(layer_tools.extruders, current_extruder_id);
+                    layer_tools.chain_from(current_extruder_id);
 
                 wipe_tower.plan_toolchange((float) layer_tools.print_z, (float) layer_tools.wipe_tower_layer_height, current_extruder_id,
                                            current_extruder_id, false);

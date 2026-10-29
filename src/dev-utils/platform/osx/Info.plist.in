@@ -9,11 +9,11 @@
   <key>CFBundleIconFile</key>
   <string>images/Snapmaker_Orca.icns</string>
   <key>CFBundleName</key>
-  <string>@SLIC3R_APP_KEY@</string>
+  <string>@SLIC3R_APP_INSTALL_KEY@</string>
   <key>CFBundleShortVersionString</key>
-  <string>@SLIC3R_APP_NAME@ @SLIC3R_BUILD_ID@</string>
+  <string>@SLIC3R_APP_INSTALL_NAME@ @SLIC3R_BUILD_ID@</string>
   <key>CFBundleIdentifier</key>
-  <string>com.snapmaker.snapmaker-orca</string>
+  <string>io.github.mcpijnappel.Snapmaker_Orca_Max</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundlePackageType</key>
@@ -31,9 +31,9 @@
       <string>Snapmaker Orca Open URL</string>
       <key>CFBundleURLSchemes</key>
       <array>
-        <string>Snapmaker_Orcaopen</string>
-        <string>Snapmaker_Orca</string>
-        <string>snapmaker-orca</string>
+        <string>Snapmaker_Orca_Maxopen</string>
+        <string>Snapmaker_Orca_Max</string>
+        <string>snapmaker-orca-max</string>
       </array>
     </dict>
   </array>

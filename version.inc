@@ -3,6 +3,15 @@
 
 set(SLIC3R_APP_NAME "Snapmaker Orca")
 set(SLIC3R_APP_KEY "Snapmaker_Orca")
+# Snapmaker Orca Max: the installed app - window title, settings folder, executable, installer,
+# desktop entry, URL scheme - so it installs next to Snapmaker Orca without replacing it or its
+# settings. SLIC3R_APP_NAME / SLIC3R_APP_KEY stay Snapmaker Orca for what the app writes into
+# files (G-code header, 3MF metadata) and for resource names (translations, icons).
+set(SLIC3R_APP_INSTALL_NAME "Snapmaker Orca Max")
+set(SLIC3R_APP_INSTALL_KEY "Snapmaker_Orca_Max")
+set(SLIC3R_APP_INSTALL_CMD "snapmaker-orca-max")
+# Domain-style id of the installed app (macOS bundle, D-Bus, Flatpak).
+set(SLIC3R_APP_INSTALL_ID "io.github.mcpijnappel.Snapmaker_Orca_Max")
 
 if(NOT DEFINED BBL_RELEASE_TO_PUBLIC)
 set(BBL_RELEASE_TO_PUBLIC "1")

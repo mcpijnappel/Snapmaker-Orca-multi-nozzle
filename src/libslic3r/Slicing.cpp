@@ -1352,6 +1352,27 @@ std::vector<double> available_extruder_layer_heights(const DynamicPrintConfig &c
     return available;
 }
 
+std::vector<size_t> link_same_size_layer_heights(std::vector<double> &heights, const std::vector<double> &nozzles,
+                                                 size_t extruder, double height)
+{
+    std::vector<size_t> linked;
+    heights.resize(nozzles.size(), 0.);
+    if (extruder >= nozzles.size())
+        return linked;
+    const double old_height = heights[extruder];
+    heights[extruder]       = height;
+    for (size_t j = 0; j < nozzles.size(); ++ j) {
+        if (j == extruder || std::abs(nozzles[j] - nozzles[extruder]) > EPSILON)
+            continue;
+        if (heights[j] < EPSILON || std::abs(heights[j] - old_height) < EPSILON) {
+            if (std::abs(heights[j] - height) > EPSILON)
+                linked.emplace_back(j);
+            heights[j] = height;
+        }
+    }
+    return linked;
+}
+
 bool other_extruder_has_layer_height(const DynamicPrintConfig &config, size_t extruder)
 {
     const std::vector<double> heights = floats_of(config, "extruder_layer_height");

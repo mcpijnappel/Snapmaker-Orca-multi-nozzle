@@ -404,7 +404,7 @@ bool is_associate_files(std::wstring extend)
     wchar_t app_path[MAX_PATH];
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
-    std::wstring prog_id             = L" Orca.Slicer.1";
+    std::wstring prog_id             = L"SnapmakerOrcaMax.Slicer.1"; // as in GUI_App::associate_files
     std::wstring reg_base            = L"Software\\Classes";
     std::wstring reg_extension       = reg_base + L"\\." + extend;
 
@@ -650,7 +650,7 @@ private:
 
         void init()
         {
-            title    = "Snapmaker Orca";
+            title    = SLIC3R_APP_INSTALL_NAME;
             version  = std::string("V") + Snapmaker_VERSION;
             betaText = _L("Beta version");
 
@@ -661,6 +661,47 @@ private:
     };
     ConstantText m_constant_text;
 };
+
+// Snapmaker Orca Max: on the first start (no settings folder yet), copy Snapmaker Orca's settings
+// folder once: its sibling (same parent, Snapmaker Orca's key as name), else on Linux the native
+// or the Flatpak folder of Snapmaker Orca. Snapmaker Orca's folder is only read; the cache, logs
+// and lock files are left out. Returns the folder copied from, empty when nothing was copied.
+static boost::filesystem::path copy_settings_from_snapmaker_orca(const boost::filesystem::path &data_dir_path)
+{
+    namespace fs = boost::filesystem;
+    if (fs::exists(data_dir_path))
+        return {};
+    std::vector<fs::path> candidates { data_dir_path.parent_path() / SLIC3R_APP_KEY };
+#ifdef __linux__
+    const fs::path home = wxFileName::GetHomeDir().ToUTF8().data();
+    candidates.emplace_back(home / ".config" / SLIC3R_APP_KEY);
+    candidates.emplace_back(home / ".var" / "app" / "io.github.Snapmaker.Snapmaker_Orca" / "config" / SLIC3R_APP_KEY);
+#endif
+    for (const fs::path &source : candidates) {
+        boost::system::error_code ec;
+        if (source == data_dir_path || ! fs::is_directory(source, ec))
+            continue;
+        try {
+            fs::create_directories(data_dir_path);
+            auto skip_file = [](const std::string name) { return boost::ends_with(name, ".lock"); };
+            for (const fs::directory_entry &entry : fs::directory_iterator(source)) {
+                const std::string name = entry.path().filename().string();
+                if (name == "cache" || name == "log" || skip_file(name))
+                    continue;
+                if (fs::is_directory(entry.path()))
+                    copy_directory_recursively(entry.path(), data_dir_path / name, skip_file);
+                else
+                    fs::copy_file(entry.path(), data_dir_path / name);
+            }
+            std::cerr << "Copied the Snapmaker Orca settings from " << source << " to " << data_dir_path << std::endl;
+            return source;
+        } catch (const std::exception &ex) {
+            std::cerr << "Copying the Snapmaker Orca settings from " << source << " failed: " << ex.what() << std::endl;
+            return {};
+        }
+    }
+    return {};
+}
 
 #ifdef __linux__
 static void migrate_flatpak_legacy_datadir(const boost::filesystem::path &data_dir_path)
@@ -2865,7 +2906,8 @@ void GUI_App::init_webview_runtime()
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-    SetAppName(SLIC3R_APP_KEY);
+    // Snapmaker Orca Max: the app name sets the settings folder, apart from Snapmaker Orca's.
+    SetAppName(SLIC3R_APP_INSTALL_KEY);
 //	SetAppName(SLIC3R_APP_KEY "-alpha");
 //  SetAppName(SLIC3R_APP_KEY "-beta");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -2908,6 +2950,7 @@ void GUI_App::init_app_config()
                 migrate_flatpak_legacy_datadir(data_dir_path);
                 set_data_dir(data_dir_path.string());
             #endif
+            m_settings_copied_from = copy_settings_from_snapmaker_orca(data_dir_path).string();
             if (!boost::filesystem::exists(data_dir_path)){
                 boost::filesystem::create_directory(data_dir_path);
             }
@@ -2971,6 +3014,13 @@ void GUI_App::init_app_config()
             app_config->set("associate_step", "true");
         }
 #endif // _WIN32
+    }
+    if (! m_settings_copied_from.empty()) {
+        // Copied from Snapmaker Orca: its file associations stay Snapmaker Orca's until they are
+        // switched on here in the preferences.
+        for (const char *key : { "associate_3mf", "associate_stl", "associate_step", "associate_gcode" })
+            app_config->set(key, "false");
+        BOOST_LOG_TRIVIAL(info) << "Settings copied from Snapmaker Orca: " << m_settings_copied_from;
     }
     MixedFilamentManager::set_auto_generate_enabled(app_config->get_bool("auto_generate_gradients"));
     // Speed Dial opens on a bare Space from any page by default. Seed the flag so Preferences and the
@@ -3651,8 +3701,9 @@ bool GUI_App::on_init_inner()
             associate_files(L"step");
             associate_files(L"stp");
         }
-        associate_url(L"Snapmaker_Orca");
-        associate_url(L"snapmaker-orca");
+        // Snapmaker Orca Max: its own URL schemes, so Snapmaker Orca keeps snapmaker-orca://.
+        associate_url(L"" SLIC3R_APP_INSTALL_KEY);
+        associate_url(L"" SLIC3R_APP_INSTALL_CMD);
 
         if (app_config->get("associate_gcode") == "true")
             associate_files(L"gcode");
@@ -4051,6 +4102,12 @@ bool GUI_App::on_init_inner()
     }
 
     do_notify_flutter_web_copy_failure();
+
+    if (! m_settings_copied_from.empty() && notification_manager() != nullptr)
+        notification_manager()->push_notification(NotificationType::CustomNotification,
+            NotificationManager::NotificationLevel::RegularNotificationLevel,
+            GUI::format(_u8L("Your Snapmaker Orca settings were copied once from %1%. From now on %2% keeps its own settings."),
+                        m_settings_copied_from, SLIC3R_APP_INSTALL_NAME));
 
     // WebSocket debug server: only when Preferences → "Web Debug Mode" (websocket_debug) is on.
     // When off, explicitly stop the debug server so port 8766 is not left listening.
@@ -7058,6 +7115,12 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
 
 void GUI_App::request_version_from_config(bool show_tips, int by_user)
 {
+    // Snapmaker Orca Max: Snapmaker's update channel offers Snapmaker Orca, not this app, so the
+    // update check is off. Asked for from the menu, say so.
+    if (by_user && mainframe != nullptr)
+        MessageDialog(mainframe, wxString::Format(_L("%s does not check for updates."), SLIC3R_APP_INSTALL_NAME),
+                      wxString(SLIC3R_APP_INSTALL_NAME), wxOK | wxICON_INFORMATION).ShowModal();
+    return;
     std::string url = app_config->get_config_api_url();
 
     json req;
@@ -9653,8 +9716,8 @@ void GUI_App::open_preferences(PreferencesTab tab, const std::string& highlight_
                     associate_files(L"step");
                     associate_files(L"stp");
                 }
-                associate_url(L"Snapmaker_Orca");
-                associate_url(L"snapmaker-orca");
+                associate_url(L"" SLIC3R_APP_INSTALL_KEY);
+                associate_url(L"" SLIC3R_APP_INSTALL_CMD);
             }
             else {
                 if (app_config->get("associate_gcode") == "true")
@@ -11053,8 +11116,9 @@ void GUI_App::associate_files(std::wstring extend)
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
     std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L" Orca.Slicer.1";
-    std::wstring prog_desc = L"Snapmaker_Orca";
+    // Snapmaker Orca Max: its own ProgID, so associating files never rewrites Snapmaker Orca's.
+    std::wstring prog_id = L"SnapmakerOrcaMax.Slicer.1";
+    std::wstring prog_desc = L"" SLIC3R_APP_INSTALL_KEY;
     std::wstring prog_command = prog_path + L" \"%1\"";
     std::wstring reg_base = L"Software\\Classes";
     std::wstring reg_extension = reg_base + L"\\." + extend;
@@ -11080,8 +11144,9 @@ void GUI_App::disassociate_files(std::wstring extend)
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
     std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L" Orca.Slicer.1";
-    std::wstring prog_desc = L"Snapmaker_Orca";
+    // Snapmaker Orca Max: its own ProgID, so associating files never rewrites Snapmaker Orca's.
+    std::wstring prog_id = L"SnapmakerOrcaMax.Slicer.1";
+    std::wstring prog_desc = L"" SLIC3R_APP_INSTALL_KEY;
     std::wstring prog_command = prog_path + L" \"%1\"";
     std::wstring reg_base = L"Software\\Classes";
     std::wstring reg_extension = reg_base + L"\\." + extend;

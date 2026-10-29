@@ -2877,3 +2877,488 @@ SCENARIO("Preferred layer heights are kept as entered and planned for slicing on
         }
     }
 }
+
+// Snapmaker Orca Max: a fine part inlaid in the underside of a coarse part that prints on support
+// (a QR code in the bottom of a housing). Coarse: a 20 x 20 plate from z 0.8 to 1.8 on extruder 2
+// (0.6 mm nozzle, 0.4 mm layers = runs of two 0.2 mm rows from its bottom), with an 8 x 8 mm
+// opening from z 0.8 to 1.4 that holds the fine insert on extruder 1 (Default: the 0.2 mm grid, rows
+// at z 1.0, 1.2 and 1.4). A 4 x 4 mm leg on extruder 1 under one corner keeps the object on the bed.
+// `lift` raises the plate and the insert (the leg grows with them); `fine_pad` adds a 5 x 5 mm fine
+// part of the insert's height 6 mm beside the plate, on support and touching nothing.
+static TriangleMesh test_box(float x0, float y0, float z0, float dx, float dy, float dz)
+{
+    TriangleMesh m = mesh(TestMesh::cube_20x20x20);
+    m.scale(Vec3f(dx / 20.f, dy / 20.f, dz / 20.f));
+    m.translate(x0, y0, z0);
+    return m;
+}
+
+static ModelObject *add_inlaid_plate(Model &model, float lift = 0.f, bool fine_pad = false)
+{
+    const float  z0  = 0.8f + lift;
+    TriangleMesh plate = test_box(0.f, 0.f, z0 + 0.6f, 20.f, 20.f, 0.4f);
+    for (const TriangleMesh &ring : { test_box(0.f, 0.f, z0, 6.f, 20.f, 0.6f), test_box(14.f, 0.f, z0, 6.f, 20.f, 0.6f),
+                                      test_box(6.f, 0.f, z0, 8.f, 6.f, 0.6f), test_box(6.f, 14.f, z0, 8.f, 6.f, 0.6f) })
+        plate.merge(ring);
+    ModelObject *object = model.add_object();
+    object->name = "inlaid_plate";
+    ModelVolume *coarse = object->add_volume(std::move(plate));
+    coarse->config.set("extruder", 2);
+    object->add_volume(test_box(6.f, 6.f, z0, 8.f, 8.f, 0.6f));   // the fine insert
+    object->add_volume(test_box(0.f, 0.f, 0.f, 4.f, 4.f, z0));     // the leg
+    if (fine_pad)
+        object->add_volume(test_box(26.f, 6.f, z0, 5.f, 5.f, 0.6f));
+    object->add_instance();
+    return object;
+}
+
+static bool object_warns(const PrintObject &po, const std::string &text)
+{
+    for (const PrintStateBase::Warning &warning : po.step_state_with_warnings(posSlice).warnings)
+        if (warning.message.find(text) != std::string::npos)
+            return true;
+    return false;
+}
+
+TEST_CASE("A fine part whose bottom rests on support prints from its own bottom", "[MultiNozzleLayerHeight][Support]")
+{
+    // Row z 1.0 is the insert's first layer; the plate's first run (rows 1.0 and 1.2) commits at 1.2.
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    const SupportType type = GENERATE(stNormalAuto, stTreeAuto);
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(type));
+    Print print;
+    Model model;
+    add_inlaid_plate(model);
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    REQUIRE(coarse_region >= 0);
+    const double insert_area = 8. * 8.;
+    CAPTURE(int(type), region_slices_area(po, fine_region, 1.0), region_slices_area(po, fine_region, 1.2));
+    CHECK(region_slices_area(po, fine_region, 1.0) > 0.9 * insert_area);   // its first layer, on the support
+    CHECK(region_slices_area(po, fine_region, 1.2) > 0.9 * insert_area);
+    CHECK_FALSE(object_warns(po, "has no support under it"));
+}
+
+TEST_CASE("A fine part bottom without support under it is printed by the neighbouring run with a warning", "[MultiNozzleLayerHeight][Support]")
+{
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    // Off, or manual support with nothing painted or placed under the insert.
+    const bool manual = GENERATE(false, true);
+    config.set_key_value("enable_support", new ConfigOptionBool(manual));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormal));
+    Print print;
+    Model model;
+    add_inlaid_plate(model);
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    CAPTURE(manual, region_slices_area(po, fine_region, 1.0), region_slices_area(po, fine_region, 1.2));
+    CHECK(region_slices_area(po, fine_region, 1.0) < 0.1);   // nothing hangs in the air
+    CHECK(region_slices_area(po, fine_region, 1.4) > 0.5 * 64.);
+    CHECK(object_warns(po, "has no support under it"));
+}
+
+TEST_CASE("A support enforcer under a fine part bottom lets it print on the support", "[MultiNozzleLayerHeight][Support]")
+{
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormal));
+    Print print;
+    Model model;
+    ModelObject *object = add_inlaid_plate(model);
+    TriangleMesh enforcer = mesh(TestMesh::cube_20x20x20);
+    enforcer.scale(Vec3f(1.f, 1.f, 0.03f));                    // z 0.5 .. 1.1, under the whole plate
+    enforcer.translate(0.f, 0.f, 0.5f);
+    object->add_volume(std::move(enforcer), ModelVolumeType::SUPPORT_ENFORCER);
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    CHECK(region_slices_area(po, fine_region, 1.0) > 0.9 * 64.);
+    CHECK_FALSE(object_warns(po, "has no support under it"));
+}
+
+TEST_CASE("The finer nozzle finishes each layer cycle without extra toolchanges per cycle", "[MultiNozzleLayerHeight][ToolOrdering]")
+{
+    // Extruder 1 prints the 0.2 mm grid, extruder 2 (0.6 mm nozzle) 0.4 mm runs: every second layer
+    // is a run top printing both.
+    auto toolchanges = [](const ToolOrdering &ordering) {
+        size_t changes = 0;
+        unsigned int loaded = (unsigned int) -1;
+        for (const LayerTools &lt : ordering.layer_tools()) {
+            if (lt.extruders.empty())
+                continue;
+            for (unsigned int extruder : lt.chain_from(loaded)) {
+                if (loaded != (unsigned int) -1 && extruder != loaded)
+                    ++ changes;
+                loaded = extruder;
+            }
+        }
+        return changes;
+    };
+    size_t changes[2] = { 0, 0 };
+    for (const bool finish : { false, true }) {
+        DynamicPrintConfig config = two_extruder_config(0.4);
+        config.set_key_value("fine_nozzle_finishes_cycle", new ConfigOptionBool(finish));
+        Print print;
+        Model model;
+        init_two_part_print(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        print.process();
+        const std::string gcode = Slic3r::Test::gcode(print);
+        REQUIRE(! gcode.empty());
+        size_t run_tops = 0, coarse_first = 0;
+        for (const LayerTools &lt : print.get_tool_ordering().layer_tools()) {
+            if (! lt.has_run_top || lt.extruders.size() < 2)
+                continue;
+            ++ run_tops;
+            if (lt.extruders.front() == 1u && lt.pin_extruder_order)
+                ++ coarse_first;
+        }
+        CAPTURE(finish, run_tops, coarse_first);
+        CHECK(run_tops > 5);
+        if (finish)
+            CHECK(coarse_first == run_tops);   // the 0.4 mm extruder first, the grid one last
+        else
+            CHECK(coarse_first == 0);
+        changes[finish ? 1 : 0] = toolchanges(print.get_tool_ordering());
+    }
+    CAPTURE(changes[0], changes[1]);
+    // Each cycle costs the same two changes; only the very top differs: the default order ends on
+    // the coarse extruder, the finishing order changes back to the fine one once more.
+    CHECK(changes[1] >= changes[0]);
+    CHECK(changes[1] <= changes[0] + 1);
+}
+
+TEST_CASE("A preferred layer height set for one nozzle size reaches the other nozzles of that size", "[MultiNozzleLayerHeight][Plan]")
+{
+    // Nozzles 0.4, 0.4, 0.4, 0.2; extruder 3 already has its own 0.24.
+    std::vector<double>       heights { 0., 0., 0.24, 0.1 };
+    const std::vector<double> nozzles { 0.4, 0.4, 0.4, 0.2 };
+    const std::vector<size_t> linked = link_same_size_layer_heights(heights, nozzles, 0, 0.2);
+    CHECK(heights[0] == Catch::Approx(0.2));
+    CHECK(heights[1] == Catch::Approx(0.2));    // was Default: follows
+    CHECK(heights[2] == Catch::Approx(0.24));   // its own value stays
+    CHECK(heights[3] == Catch::Approx(0.1));    // another nozzle size stays
+    CHECK(linked == std::vector<size_t>{ 1 });
+    // Changing extruder 1 again moves extruder 2, which still has the old shared value.
+    link_same_size_layer_heights(heights, nozzles, 0, 0.16);
+    CHECK(heights[1] == Catch::Approx(0.16));
+    CHECK(heights[2] == Catch::Approx(0.24));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Snapmaker Orca Max: same-size parts in step (bottoms rounded onto the coarse ladder) and the
+// constrained "finer nozzle finishes" order.
+// ---------------------------------------------------------------------------------------------
+
+// Layer indices where `region` commits a combined run.
+static std::vector<size_t> run_top_rows(const PrintObject &po, int region)
+{
+    std::vector<size_t> rows;
+    for (size_t idx = 0; idx < po.layer_count(); ++ idx) {
+        const Layer *layer = po.get_layer(int(idx));
+        if (region < int(layer->region_count()) && layer->get_region(region)->combined_layer_count() > 1)
+            rows.push_back(idx);
+    }
+    return rows;
+}
+
+// Every run top of a pitch-`pitch` region sits on the shared ladder (run tops at
+// first_combined_layer_idx - 1 + n * pitch).
+static bool on_ladder(const std::vector<size_t> &rows, size_t pitch)
+{
+    for (size_t row : rows)
+        if ((row - PrintObject::first_combined_layer_idx) % pitch != pitch - 1)
+            return false;
+    return true;
+}
+
+static int region_of_filament(const PrintObject &po, int filament_1based)
+{
+    for (size_t i = 0; i < po.num_printing_regions(); ++ i)
+        if (po.printing_region(i).config().outer_wall_filament_id.value == filament_1based)
+            return int(i);
+    return -1;
+}
+
+// Tool changes of the whole chain, walked as GCode::process_layer does.
+static size_t count_toolchanges(const ToolOrdering &ordering)
+{
+    size_t       changes = 0;
+    unsigned int loaded  = (unsigned int) -1;
+    for (const LayerTools &lt : ordering.layer_tools()) {
+        if (lt.extruders.empty())
+            continue;
+        for (unsigned int extruder : lt.chain_from(loaded)) {
+            if (loaded != (unsigned int) -1 && extruder != loaded)
+                ++ changes;
+            loaded = extruder;
+        }
+    }
+    return changes;
+}
+
+// Layers whose printed order breaks the rule: a filament printing a run that ends there comes after a
+// finer filament printing the object there.
+static size_t finish_rule_breaks(const Print &print)
+{
+    const PrintConfig &config = print.config();
+    auto height_of = [&config](unsigned int f) { return config.extruder_layer_height.get_at(Print::width_slot(config, f + 1)); };
+    size_t       breaks = 0;
+    unsigned int loaded = (unsigned int) -1;
+    for (const LayerTools &lt : print.get_tool_ordering().layer_tools()) {
+        if (lt.extruders.empty())
+            continue;
+        const std::vector<unsigned int> chain = lt.chain_from(loaded);
+        loaded = chain.back();
+        auto pos = [&chain](unsigned int f) { return size_t(std::find(chain.begin(), chain.end(), f) - chain.begin()); };
+        bool broken = false;
+        for (unsigned int a : lt.run_top_extruders)
+            for (unsigned int b : lt.part_extruders)
+                if (a != b && height_of(a) > height_of(b) + EPSILON && pos(a) < chain.size() && pos(b) < chain.size() && pos(a) > pos(b))
+                    broken = true;
+        breaks += broken;
+    }
+    return breaks;
+}
+
+// Grows every per-filament vector of `config` to `n` filaments by repeating its last value.
+static void grow_filaments(DynamicPrintConfig &config, size_t n)
+{
+    for (const char *key : { "filament_diameter", "filament_colour", "filament_type", "default_filament_colour", "nozzle_temperature",
+                             "nozzle_temperature_range_low", "nozzle_temperature_range_high", "flush_multiplier" }) {
+        ConfigOption *opt = config.option(key);
+        if (auto *vec = dynamic_cast<ConfigOptionVectorBase *>(opt); vec != nullptr && vec->size() < n)
+            vec->resize(n, vec);
+    }
+    config.set_key_value("filament_colour", new ConfigOptionStrings({ "#FF0000", "#00FF00", "#0000FF" }));
+    config.set_key_value("default_filament_colour", new ConfigOptionStrings({ "#FF0000", "#00FF00", "#0000FF" }));
+    config.set_key_value("flush_volumes_matrix", new ConfigOptionFloats(std::vector<double>(n * n * n, 0.)));
+}
+
+TEST_CASE("A coarse part bottom between thick layers rounds up with the fine part sharing its face", "[MultiNozzleLayerHeight][Support][Align]")
+{
+    // The inlaid plate lifted 0.2 mm: its bottom (z 1.0, first row 1.2) lies between two rungs of the
+    // plate's 0.4 mm ladder (run tops at rows 0.8, 1.2, 1.6). A fine pad of its own beside it.
+    const bool align = GENERATE(true, false);
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormalAuto));
+    config.set_key_value("align_bottoms_to_coarse_layers", new ConfigOptionBool(align));
+    Print print;
+    Model model;
+    add_inlaid_plate(model, 0.2f, true);
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    REQUIRE(coarse_region >= 0);
+    const double insert = 8. * 8., pad = 5. * 5.;
+    CAPTURE(align, region_slices_area(po, fine_region, 1.2), region_slices_area(po, fine_region, 1.4), region_slices_area(po, coarse_region, 1.2));
+    if (align) {
+        // Insert and plate start one row up, together; the pad of its own keeps its exact bottom.
+        CHECK(region_slices_area(po, fine_region, 1.2) > 0.9 * pad);
+        CHECK(region_slices_area(po, fine_region, 1.2) < 1.1 * pad);
+    } else {
+        CHECK(region_slices_area(po, fine_region, 1.2) > 0.9 * (insert + pad));
+    }
+    CHECK(region_slices_area(po, fine_region, 1.4) > 0.9 * (insert + pad));
+    // Either way the plate's runs end on the shared ladder, in step with a part standing on the bed
+    // (unaligned: one thin row brings it back).
+    const std::vector<size_t> tops = run_top_rows(po, coarse_region);
+    REQUIRE(! tops.empty());
+    CHECK(on_ladder(tops, 2));
+    CHECK_FALSE(object_warns(po, "has no support under it"));
+}
+
+TEST_CASE("The finishing order leaves support filaments free and changes tools as little as the rule allows", "[MultiNozzleLayerHeight][ToolOrdering]")
+{
+    // Filament 1 fine (0.4 mm nozzle on the 0.2 mm grid), filament 2 coarse (0.6 mm nozzle, 0.4 mm
+    // runs), filament 3 the support, also on a 0.6 mm nozzle preferring 0.4 mm.
+    size_t changes[2] = { 0, 0 }, breaks_off = 0;
+    for (const bool finish : { false, true }) {
+        DynamicPrintConfig config = two_extruder_config(0.4);
+        grow_filaments(config, 3);
+        config.set_key_value("nozzle_diameter", new ConfigOptionFloats({ 0.4, 0.6, 0.6 }));
+        config.set_key_value("extruder_layer_height", new ConfigOptionFloats({ 0., 0.4, 0.4 }));
+        config.set_key_value("min_layer_height", new ConfigOptionFloats({ 0.07, 0.07, 0.07 }));
+        config.set_key_value("max_layer_height", new ConfigOptionFloats({ 0.3, 0.45, 0.45 }));
+        config.set_key_value("enable_support", new ConfigOptionBool(true));
+        config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormalAuto));
+        config.set_key_value("support_filament", new ConfigOptionInt(3));
+        config.set_key_value("support_interface_filament", new ConfigOptionInt(3));
+        config.set_key_value("fine_nozzle_finishes_cycle", new ConfigOptionBool(finish));
+        Print print;
+        Model model;
+        add_inlaid_plate(model, 0.2f, true);
+        place_and_apply(print, model, config);
+        {
+            const StringObjectException err = print.validate();
+            INFO(err.string);
+            REQUIRE(err.string.empty());
+        }
+        print.process();
+        REQUIRE(! Slic3r::Test::gcode(print).empty());
+        const size_t breaks = finish_rule_breaks(print);
+        changes[finish ? 1 : 0] = count_toolchanges(print.get_tool_ordering());
+        CAPTURE(finish, breaks);
+        if (finish)
+            CHECK(breaks == 0);
+        else
+            breaks_off = breaks;
+    }
+    CAPTURE(changes[0], changes[1], breaks_off);
+    // Each layer the default order breaks costs at most two changes to put right: back to the fine
+    // filament on that layer, and to the coarse one again on the next.
+    CHECK(changes[1] <= changes[0] + 2 * breaks_off);
+}
+
+// Three nozzle sizes on a 0.1 mm grid: 0.2 mm nozzle at 0.1 mm (filament 1), 0.4 mm at 0.2 mm
+// (filament 2), 0.6 mm at 0.3 mm (filament 3, also the support).
+static DynamicPrintConfig three_size_config()
+{
+    DynamicPrintConfig config = two_extruder_config(0.2);
+    grow_filaments(config, 3);
+    config.set_key_value("layer_height", new ConfigOptionFloat(0.1));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("nozzle_diameter", new ConfigOptionFloats({ 0.2, 0.4, 0.6 }));
+    config.set_key_value("extruder_layer_height", new ConfigOptionFloats({ 0.1, 0.2, 0.3 }));
+    config.set_key_value("min_layer_height", new ConfigOptionFloats({ 0.04, 0.08, 0.12 }));
+    config.set_key_value("max_layer_height", new ConfigOptionFloats({ 0.14, 0.3, 0.45 }));
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormalAuto));
+    config.set_key_value("support_filament", new ConfigOptionInt(3));
+    config.set_key_value("support_interface_filament", new ConfigOptionInt(3));
+    return config;
+}
+
+TEST_CASE("Three nozzle sizes keep their ladders, round a shared bottom and finish coarsest to finest", "[MultiNozzleLayerHeight][Support][Align][ToolOrdering]")
+{
+    // A plate on the 0.6 mm nozzle from z 1.0 to 2.0 with an 8 x 8 mm insert on the 0.2 mm nozzle
+    // (z 1.0 to 1.6), both over support; a 4 x 4 mm column on the 0.4 mm nozzle beside them stands
+    // on the bed. Rows: z = 0.2 + 0.1 * index; the plate's first row (z 1.1, index 9) is off its
+    // 0.3 mm ladder (run bottoms at indices 1, 4, 7, 10), so plate and insert start at z 1.2.
+    Print print;
+    Model model;
+    {
+        TriangleMesh plate = test_box(0.f, 0.f, 1.6f, 20.f, 20.f, 0.4f);
+        for (const TriangleMesh &ring : { test_box(0.f, 0.f, 1.f, 6.f, 20.f, 0.6f), test_box(14.f, 0.f, 1.f, 6.f, 20.f, 0.6f),
+                                          test_box(6.f, 0.f, 1.f, 8.f, 6.f, 0.6f), test_box(6.f, 14.f, 1.f, 8.f, 6.f, 0.6f) })
+            plate.merge(ring);
+        ModelObject *object = model.add_object();
+        object->name = "three_sizes";
+        object->add_volume(std::move(plate))->config.set("extruder", 3);
+        object->add_volume(test_box(6.f, 6.f, 1.f, 8.f, 8.f, 0.6f))->config.set("extruder", 1);
+        object->add_volume(test_box(25.f, 8.f, 0.f, 4.f, 4.f, 2.f))->config.set("extruder", 2);
+        object->add_instance();
+    }
+    place_and_apply(print, model, three_size_config());
+    {
+        const StringObjectException err = print.validate();
+        INFO(err.string);
+        REQUIRE(err.string.empty());
+    }
+    print.process();
+    REQUIRE(! Slic3r::Test::gcode(print).empty());
+    const PrintObject &po = *print.objects().front();
+    const int fine = region_of_filament(po, 1), mid = region_of_filament(po, 2), coarse = region_of_filament(po, 3);
+    REQUIRE(fine >= 0);
+    REQUIRE(mid >= 0);
+    REQUIRE(coarse >= 0);
+
+    CAPTURE(region_slices_area(po, fine, 1.1), region_slices_area(po, fine, 1.2));
+    CHECK(region_slices_area(po, fine, 1.1) < 1.);          // rounded with the plate
+    CHECK(region_slices_area(po, fine, 1.2) > 0.9 * 64.);   // its first row, on the support
+    CHECK_FALSE(object_warns(po, "has no support under it"));
+    CHECK(on_ladder(run_top_rows(po, mid), 2));
+    CHECK(on_ladder(run_top_rows(po, coarse), 3));
+
+    CHECK(finish_rule_breaks(print) == 0);
+    // Index 12 (z 1.4) ends a 0.3 and a 0.2 run while the insert prints: 0.6, then 0.4, then 0.2.
+    bool checked = false;
+    unsigned int loaded = (unsigned int) -1;
+    for (const LayerTools &lt : print.get_tool_ordering().layer_tools()) {
+        if (lt.extruders.empty())
+            continue;
+        const std::vector<unsigned int> chain = lt.chain_from(loaded);
+        loaded = chain.back();
+        if (std::abs(lt.print_z - 1.4) > EPSILON)
+            continue;
+        auto pos = [&chain](unsigned int f) { return size_t(std::find(chain.begin(), chain.end(), f) - chain.begin()); };
+        CAPTURE(chain);
+        REQUIRE(pos(0) < chain.size());
+        REQUIRE(pos(1) < chain.size());
+        REQUIRE(pos(2) < chain.size());
+        CHECK(pos(2) < pos(1));
+        CHECK(pos(1) < pos(0));
+        checked = true;
+    }
+    CHECK(checked);
+}
+
+TEST_CASE("A 0.4 mm part sharing a bottom with a 0.6 mm part rounds to the coarser ladder and steps back onto its own", "[MultiNozzleLayerHeight][Support][Align]")
+{
+    // Filament 1: 0.4 mm nozzle at 0.2 mm; filament 2: 0.6 mm nozzle at 0.3 mm, also the support;
+    // 0.1 mm grid. The inlaid plate lifted 0.1 mm: bottom z 0.9, first row z 1.0 (index 8), two rows
+    // off the 0.3 mm ladder: plate and insert start at index 10 (z 1.2).
+    DynamicPrintConfig config = two_extruder_config(0.3);
+    config.set_key_value("layer_height", new ConfigOptionFloat(0.1));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("extruder_layer_height", new ConfigOptionFloats({ 0.2, 0.3 }));
+    config.set_key_value("min_layer_height", new ConfigOptionFloats({ 0.08, 0.1 }));
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormalAuto));
+    config.set_key_value("support_filament", new ConfigOptionInt(2));
+    config.set_key_value("support_interface_filament", new ConfigOptionInt(2));
+    Print print;
+    Model model;
+    add_inlaid_plate(model, 0.1f);
+    place_and_apply(print, model, config);
+    {
+        const StringObjectException err = print.validate();
+        INFO(err.string);
+        REQUIRE(err.string.empty());
+    }
+    print.process();
+    REQUIRE(! Slic3r::Test::gcode(print).empty());
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    REQUIRE(coarse_region >= 0);
+    CAPTURE(region_slices_area(po, fine_region, 1.0), region_slices_area(po, fine_region, 1.1), region_slices_area(po, fine_region, 1.2));
+    // The leg (filament 1, 4 x 4 mm) ends below; the insert starts with the plate.
+    CHECK(region_slices_area(po, fine_region, 1.1) < 1.);
+    CHECK(region_slices_area(po, fine_region, 1.2) + region_slices_area(po, fine_region, 1.3) > 0.9 * 64.);
+    // Up to the insert's top (index 13, z 1.5): above it the plate's colour guard and its top cap may
+    // end runs off the ladder, as everywhere.
+    auto below_insert_top = [](std::vector<size_t> rows) {
+        rows.erase(std::remove_if(rows.begin(), rows.end(), [](size_t row) { return row >= 13; }), rows.end());
+        return rows;
+    };
+    const std::vector<size_t> coarse_tops = below_insert_top(run_top_rows(po, coarse_region));
+    const std::vector<size_t> fine_tops   = below_insert_top(run_top_rows(po, fine_region));
+    CHECK(std::find(coarse_tops.begin(), coarse_tops.end(), 12u) != coarse_tops.end());
+    CHECK(std::find(fine_tops.begin(), fine_tops.end(), 12u) != fine_tops.end());
+    CHECK(on_ladder(coarse_tops, 3));
+    CHECK(on_ladder(fine_tops, 2));
+    CHECK(finish_rule_breaks(print) == 0);
+    CHECK_FALSE(object_warns(po, "has no support under it"));
+}

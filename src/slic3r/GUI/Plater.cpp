@@ -11524,8 +11524,17 @@ static bool store_preferred_layer_height(size_t extruder_idx, double height)
     heights.resize(nd_opt->values.size(), 0.);
     if (std::abs(heights[extruder_idx] - height) < 1e-6)
         return false;
-    heights[extruder_idx] = height;
+    // Snapmaker Orca Max: nozzles of one size share the preferred height unless one has its own.
+    const std::vector<size_t> linked = link_same_size_layer_heights(heights, nd_opt->values, extruder_idx, height);
     new_conf.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
+    if (! linked.empty()) {
+        std::string names;
+        for (size_t j : linked)
+            names += (names.empty() ? "" : ", ") + std::to_string(j + 1);
+        if (NotificationManager *notifications = wxGetApp().plater()->get_notification_manager(); notifications != nullptr)
+            notifications->push_notification(NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel,
+                GUI::format(_u8L("Also set for extruder(s) %1%, which have the same %2% mm nozzle."), names, nd_opt->values[extruder_idx]));
+    }
     // As with the diameter combo: marks the printer preset modified and propagates the change
     // without switching presets; the sidebar fields and hints are refilled from there.
     printer_tab->load_config(new_conf);
@@ -22102,7 +22111,7 @@ void Plater::priv::set_project_name(const wxString& project_name)
     if (!m_project_name.IsEmpty())
         wxGetApp().mainframe->update_title_colour_after_set_title();
 #else
-    wxGetApp().mainframe->SetTitle(m_project_name + " - Snapmaker Orca");
+    wxGetApp().mainframe->SetTitle(m_project_name + " - " SLIC3R_APP_INSTALL_NAME);
     wxGetApp().mainframe->topbar()->SetTitle(m_project_name);
 #endif
 }
@@ -22122,7 +22131,7 @@ void Plater::priv::update_title_dirty_status()
     wxGetApp().mainframe->SetTitle(title);
     wxGetApp().mainframe->update_title_colour_after_set_title();
 #else
-    wxGetApp().mainframe->SetTitle(title + " - Snapmaker Orca");
+    wxGetApp().mainframe->SetTitle(title + " - " SLIC3R_APP_INSTALL_NAME);
     wxGetApp().mainframe->topbar()->SetTitle(title);
 #endif    
 }

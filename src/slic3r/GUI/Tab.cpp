@@ -3588,6 +3588,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("top_surface_filament_id", "multimaterial_settings_filament_for_features#top-surface");
         optgroup->append_single_option_line("bottom_surface_filament_id", "multimaterial_settings_filament_for_features#bottom-surface");
         optgroup->append_single_option_line("wipe_tower_filament", "multimaterial_settings_filament_for_features#wipe-tower");
+        optgroup->append_single_option_line("fine_nozzle_finishes_cycle");
+        optgroup->append_single_option_line("align_bottoms_to_coarse_layers");
 
         optgroup = page->new_optgroup(L("Ooze prevention"), L"param_ooze_prevention");
         optgroup->append_single_option_line("ooze_prevention", "multimaterial_settings_ooze_prevention");
@@ -5147,6 +5149,18 @@ void TabPrintModel::on_value_change(const std::string& opt_id, const boost::any&
     // Snapmaker Orca: an object, part or layer range override holds one value per flow type, as wide
     // as the preset's shared columns (PerHeadProcess::shared_width); values set per tool head never widen it.
     const size_t override_width = tab_opt == nullptr ? 1 : std::max<size_t>(1, PerHeadProcess::shared_width(*m_config));
+    // Snapmaker Orca Max: a line width does not depend on the flow type, so an edit or a reset of
+    // one flow column applies to every column of the override.
+    const bool flow_independent = PerHeadProcess::flow_independent_keys().count(opt_key) > 0;
+    auto columns_of = [&](int index) {
+        std::vector<int> columns;
+        if (flow_independent)
+            for (size_t i = 0; i < override_width; ++i)
+                columns.emplace_back(int(i));
+        else
+            columns.emplace_back(index);
+        return columns;
+    };
     static std::map<ConfigOptionType, ConfigOptionVectorBase const *> null_vecs {
         {coBools, new ConfigOptionBoolsNullable(std::initializer_list<unsigned char>{ConfigOptionBoolsNullable::nil_value()})},
         {coInts, new ConfigOptionIntsNullable(1, ConfigOptionIntsNullable::nil_value())},
@@ -5164,7 +5178,8 @@ void TabPrintModel::on_value_change(const std::string& opt_id, const boost::any&
                 if (opt) {
                     auto opt2 = opt->clone();
                     dynamic_cast<ConfigOptionVectorBase *>(opt2)->resize(override_width);
-                    dynamic_cast<ConfigOptionVectorBase *>(opt2)->set_at(null_vecs[tab_opt->type()], opt_index, 0);
+                    for (int column : columns_of(opt_index))
+                        dynamic_cast<ConfigOptionVectorBase *>(opt2)->set_at(null_vecs[tab_opt->type()], column, 0);
                     if (opt2->is_nil()) {
                         delete opt2;
                         config.second->erase(opt_key);
@@ -5184,7 +5199,8 @@ void TabPrintModel::on_value_change(const std::string& opt_id, const boost::any&
                 auto opt = config.second->option(opt_key);
                 auto opt2 = opt ? opt->clone() : null_vecs[tab_opt->type()]->clone();
                 dynamic_cast<ConfigOptionVectorBase *>(opt2)->resize(override_width);
-                dynamic_cast<ConfigOptionVectorBase *>(opt2)->set_at(tab_opt, opt_index, opt_index);
+                for (int column : columns_of(opt_index))
+                    dynamic_cast<ConfigOptionVectorBase *>(opt2)->set_at(tab_opt, column, opt_index);
                 config.second->set_key_value(opt_key, opt2);
             }
         }

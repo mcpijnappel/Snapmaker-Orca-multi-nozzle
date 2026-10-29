@@ -285,7 +285,8 @@ extern bool is_safe_to_open_file_name(const std::string &file_name);
 // Orca: custom protocal support utils
 inline bool is_orca_open(const std::string& url)
 {
-    return boost::starts_with(url, "Snapmaker_Orca://open") || boost::starts_with(url, "snapmaker-orca://open");
+    return boost::starts_with(url, "Snapmaker_Orca://open") || boost::starts_with(url, "snapmaker-orca://open") ||
+           boost::starts_with(url, "Snapmaker_Orca_Max://open") || boost::starts_with(url, "snapmaker-orca-max://open");
 }
 inline bool is_prusaslicer_open(const std::string& url) { return boost::starts_with(url, "prusaslicer://open"); }
 inline bool is_bambustudio_open(const std::string& url) { return boost::starts_with(url, "bambustudio://open") || boost::starts_with(url, "bambustudioopen://"); }

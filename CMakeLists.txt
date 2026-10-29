@@ -307,7 +307,7 @@ if (APPLE)
     if (CMAKE_MACOSX_BUNDLE)
         set(CMAKE_INSTALL_RPATH @executable_path/../Frameworks)
     endif()
-    SET(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.snapmaker.snapmaker-orca")
+    SET(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${SLIC3R_APP_INSTALL_ID}")
 
     # The macOS CI jobs build with Ninja (build_release_macos.sh -x), so the Xcode generator
     # is not covered. Xcode adds -Wshorten-64-to-32 by default ("Implicit Conversion to 32 Bit
@@ -1400,7 +1400,7 @@ if(BUILD_TESTS)
 endif()
 
 if (NOT WIN32 AND NOT APPLE)
-    set(SLIC3R_APP_CMD "snapmaker-orca")
+    set(SLIC3R_APP_CMD "${SLIC3R_APP_INSTALL_CMD}")
     configure_file(${LIBDIR}/dev-utils/platform/unix/build_appimage.sh.in ${CMAKE_CURRENT_BINARY_DIR}/build_appimage.sh USE_SOURCE_PERMISSIONS @ONLY)
 endif()
 
@@ -1415,17 +1415,17 @@ if (WIN32)
     install (PROGRAMS ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} DESTINATION ".")
 elseif (SLIC3R_FHS)
     # CMAKE_INSTALL_FULL_DATAROOTDIR: read-only architecture-independent data root (share)
-    set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/Snapmaker_Orca")
+    set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/${SLIC3R_APP_INSTALL_KEY}")
     install(DIRECTORY ${SLIC3R_RESOURCES_DIR}/ DESTINATION ${SLIC3R_FHS_RESOURCES}
         PATTERN "*/udev" EXCLUDE
     )
     if(ORCA_BUNDLED_UV_EXECUTABLE)
         install(PROGRAMS "${ORCA_BUNDLED_UV_EXECUTABLE}" DESTINATION "${SLIC3R_FHS_RESOURCES}/tools/uv" RENAME "${ORCA_BUNDLED_UV_FILENAME}")
     endif()
-    install(FILES src/dev-utils/platform/unix/Snapmaker_Orca.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+    install(FILES src/dev-utils/platform/unix/Snapmaker_Orca.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications RENAME ${SLIC3R_APP_INSTALL_KEY}.desktop)
     foreach(SIZE 32 128 192)
         install(FILES ${SLIC3R_RESOURCES_DIR}/images/Snapmaker_Orca_${SIZE}px.png
-            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/${SIZE}x${SIZE}/apps RENAME Snapmaker_Orca.png
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/${SIZE}x${SIZE}/apps RENAME ${SLIC3R_APP_INSTALL_KEY}.png
         )
     endforeach()
 elseif (CMAKE_MACOSX_BUNDLE)
@@ -1434,7 +1434,7 @@ elseif (CMAKE_MACOSX_BUNDLE)
         install(PROGRAMS "${ORCA_BUNDLED_UV_EXECUTABLE}" DESTINATION "${CMAKE_INSTALL_PREFIX}/Snapmaker Orca.app/Contents/Resources/tools/uv" RENAME "${ORCA_BUNDLED_UV_FILENAME}")
     endif()
 else ()
-    install(FILES src/dev-utils/platform/unix/Snapmaker_Orca.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications)
+    install(FILES src/dev-utils/platform/unix/Snapmaker_Orca.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications RENAME ${SLIC3R_APP_INSTALL_KEY}.desktop)
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources")
     if(ORCA_BUNDLED_UV_EXECUTABLE)
         install(PROGRAMS "${ORCA_BUNDLED_UV_EXECUTABLE}" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources/tools/uv" RENAME "${ORCA_BUNDLED_UV_FILENAME}")
@@ -1460,24 +1460,25 @@ endif ()
 install(FILES ${CMAKE_SOURCE_DIR}/LICENSE.txt DESTINATION ".")
 configure_file(${LIBDIR}/dev-utils/platform/unix/fhs.hpp.in ${LIBDIR_BIN}/dev-utils/platform/unix/fhs.hpp)
 
-set (CPACK_PACKAGE_NAME "Snapmaker_Orca")
+# Snapmaker Orca Max: installed next to Snapmaker Orca - own name, folder, registry keys, shortcuts.
+set (CPACK_PACKAGE_NAME "${SLIC3R_APP_INSTALL_KEY}")
 set (CPACK_PACKAGE_VENDOR "Snapmaker")
 set (CPACK_PACKAGE_VERSION_MAJOR "${ORCA_VERSION_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${ORCA_VERSION_MINOR}")
 set (CPACK_PACKAGE_VERSION_PATCH "${ORCA_VERSION_PATCH}")
-set (CPACK_PACKAGE_FILE_NAME "Snapmaker_Orca_Windows_Installer_V${Snapmaker_VERSION}")
+set (CPACK_PACKAGE_FILE_NAME "${SLIC3R_APP_INSTALL_KEY}_Windows_Installer_V${Snapmaker_VERSION}")
 # NOTE: Orca upstream appends an "_x64"/"_arm64" arch suffix here. Snapmaker's
 # release workflow (.github/workflows/build_orca.yml) publishes a single x64
 # Windows installer and refers to it by the unsuffixed name, so the suffix is
 # intentionally not applied. Re-enable it here together with the workflow if a
 # Windows ARM64 build is ever added.
-set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Snapmaker Orca is an open source slicer for FDM printers")
+set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "${SLIC3R_APP_INSTALL_NAME} is an open source slicer for FDM printers")
 set (CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Snapmaker/OrcaSlicer")
 set (CPACK_PACKAGE_INSTALL_DIRECTORY ${CPACK_PACKAGE_NAME})
 set (CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/resources/images\\\\Snapmaker_Orca.ico")
 set (CPACK_NSIS_MUI_ICON "${CPACK_PACKAGE_ICON}")
 set (CPACK_NSIS_MUI_UNIICON "${CPACK_PACKAGE_ICON}")
-set (CPACK_NSIS_INSTALLED_ICON_NAME "snapmaker-orca.exe")
+set (CPACK_NSIS_INSTALLED_ICON_NAME "${SLIC3R_APP_INSTALL_CMD}.exe")
 set(CPACK_NSIS_UNINSTALL_NAME "Uninstall")
 # Window caption. Keep install dir / Start Menu / registry without version.
 # CPack-generated .nsi stays ASCII. Chinese uninstall confirm is a UTF-8 BOM
@@ -1497,9 +1498,7 @@ set (CPACK_NSIS_DEFINES "!define MUI_STARTMENUPAGE_DEFAULTFOLDER \"${CPACK_PACKA
 file(READ "${CMAKE_SOURCE_DIR}/cmake/nsis/SnapmakerURLProtocols_install.nsh" CPACK_NSIS_EXTRA_INSTALL_COMMANDS)
 file(READ "${CMAKE_SOURCE_DIR}/cmake/nsis/SnapmakerURLProtocols_uninstall.nsh" _snapmaker_nsis_uninst_url)
 set(_snapmaker_nsis_uninst_kill [=[
-  nsExec::Exec 'taskkill /F /IM snapmaker-orca.exe /T'
-  Pop $0
-  nsExec::Exec 'taskkill /F /IM Snapmaker_Orca.exe /T'
+  nsExec::Exec 'taskkill /F /IM snapmaker-orca-max.exe /T'
   Pop $0
 ]=])
 string(CONCAT CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
@@ -1510,19 +1509,19 @@ string(APPEND CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "  SetAutoClose true\n")
 # Desktop shortcut inside MUI_STARTMENU_WRITE_BEGIN: respects "do not create shortcuts" on the start menu page.
 set(CPACK_NSIS_CREATE_ICONS_EXTRA [=[
   SetShellVarContext current
-  CreateShortCut "$DESKTOP\Snapmaker Orca.lnk" "$INSTDIR\snapmaker-orca.exe" "" "$INSTDIR\snapmaker-orca.exe" 0
+  CreateShortCut "$DESKTOP\Snapmaker Orca Max.lnk" "$INSTDIR\snapmaker-orca-max.exe" "" "$INSTDIR\snapmaker-orca-max.exe" 0
   SetShellVarContext all
 ]=])
 set(CPACK_NSIS_DELETE_ICONS_EXTRA [=[
   SetShellVarContext current
-  Delete "$DESKTOP\Snapmaker Orca.lnk"
+  Delete "$DESKTOP\Snapmaker Orca Max.lnk"
   SetShellVarContext all
 ]=])
 set (CPACK_PACKAGE_CHECKSUM SHA256)
-set (CPACK_PACKAGE_INSTALL_REGISTRY_KEY "Snapmaker_Orca")
+set (CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${SLIC3R_APP_INSTALL_KEY}")
 set (CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL OFF)
 set (CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
-set(CPACK_PACKAGE_EXECUTABLES "snapmaker-orca;Snapmaker Orca")
+set(CPACK_PACKAGE_EXECUTABLES "${SLIC3R_APP_INSTALL_CMD};${SLIC3R_APP_INSTALL_NAME}")
 set (CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/LICENSE.txt) # must also include in install command
 
 set(CPACK_WIX_UPGRADE_GUID "058245e8-20e0-4a95-9ab7-1acfe17ad511")

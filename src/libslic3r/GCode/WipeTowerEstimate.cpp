@@ -114,9 +114,28 @@ WipeTowerFootprint estimate_wipe_tower_footprint(const ConfigBase &config, WipeT
     if (filaments_cnt < 2 && !need_wipe_tower)
         return footprint;
 
+    // Snapmaker Orca Max: with "fine_nozzle_finishes_cycle" a run-top layer can start on the finest
+    // filament (still loaded from the layer below), visit the coarser ones and come back to it. That
+    // is one change more than the filaments_cnt - 1 the planners assume per layer.
+    bool closing_change = false;
+    if (filaments_cnt > 1 && opt_bool("fine_nozzle_finishes_cycle")) {
+        const auto  *heights = floats_of("extruder_layer_height");
+        const size_t nozzles = nozzle_opt != nullptr ? nozzle_opt->values.size() : 0;
+        if (heights != nullptr && !heights->values.empty()) {
+            // The column of a 0-based filament, as Print::width_slot() picks it.
+            auto height_of = [&](unsigned int id) { return heights->get_at(id < nozzles ? id : 0); };
+            double lowest = height_of(filament_ids.front()), highest = lowest;
+            for (unsigned int id : filament_ids) {
+                lowest  = std::min(lowest, height_of(id));
+                highest = std::max(highest, height_of(id));
+            }
+            closing_change = highest > EPSILON && highest > lowest + EPSILON;
+        }
+    }
+
     // A tower printed for one of the reasons above has no tool change to purge for; both
     // planners give it the idle depth below and nothing more.
-    const size_t purge_count = filaments_cnt > 1 ? (dual_nozzle ? filaments_cnt : filaments_cnt - 1) : 0;
+    const size_t purge_count = filaments_cnt > 1 ? (dual_nozzle ? filaments_cnt : filaments_cnt - 1) + (closing_change ? 1 : 0) : 0;
 
     // Type2 purges one volume per tool change. Type1 plans per filament below; here the volume
     // only decides whether a tower exists.
@@ -164,7 +183,7 @@ WipeTowerFootprint estimate_wipe_tower_footprint(const ConfigBase &config, WipeT
     // Type2 (flush matrix: rib wall only): a layer's depth is the sum of what set_toolchange() reserves per
     // change - the old tool's ram band and the new tool's whole purge rows, each at its own line width -
     // plus the wall. One change per further filament and layer, in id order; nozzle changes add none.
-    const size_t planned_changes = filaments_cnt > 1 ? filaments_cnt - 1 : 0;
+    const size_t planned_changes = filaments_cnt > 1 ? filaments_cnt - 1 + (closing_change ? 1 : 0) : 0;
     const bool   type2_planned   = !type1 && planned_changes > 0 && (!semm_flush || rib_wall);
     const std::vector<std::vector<float>> flush_volumes = type2_planned && semm_flush ? WipeTower2::extract_wipe_volumes(config)
                                                                                       : std::vector<std::vector<float>>();
@@ -184,7 +203,8 @@ WipeTowerFootprint estimate_wipe_tower_footprint(const ConfigBase &config, WipeT
         double depth = 0.;
         for (size_t k = 1; k <= planned_changes; ++k) {
             const unsigned int old_id = filament_ids[k - 1];
-            const unsigned int new_id = filament_ids[k];
+            // The closing change (see closing_change) goes from the last filament back to the first.
+            const unsigned int new_id = filament_ids[k % filaments_cnt];
             const size_t       column = self_index != nullptr ? first_filament_variant_column(self_index->values, old_id) : old_id;
             const double       ramming_volume = float_at("filament_multitool_ramming_volume", unsigned(column), 0.);
             const double       ramming_flow   = float_at("filament_multitool_ramming_flow", unsigned(column), 0.);

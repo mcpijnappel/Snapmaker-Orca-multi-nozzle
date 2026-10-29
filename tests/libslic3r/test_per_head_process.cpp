@@ -3529,3 +3529,33 @@ TEST_CASE("Preferred layer heights stay as entered in the presets and the config
     CHECK_THAT(entered[1] + entered[2] + entered[3], WithinAbs(0., 1e-9));
     CHECK_FALSE(project.has(extruder_layer_height_planned_key));
 }
+
+TEST_CASE("A line width override set in one flow column applies to extruders of every flow type", "[PerHeadProcess][PerHeadWidth]")
+{
+    // A part override saved as "nil,0.26": the 0.26 sits in the High Flow column only. Four
+    // Standard extruders read the override by their flow type (column 0).
+    ConfigOptionFloatsOrPercentsNullable source;
+    REQUIRE(source.deserialize("nil,0.26"));
+    VariantOverrideRule rule;
+    rule.flow_count = 2;
+    rule.flow_index = { 0, 0, 0, 0 };
+    const std::vector<int> variant_index { 0, 1, 2, 3 };
+
+    ConfigOptionFloatsOrPercentsNullable width;
+    REQUIRE(width.deserialize("105%,105%,105%,110%"));
+    set_variant_override(width, source, variant_index, 1, rule, "outer_wall_line_width");
+    REQUIRE(width.size() == 4);
+    for (size_t slot = 0; slot < 4; ++slot) {
+        CAPTURE(slot);
+        CHECK_FALSE(width.get_at(slot).percent);
+        CHECK(width.get_at(slot).value == Catch::Approx(0.26));
+    }
+
+    // A speed depends on the flow type: its nil Standard column is not filled from High Flow.
+    ConfigOptionFloatsNullable speed_source;
+    REQUIRE(speed_source.deserialize("nil,300"));
+    ConfigOptionFloatsNullable speed;
+    REQUIRE(speed.deserialize("200,200,200,200"));
+    set_variant_override(speed, speed_source, variant_index, 1, rule, "outer_wall_speed");
+    CHECK_FALSE(speed.get_at(3) == Catch::Approx(300.));
+}

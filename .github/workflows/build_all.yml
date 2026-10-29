@@ -218,7 +218,7 @@ jobs:
       group: flatpak-${{ matrix.variant.arch }}-${{ github.ref }}
       cancel-in-progress: false
     container:
-      # Must track `runtime-version` in scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
+      # Must track `runtime-version` in scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-49
       options: --privileged
       volumes:
@@ -269,7 +269,7 @@ jobs:
       shell: bash
     - name: Compute the flatpak-builder cache key
       id: fp_cache_key
-      run: echo "key=flatpak-builder-${{ matrix.variant.arch }}-${{ hashFiles('deps/**', 'scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml') }}" >> "$GITHUB_OUTPUT"
+      run: echo "key=flatpak-builder-${{ matrix.variant.arch }}-${{ hashFiles('deps/**', 'scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml') }}" >> "$GITHUB_OUTPUT"
       shell: bash
     # Manage flatpak-builder cache externally so PRs restore but never upload.
     # The compiler cache under it is keyed per run below, so it is left out.
@@ -310,7 +310,7 @@ jobs:
     - name: Disable debug info for faster CI builds
       run: |
         sed -i '/^build-options:/a\  no-debuginfo: true\n  strip: true' \
-          scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
+          scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
       shell: bash
     # flatpak-builder reuses a module from its cache when the definition and
     # sources are unchanged, so a re-run of the same commit would skip the
@@ -323,7 +323,7 @@ jobs:
         flatpak_builder_cache_buster: ${{ github.run_id }}-${{ github.run_attempt }}
       run: |
         sed -i "/name: Snapmaker_Orca/{n;s|buildsystem: simple|buildsystem: simple\n    run-tests: true\n    build-options:\n      env:\n        flatpak_builder_cache_buster: \"$flatpak_builder_cache_buster\"\n        git_commit_hash: \"$git_commit_hash\"|}" \
-          scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
+          scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
       shell: bash
     # flatpak-builder's --ccache only wraps cc and gcc, and the manifest builds
     # with clang, so CMake's launcher runs ccache instead; --ccache is still what
@@ -335,8 +335,8 @@ jobs:
           'CMAKE_C_COMPILER_LAUNCHER: ccache' \
           'CMAKE_CXX_COMPILER_LAUNCHER: ccache' > "$RUNNER_TEMP/ccache-env.yml"
         sed -i "/^        git_commit_hash: /r $RUNNER_TEMP/ccache-env.yml" \
-          scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
-        grep -q '^        CMAKE_CXX_COMPILER_LAUNCHER: ccache$' scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
+          scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
+        grep -q '^        CMAKE_CXX_COMPILER_LAUNCHER: ccache$' scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
         mkdir -p .flatpak-builder/ccache
         export CCACHE_DIR=$PWD/.flatpak-builder/ccache
         ccache --set-config=max_size=3G
@@ -359,7 +359,7 @@ jobs:
     - uses: flatpak/flatpak-github-actions/flatpak-builder@master
       with:
         bundle: Snapmaker_Orca-Linux-flatpak_${{ env.ver }}_${{ matrix.variant.arch }}.flatpak
-        manifest-path: scripts/flatpak/io.github.Snapmaker.Snapmaker_Orca.yml
+        manifest-path: scripts/flatpak/io.github.mcpijnappel.Snapmaker_Orca_Max.yml
         # cache only turns on flatpak-builder --ccache; the caching itself is above.
         cache: true
         restore-cache: false

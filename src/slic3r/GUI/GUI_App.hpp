@@ -1041,6 +1041,8 @@ private:
 
     bool                    m_init_app_config_from_older { false };
     bool                    m_datadir_redefined { false };
+    // Snapmaker Orca Max: the Snapmaker Orca settings folder copied on the first start, else empty.
+    std::string             m_settings_copied_from;
     std::string             m_older_data_dir_path;
     bool                    m_unsigned_plugin_warning_shown { false };
     boost::optional<Semver> m_last_config_version;

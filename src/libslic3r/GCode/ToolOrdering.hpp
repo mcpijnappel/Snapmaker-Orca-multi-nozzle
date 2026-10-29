@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <map>
+#include <set>
 #include <utility>
 
 #include <boost/container/small_vector.hpp>
@@ -156,6 +157,17 @@ public:
 
     bool is_extruder_order(unsigned int a, unsigned int b) const;
     bool has_extruder(unsigned int extruder) const { return std::find(this->extruders.begin(), this->extruders.end(), extruder) != this->extruders.end(); }
+    // The order this layer's extruders print in when `loaded` is in the nozzle: rotated to start
+    // with it (no initial toolchange), unless the order is pinned (pin_extruder_order). The tower
+    // plan and GCode::process_layer walk this same chain.
+    std::vector<unsigned int> chain_from(unsigned int loaded) const
+    {
+        std::vector<unsigned int> chain = this->extruders;
+        if (! this->pin_extruder_order)
+            if (auto it = std::find(chain.begin(), chain.end(), loaded); it != chain.end())
+                std::rotate(chain.begin(), it, chain.end());
+        return chain;
+    }
 
     // Return a zero based extruder from the region, or extruder_override if overriden.
     unsigned int wall_extruder_id(const PrintRegion &region) const;
@@ -176,6 +188,15 @@ public:
     // Zero based extruder IDs, ordered to minimize tool switches.
     std::vector<unsigned int> 	extruders;
     bool                        preserve_extruder_order = false;
+    // Snapmaker Orca Max: a combined run (several object layers printed as one thicker pass) ends
+    // at this print_z. With "fine_nozzle_finishes_cycle" the run's coarser extruders print before
+    // the finer ones here, and the order is kept (no rotation to the loaded tool).
+    bool                        has_run_top = false;
+    bool                        pin_extruder_order = false;
+    // Zero based filaments printing object regions here, and those of them printing a combined run
+    // that ends here (support and tower extruders are in neither).
+    std::set<unsigned int>      part_extruders;
+    std::set<unsigned int>      run_top_extruders;
     // An object splits this layer into Local-Z sublayers; purge overrides stay off here because
     // they would disable Local-Z emission for the entire shared print layer.
     bool                        has_local_z_subdivision = false;
@@ -408,6 +429,7 @@ private:
     void                reorder_extruders_for_minimum_flush_volume(bool reorder_first_layer);
     void                resolve_mixed_filaments(const PrintConfig &config);
     void                enforce_mixed_component_order();
+    void                plan_fine_finish_order(const PrintConfig &config);
 
     // BBS
     std::vector<unsigned int> generate_first_layer_tool_order(const Print& print);

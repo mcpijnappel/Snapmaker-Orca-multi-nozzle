@@ -281,7 +281,7 @@ mkdir -p "$BUILD_DIR"
 rm -rf "$BUILD_DIR/build-dir"
 
 # Flatpak identity (must match app-id in the manifest)
-APP_ID="io.github.Snapmaker.Snapmaker_Orca"
+APP_ID="io.github.mcpijnappel.Snapmaker_Orca_Max"
 MANIFEST_BASE="scripts/flatpak/${APP_ID}.yml"
 
 # Check if flatpak manifest exists
