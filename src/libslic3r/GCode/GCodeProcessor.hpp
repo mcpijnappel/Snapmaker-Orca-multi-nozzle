@@ -243,6 +243,8 @@ class Print;
             //BBS
             int  object_label_id{-1};
             float print_z{0.0f};
+            // Snapmaker Orca Max: the bed temperature last set by M140/M190 (Celsius degrees).
+            float bed_temperature{ 0.0f };
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
             float actual_volumetric_rate() const { return actual_feedrate * mm3_per_mm; }
@@ -1165,6 +1167,8 @@ class Print;
         ExtruderTemps m_extruder_temps;
         bool  m_is_XL_printer = false;
         int m_highest_bed_temp;
+        // Snapmaker Orca Max: the current bed temperature target (M140/M190 S), stored on every move.
+        float m_bed_temperature{ 0.0f };
         float m_extruded_last_z;
         float m_first_layer_height; // mm
         float m_zero_layer_height; // mm

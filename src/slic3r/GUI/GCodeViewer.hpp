@@ -404,6 +404,8 @@ private:
 
     //BBS: GUI refactor: add canvas size
     void render_legend(float &legend_height, int canvas_width, int canvas_height, int right_margin);
+    // Snapmaker Orca Max: which filament settings decide the bed temperature (Bed temperature legend).
+    void render_bed_temperature_sources(const libvgcode::ColorRange &range) const;
     void render_legend_color_arr_recommen(float window_padding);
     void render_slider(int canvas_width, int canvas_height);
 };

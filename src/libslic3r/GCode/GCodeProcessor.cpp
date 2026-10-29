@@ -3614,6 +3614,7 @@ void GCodeProcessor::reset()
     m_has_filament_switcher = false;
 
     m_highest_bed_temp = 0;
+    m_bed_temperature  = 0.0f;
 
     m_extruded_last_z = 0.0f;
     m_zero_layer_height = 0.0f;
@@ -6291,15 +6292,20 @@ void GCodeProcessor::process_M135(const GCodeReader::GCodeLine& line)
 void GCodeProcessor::process_M140(const GCodeReader::GCodeLine& line)
 {
     float new_temp;
-    if (line.has_value('S', new_temp))
+    if (line.has_value('S', new_temp)) {
         m_highest_bed_temp = m_highest_bed_temp < (int)new_temp ? (int)new_temp : m_highest_bed_temp;
+        m_bed_temperature  = new_temp;
+    }
 }
 
 void GCodeProcessor::process_M190(const GCodeReader::GCodeLine& line)
 {
     float new_temp;
-    if (line.has_value('S', new_temp))
+    // M190 R<temp> waits for the temperature while cooling too; both set the target.
+    if (line.has_value('S', new_temp) || line.has_value('R', new_temp)) {
         m_highest_bed_temp = m_highest_bed_temp < (int)new_temp ? (int)new_temp : m_highest_bed_temp;
+        m_bed_temperature  = new_temp;
+    }
 }
 
 void GCodeProcessor::process_M191(const GCodeReader::GCodeLine& line)
@@ -7127,7 +7133,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type, EMovePathType path_type, 
         std::max<unsigned int>(1, m_layer_id) - 1,
         internal_only,
         m_object_label_id,
-        m_print_z
+        m_print_z,
+        m_bed_temperature
     });
 
     if (type == EMoveType::Seam) {

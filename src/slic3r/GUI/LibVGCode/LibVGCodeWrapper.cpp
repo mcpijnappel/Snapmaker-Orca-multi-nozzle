@@ -238,6 +238,7 @@ GCodeInputData convert(const Slic3r::GCodeProcessorResult& result, const std::ve
                     /* ORCA: Add Jerk visualization support */ curr.jerk };
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
                 ret.vertices.emplace_back(vertex);
+                ret.vertices.back().bed_temperature = curr.bed_temperature; // Snapmaker Orca Max
             }
         }
 
@@ -260,6 +261,7 @@ GCodeInputData convert(const Slic3r::GCodeProcessorResult& result, const std::ve
             /* ORCA: Add Jerk visualization support */ curr.jerk };
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
         ret.vertices.emplace_back(vertex);
+        ret.vertices.back().bed_temperature = curr.bed_temperature; // Snapmaker Orca Max
     }
     ret.vertices.shrink_to_fit();
 

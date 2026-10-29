@@ -90,6 +90,8 @@ static std::string get_view_type_string(libvgcode::EViewType view_type)
         return _u8L("Fan Speed");
     else if (view_type == libvgcode::EViewType::Temperature)
         return _u8L("Temperature");
+    else if (view_type == libvgcode::EViewType::BedTemperature)
+        return _u8L("Bed temperature");
     else if (view_type == libvgcode::EViewType::VolumetricFlowRate)
         return _u8L("Flow");
     else if (view_type == libvgcode::EViewType::ActualVolumetricFlowRate)
@@ -128,6 +130,7 @@ static const std::vector<std::pair<std::string, libvgcode::EViewType>>& view_typ
         { "layer_time_logarithmic",       libvgcode::EViewType::LayerTimeLogarithmic },
         { "fan_speed",                    libvgcode::EViewType::FanSpeed },
         { "temperature",                  libvgcode::EViewType::Temperature },
+        { "bed_temperature",              libvgcode::EViewType::BedTemperature },
         { "pressure_advance",             libvgcode::EViewType::PressureAdvance },
     };
     return map;
@@ -420,6 +423,9 @@ void GCodeViewer::SequentialView::Marker::render_position_window(const libvgcode
                 break;
             case libvgcode::EViewType::Temperature:
                 sprintf(detail_buf, "%s%.0f", _u8L("Temperature: ").c_str(), vertex.temperature);
+                break;
+            case libvgcode::EViewType::BedTemperature:
+                sprintf(detail_buf, "%s%.0f", _u8L("Bed temperature: ").c_str(), vertex.bed_temperature);
                 break;
             case libvgcode::EViewType::LayerTimeLinear:
             case libvgcode::EViewType::LayerTimeLogarithmic:
@@ -1230,6 +1236,7 @@ void GCodeViewer::update_by_mode(ConfigOptionMode mode)
     view_type_items.push_back(libvgcode::EViewType::LayerTimeLogarithmic);
     view_type_items.push_back(libvgcode::EViewType::FanSpeed);
     view_type_items.push_back(libvgcode::EViewType::Temperature);
+    view_type_items.push_back(libvgcode::EViewType::BedTemperature);
 // ORCA: Add Pressure Advance visualization support
     view_type_items.push_back(libvgcode::EViewType::PressureAdvance);
     //if (mode == ConfigOptionMode::comDevelop) {
@@ -3347,6 +3354,48 @@ void GCodeViewer::render_legend_color_arr_recommen(float window_padding)
     ImGui::PopStyleVar(1);
 }
 
+// Snapmaker Orca Max: under the bed temperature range, which filament settings decide it: the plate
+// type, the formula, and each used filament's own bed temperature for this plate (first layer /
+// other layers). Filaments whose own temperature is what the G-code sets are marked.
+void GCodeViewer::render_bed_temperature_sources(const libvgcode::ColorRange &range) const
+{
+    // The standalone G-code viewer has no project to read the filament settings from.
+    if (! wxGetApp().is_editor())
+        return;
+    const Print       &print  = wxGetApp().plater()->get_partplate_list().get_current_fff_print();
+    if (print.objects().empty())
+        return;
+    const PrintConfig &config = print.config();
+    const BedType      bed    = config.curr_bed_type.value;
+    const auto *other_layers = dynamic_cast<const ConfigOptionInts *>(config.option(get_bed_temp_key(bed)));
+    const auto *first_layer  = dynamic_cast<const ConfigOptionInts *>(config.option(get_bed_temp_1st_layer_key(bed)));
+    if (other_layers == nullptr || first_layer == nullptr)
+        return;
+    const std::array<float, 2> set = range.get_range(); // lowest and highest target in the G-code
+    ImGuiWrapper &imgui = *wxGetApp().imgui();
+    ImGui::Spacing();
+    imgui.text(_u8L("Plate") + ": " + config.opt_serialize("curr_bed_type"));
+    imgui.text(_u8L("Formula") + ": " + (config.bed_temperature_formula.value == BedTempFormula::btfHighestTemp ?
+                                            _u8L("highest of the used filaments") : _u8L("first filament")));
+    imgui.text(_u8L("Filament bed temperatures (first layer / other layers):"));
+    std::vector<unsigned int> used = print.get_slice_used_filaments(false);
+    for (unsigned int f : print.get_slice_used_filaments(true))
+        if (std::find(used.begin(), used.end(), f) == used.end())
+            used.push_back(f);
+    std::sort(used.begin(), used.end());
+    for (unsigned int f : used) {
+        const int  t1   = first_layer->get_at(f);
+        const int  t    = other_layers->get_at(f);
+        const bool sets = std::abs(float(t1) - set[1]) < 0.5f || std::abs(float(t) - set[1]) < 0.5f ||
+                          std::abs(float(t1) - set[0]) < 0.5f || std::abs(float(t) - set[0]) < 0.5f;
+        std::string line = "  " + std::to_string(f + 1) + " " + config.filament_type.get_at(f) + ": " +
+                           std::to_string(t1) + " / " + std::to_string(t) + " ℃";
+        if (sets)
+            line += "  <- " + _u8L("sets the bed");
+        imgui.text(line);
+    }
+}
+
 void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canvas_height, int right_margin)
 {
     if (!is_legend_shown())
@@ -3963,6 +4012,7 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     }
     case libvgcode::EViewType::FanSpeed:       { imgui.title(_u8L("Fan speed (%)")); break; }
     case libvgcode::EViewType::Temperature:    { imgui.title(_u8L("Temperature (℃)")); break; }
+    case libvgcode::EViewType::BedTemperature: { imgui.title(_u8L("Bed temperature (℃)")); break; }
 // ORCA: Add Pressure Advance visualization support
     case libvgcode::EViewType::PressureAdvance:{ imgui.title(_u8L("Pressure Advance")); break; }
     case libvgcode::EViewType::VolumetricFlowRate:
@@ -4236,6 +4286,12 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     }
     case libvgcode::EViewType::FanSpeed:                 { append_range(m_viewer.get_color_range(libvgcode::EViewType::FanSpeed), 0); break; }
     case libvgcode::EViewType::Temperature:              { append_range(m_viewer.get_color_range(libvgcode::EViewType::Temperature), 0); break; }
+    case libvgcode::EViewType::BedTemperature: {
+        const libvgcode::ColorRange &range = m_viewer.get_color_range(libvgcode::EViewType::BedTemperature);
+        append_range(range, 0);
+        render_bed_temperature_sources(range);
+        break;
+    }
 // ORCA: Add Pressure Advance visualization support
     case libvgcode::EViewType::PressureAdvance:          { append_range(m_viewer.get_color_range(libvgcode::EViewType::PressureAdvance), 3); break; }
     case libvgcode::EViewType::LayerTimeLinear:          { append_range(m_viewer.get_color_range(libvgcode::EViewType::LayerTimeLinear), true); break; }

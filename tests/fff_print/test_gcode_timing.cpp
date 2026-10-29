@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <map>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -613,4 +614,27 @@ TEST_CASE("How fast a corner is taken does not depend on how much is extruded th
         REQUIRE_THAT(planned_corner_speed(gcfMarlinFirmware, scv, 0.05, turn, 0.0, 0.029),
                      Catch::Matchers::WithinRel(marlin, 0.02));
     }
+}
+
+// Snapmaker Orca Max: every move carries the bed temperature target set before it (M140, and M190
+// with S or R), for the preview's Bed temperature colour scheme.
+TEST_CASE("Moves carry the current bed temperature target", "[GCodeProcessor][BedTemperature]")
+{
+    FullPrintConfig config = make_config(0., 0., 0.);
+    GCodeProcessor  proc;
+    run_processor(proc, config,
+                  "M140 S60\n"
+                  "G1 X10 Y10 E1 F1200\n"
+                  "M190 S80\n"
+                  "G1 X20 Y10 E2\n"
+                  "M190 R55\n"
+                  "G1 X30 Y10 E3\n");
+    // The reader may split a line into several moves; each keeps the target of its line.
+    std::map<unsigned int, std::set<float>> temps_by_line;
+    for (const auto &move : proc.get_result().moves)
+        if (move.type == EMoveType::Extrude)
+            temps_by_line[move.gcode_id].insert(move.bed_temperature);
+    // G-code lines 2, 4 and 6 are the three G1 moves.
+    const std::map<unsigned int, std::set<float>> expected = { { 2, { 60.f } }, { 4, { 80.f } }, { 6, { 55.f } } };
+    CHECK(temps_by_line == expected);
 }
