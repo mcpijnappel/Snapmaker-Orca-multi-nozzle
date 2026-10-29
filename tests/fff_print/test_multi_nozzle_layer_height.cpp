@@ -3362,3 +3362,175 @@ TEST_CASE("A 0.4 mm part sharing a bottom with a 0.6 mm part rounds to the coars
     CHECK(finish_rule_breaks(print) == 0);
     CHECK_FALSE(object_warns(po, "has no support under it"));
 }
+
+// Paints every downward facing facet of the object's model parts but the last (the leg) with `state`.
+static void paint_undersides(ModelObject &object, EnforcerBlockerType state, size_t skip_last = 1)
+{
+    for (size_t v = 0; v + skip_last < object.volumes.size(); ++ v) {
+        ModelVolume *volume = object.volumes[v];
+        if (! volume->is_model_part())
+            continue;
+        TriangleSelector selector(volume->mesh());
+        const indexed_triangle_set &its = volume->mesh().its;
+        for (size_t f = 0; f < its.indices.size(); ++ f) {
+            const Vec3f &a = its.vertices[its.indices[f](0)], &b = its.vertices[its.indices[f](1)], &c = its.vertices[its.indices[f](2)];
+            if ((b - a).cross(c - a).normalized().z() < -0.5f)
+                selector.set_facet(int(f), state);
+        }
+        volume->supported_facets.set(selector);
+    }
+}
+
+// Area of the support islands on the support layer nearest to print_z.
+static double support_area_at(const PrintObject &po, double print_z)
+{
+    const SupportLayer *best = nullptr;
+    for (const SupportLayer *layer : po.support_layers())
+        if (best == nullptr || std::abs(layer->print_z - print_z) < std::abs(best->print_z - print_z))
+            best = layer;
+    double area = 0.;
+    if (best != nullptr)
+        for (const ExPolygon &island : best->support_islands)
+            area += unscale<double>(unscale<double>(island.area()));
+    return area;
+}
+
+TEST_CASE("Painted support enforcers follow a bottom rounded onto the coarse layers", "[MultiNozzleLayerHeight][Support][Align]")
+{
+    // The lifted inlaid plate (bottom z 1.0, rounded up to the row starting at 1.2) with manual
+    // support and its underside painted as enforcer: the support prints under it either way.
+    double area[2] = { 0., 0. };
+    for (const bool align : { false, true }) {
+        DynamicPrintConfig config = two_extruder_config(0.4);
+        config.set_key_value("enable_support", new ConfigOptionBool(true));
+        config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormal));
+        config.set_key_value("align_bottoms_to_coarse_layers", new ConfigOptionBool(align));
+        Print print;
+        Model model;
+        ModelObject *object = add_inlaid_plate(model, 0.2f);
+        paint_undersides(*object, EnforcerBlockerType::ENFORCER);
+        place_and_apply(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        print.process();
+        const PrintObject &po = *print.objects().front();
+        int fine_region = -1, coarse_region = -1;
+        find_regions(po, fine_region, coarse_region);
+        REQUIRE(fine_region >= 0);
+        area[align ? 1 : 0] = support_area_at(po, 0.6);
+        CAPTURE(align, area[align ? 1 : 0], region_slices_area(po, fine_region, 1.4));
+        CHECK(area[align ? 1 : 0] > 0.8 * (400. - 16.));        // under the whole plate but the leg
+        CHECK(region_slices_area(po, fine_region, 1.4) > 0.9 * 64.);
+        CHECK_FALSE(object_warns(po, "has no support under it"));
+    }
+    CHECK(area[1] > 0.9 * area[0]);
+}
+
+TEST_CASE("Painted support blockers follow a bottom rounded onto the coarse layers", "[MultiNozzleLayerHeight][Support][Align]")
+{
+    // Auto support, the underside painted as blocker: nothing grows under the plate either way.
+    for (const bool align : { false, true }) {
+        DynamicPrintConfig config = two_extruder_config(0.4);
+        config.set_key_value("enable_support", new ConfigOptionBool(true));
+        config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(stNormalAuto));
+        config.set_key_value("align_bottoms_to_coarse_layers", new ConfigOptionBool(align));
+        Print print;
+        Model model;
+        ModelObject *object = add_inlaid_plate(model, 0.2f);
+        paint_undersides(*object, EnforcerBlockerType::BLOCKER);
+        place_and_apply(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        print.process();
+        const PrintObject &po = *print.objects().front();
+        CAPTURE(align, support_area_at(po, 0.6));
+        CHECK(support_area_at(po, 0.6) < 0.1 * 400.);
+    }
+}
+
+TEST_CASE("Support prints at the support nozzle's preferred height and ends exactly at the gap", "[MultiNozzleLayerHeight][Support][WipeTower]")
+{
+    // 0.1 mm grid (filament 1: 0.2 mm nozzle at 0.1 mm prints the part), support on filament 2
+    // (0.4 mm nozzle preferring 0.2 mm), prime tower on. A 10 x 10 mm pillar with a 10 mm arm whose
+    // underside lies on a 0.2 mm step (z 3.0) or between two (z 3.1).
+    const SupportType type      = GENERATE(stNormalAuto, stTreeAuto);
+    const double      top_gap   = GENERATE(0., 0.2);
+    const float       arm_floor = GENERATE(3.0f, 3.1f);
+    DynamicPrintConfig config = two_extruder_config(0.2);
+    config.set_key_value("layer_height", new ConfigOptionFloat(0.1));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("nozzle_diameter", new ConfigOptionFloats({ 0.2, 0.4 }));
+    config.set_key_value("extruder_layer_height", new ConfigOptionFloats({ 0.1, 0.2 }));
+    config.set_key_value("min_layer_height", new ConfigOptionFloats({ 0.04, 0.08 }));
+    config.set_key_value("max_layer_height", new ConfigOptionFloats({ 0.14, 0.32 }));
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(type));
+    // The default tree style turns organic with a top gap, and organic trees print on the object
+    // layers by design; the hybrid style plans its own (grid-aligned) support layers.
+    if (type == stTreeAuto)
+        config.set_key_value("support_style", new ConfigOptionEnum<SupportMaterialStyle>(smsTreeHybrid));
+    config.set_key_value("support_filament", new ConfigOptionInt(2));
+    config.set_key_value("support_interface_filament", new ConfigOptionInt(2));
+    config.set_key_value("support_top_z_distance", new ConfigOptionFloat(top_gap));
+    config.set_key_value("support_bottom_z_distance", new ConfigOptionFloat(top_gap));
+    config.set_key_value("enable_prime_tower", new ConfigOptionBool(true));
+    config.set_key_value("single_extruder_multi_material", new ConfigOptionBool(false));
+    config.set_key_value("use_relative_e_distances", new ConfigOptionBool(true));
+    config.set_key_value("layer_change_gcode", new ConfigOptionString("G92 E0"));
+    config.set_key_value("wipe_tower_x", new ConfigOptionFloats({ 10. }));
+    config.set_key_value("wipe_tower_y", new ConfigOptionFloats({ 10. }));
+    Print print;
+    Model model;
+    {
+        ModelObject *object = model.add_object();
+        object->name = "arm";
+        TriangleMesh part = test_box(0.f, 0.f, 0.f, 10.f, 10.f, 4.f);
+        part.merge(test_box(10.f, 0.f, arm_floor, 10.f, 10.f, 4.f - arm_floor));
+        object->add_volume(std::move(part))->config.set("extruder", 1);
+        object->add_instance();
+    }
+    place_and_apply(print, model, config);
+    {
+        const StringObjectException err = print.validate();
+        INFO(err.string);
+        REQUIRE(err.string.empty());
+    }
+    print.process();
+    REQUIRE(! Slic3r::Test::gcode(print).empty());
+    const PrintObject &po = *print.objects().front();
+
+    std::vector<double> object_z;
+    for (const Layer *layer : po.layers())
+        object_z.push_back(layer->print_z);
+    auto object_row = [&object_z](double z) -> int {
+        for (size_t i = 0; i < object_z.size(); ++ i)
+            if (std::abs(object_z[i] - z) < 1e-3)
+                return int(i);
+        return -1;
+    };
+    // Support layers that print something below the arm.
+    std::vector<const SupportLayer *> printed;
+    for (const SupportLayer *layer : po.support_layers())
+        if (! layer->support_fills.entities.empty() && layer->print_z < arm_floor + 1e-3)
+            printed.push_back(layer);
+    REQUIRE(printed.size() > 3);
+    const double top     = printed.back()->print_z;
+    size_t       full    = 0, thin = 0, off_grid = 0, off_ladder = 0;
+    for (const SupportLayer *layer : printed) {
+        const int row = object_row(layer->print_z);
+        if (row < 0)
+            ++ off_grid;   // every support boundary is an object row: the prime tower has a layer there
+        if (std::abs(layer->height - 0.2) < 1e-3) {
+            ++ full;
+            if (row >= 0 && (size_t(row) - PrintObject::first_combined_layer_idx) % 2 != 1)
+                ++ off_ladder;
+        } else if (layer->print_z > 0.2 + EPSILON)
+            ++ thin;
+    }
+    CAPTURE(int(type), top_gap, arm_floor, top, printed.size(), full, thin, off_grid, off_ladder);
+    // The support ends exactly one gap below the arm: no gap of its own, no overlap.
+    CHECK(std::abs(top - (arm_floor - top_gap)) < 1e-3);
+    CHECK(off_grid == 0);
+    // 0.2 mm layers on the 0.2 mm steps, a thinner one only where a contact needs it.
+    CHECK(full >= 0.75 * double(printed.size()));
+    CHECK(off_ladder == 0);
+    CHECK(thin <= 3);
+}

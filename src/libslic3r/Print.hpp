@@ -657,6 +657,11 @@ private:
     void slice_volumes();
     // Combine slices of regions configured with a thicker extruder layer height into every Nth layer where geometry allows. Called by slice().
     void apply_extruder_layer_heights();
+    // Snapmaker Orca Max: bottom faces rounded up onto the coarse layers by
+    // apply_extruder_layer_heights(): rows first_row .. new_bottom_row - 1 lost `area`, which now
+    // starts at new_bottom_row. project_and_append_custom_facets() lifts painted support facets there.
+    struct RoundedBottom { size_t first_row; size_t new_bottom_row; Polygons area; };
+    std::vector<RoundedBottom> m_rounded_bottoms;
     //BBS
     ExPolygons _shrink_contour_holes(double contour_delta, double hole_delta, const ExPolygons& polys) const;
     // BBS

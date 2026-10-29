@@ -219,11 +219,10 @@ struct SupportParameters {
                 grid_height_step = 2;
             else if (step == slhsQuarterLayer)
                 grid_height_step = 4;
-            else if (step == slhsAuto || step == slhsMaxHeight) {
+            else if (step == slhsAuto || step == slhsMaxHeight || step == slhsPreferred) {
                 // The coarsest step whose ladder reaches the tallest support layer the support
                 // nozzle allows: whole layers when they do, else half, else quarter (a 0.14 mm
                 // maximum on a 0.08 mm grid needs quarter steps: 1.75 layers).
-                grid_max_height_priority = step == slhsMaxHeight;
                 const double h          = object_config.layer_height.value;
                 const double max_height = std::max(slicing_params.max_suport_layer_height, h);
                 double       best       = 0.;
@@ -235,6 +234,28 @@ struct SupportParameters {
                     }
                 }
             }
+        }
+
+        // Snapmaker Orca Max ("preferred" step): support layers at the support nozzle's preferred
+        // layer height, on the ladder the parts of that nozzle size use (run tops at
+        // first_combined_layer_idx - 1 + n * pitch). Read by tree supports (grid-aligned heights)
+        // and by the classic generator (layers synchronized with the object). A support filament
+        // printing the object grid (no preference) keeps whole object layers.
+        support_pitch = 1;
+        if (print_config.support_layer_height_step.value == slhsPreferred && !print_config.single_extruder_multi_material &&
+            has_extruder_layer_heights(print_config)) {
+            const double h         = object_config.layer_height.value;
+            double       preferred = std::numeric_limits<double>::max();
+            for (const auto &[filament, interface_role] : { std::make_pair(object_config.support_filament.value, false),
+                                                            std::make_pair(object_config.support_interface_filament.value, true) })
+                preferred = std::min(preferred, print_config.extruder_layer_height.get_at(support_head(&object, filament, interface_role)));
+            if (h > EPSILON && preferred > h + EPSILON) {
+                support_pitch = std::max<size_t>(1, size_t(std::round(preferred / h)));
+                while (support_pitch > 1 && double(support_pitch) * h > std::max(slicing_params.max_suport_layer_height, h) + EPSILON)
+                    -- support_pitch;
+            }
+            if (support_pitch > 1)
+                grid_height_step = 1;
         }
 
         // force double walls everywhere if wall count is larger than 1        
@@ -375,7 +396,10 @@ struct SupportParameters {
     // 1 = whole object layers; 2/4 = half/quarter sub-layer boundaries allowed.
     int  grid_height_step = 1;
     // ORCA: support pieces run through overhang contact layers; the gap rounds to support layers.
+    // Snapmaker Orca Max: never set (the gap stays exact with every step).
     bool grid_max_height_priority = false;
+    // Snapmaker Orca Max: object layers per support layer with the "preferred" step (1 = off).
+    size_t support_pitch = 1;
     // Length of a big overhang (10 mm); area comparisons use its square.
     const double thresh_big_overhang = scale_(10);
 

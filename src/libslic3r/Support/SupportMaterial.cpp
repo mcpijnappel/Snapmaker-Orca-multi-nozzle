@@ -2878,11 +2878,27 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                 intermediate_layers.push_back(&layer_new);
             }
             // Emit all intermediate support layers synchronized with object layers up to extr2z.
+            // Snapmaker Orca Max ("preferred" step, support_pitch > 1): one support layer per rung of
+            // the parts' ladder (run tops at first_combined_layer_idx - 1 + n * pitch), spanning the
+            // object layers since the previous one; the last layer below extr2z still ends exactly
+            // there, so the gap to the contact stays as configured.
+            const size_t pitch        = m_support_params.support_pitch;
+            coordf_t     piece_bottom = -1.;
             for (; idx_layer_object < object.layers().size() && object.layers()[idx_layer_object]->print_z < extr2z + EPSILON; ++ idx_layer_object) {
+                const Layer *object_layer = object.layers()[idx_layer_object];
+                const coordf_t own_bottom = (idx_layer_object > 0) ? object.layers()[idx_layer_object - 1]->print_z : (object_layer->print_z - object_layer->height);
+                const bool last = idx_layer_object + 1 >= object.layers().size() || object.layers()[idx_layer_object + 1]->print_z >= extr2z + EPSILON;
+                if (pitch > 1 && ! last && idx_layer_object >= PrintObject::first_combined_layer_idx &&
+                    (idx_layer_object - PrintObject::first_combined_layer_idx) % pitch != pitch - 1) {
+                    if (piece_bottom < 0.)
+                        piece_bottom = own_bottom;
+                    continue;
+                }
                 SupportGeneratorLayer &layer_new = layer_storage.allocate(SupporLayerType::Intermediate);
-                layer_new.print_z  = object.layers()[idx_layer_object]->print_z;
-                layer_new.height   = object.layers()[idx_layer_object]->height;
-                layer_new.bottom_z = (idx_layer_object > 0) ? object.layers()[idx_layer_object - 1]->print_z : (layer_new.print_z - layer_new.height);
+                layer_new.print_z  = object_layer->print_z;
+                layer_new.bottom_z = piece_bottom >= 0. ? piece_bottom : own_bottom;
+                layer_new.height   = layer_new.print_z - layer_new.bottom_z;
+                piece_bottom       = -1.;
                 assert(intermediate_layers.empty() || intermediate_layers.back()->print_z < layer_new.print_z + EPSILON);
                 intermediate_layers.push_back(&layer_new);
             }

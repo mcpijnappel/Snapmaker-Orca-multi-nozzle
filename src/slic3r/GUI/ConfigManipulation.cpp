@@ -1054,9 +1054,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     // generator synchronizes to the object layers (SupportMaterial::synchronize_layers()).
     toggle_field("independent_support_layer_height", have_support_material && (support_is_tree || !config->opt_bool("enable_prime_tower")));
     // The step only has an effect for non-organic tree supports with independent layer heights
-    // under the prime tower; single-extruder multi-material keeps whole steps.
-    toggle_line("support_layer_height_step", support_is_normal_tree && config->opt_bool("independent_support_layer_height") &&
-                                                 config->opt_bool("enable_prime_tower") && !bSEMM);
+    // under the prime tower; single-extruder multi-material keeps whole steps. Snapmaker Orca Max:
+    // classic supports synchronized with the object layers read its "preferred" choice too.
+    const bool classic_synchronized = have_support_material && !support_is_tree &&
+                                      (config->opt_bool("enable_prime_tower") || !config->opt_bool("independent_support_layer_height"));
+    toggle_line("support_layer_height_step", ((support_is_normal_tree && config->opt_bool("independent_support_layer_height") &&
+                                               config->opt_bool("enable_prime_tower")) || classic_synchronized) && !bSEMM);
 
     toggle_field("tree_support_brim_width", support_is_tree && !config->opt_bool("tree_support_auto_brim"));
     // tree support use max_bridge_length instead of bridge_no_support

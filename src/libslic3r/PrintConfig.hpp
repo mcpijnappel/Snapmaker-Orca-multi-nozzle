@@ -397,7 +397,8 @@ enum SupportLayerHeightStep : int {
     slhsHalfLayer,
     slhsQuarterLayer,
     slhsAuto,      // the coarsest step whose ladder reaches the support nozzle's maximum layer height
-    slhsMaxHeight, // like auto, and support pieces run through contact layers (gap rounded to pieces)
+    slhsMaxHeight, // like auto (Snapmaker Orca Max: the gap is exact too, kept for old projects)
+    slhsPreferred, // Snapmaker Orca Max: the support nozzle's preferred layer height, on the parts' ladder
 };
 
 enum SkirtType {

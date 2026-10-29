@@ -934,6 +934,7 @@ void PrintObject::slice()
 // colour. Uniform layer heights are required (Print::validate() rejects variable layer heights).
 void PrintObject::apply_extruder_layer_heights()
 {
+    m_rounded_bottoms.clear();
     if (m_layers.size() < 2 || this->num_printing_regions() == 0)
         return;
     std::vector<unsigned int> multipliers(this->num_printing_regions(), 1);
@@ -1036,6 +1037,8 @@ void PrintObject::apply_extruder_layer_heights()
                 // A part thinner than the rows to drop keeps its exact rows: rounding would erase it.
                 if (intersection(face, to_polygons(m_layers[b + k]->lslices)).empty())
                     continue;
+                // Painted support facets of this face follow it up (project_and_append_custom_facets).
+                m_rounded_bottoms.push_back({ b, b + k, diff(face, below) });
                 for (size_t row = b; row < b + k; ++ row) {
                     if (std::abs(m_layers[row]->height - m_layers[b]->height) > EPSILON)
                         break;

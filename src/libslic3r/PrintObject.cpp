@@ -6262,6 +6262,20 @@ void PrintObject::project_and_append_custom_facets(
                     std::vector<Polygons> projected;
                     // Support blockers or enforcers. Project downward facing painted areas upwards to their respective slicing plane.
                     slice_mesh_slabs(custom_facets, zs_from_layers(this->layers()), this->trafo_centered() * mv->get_matrix(), nullptr, &projected, vertical_points, [](){});
+                    // Snapmaker Orca Max: a bottom face rounded up onto the coarse layers starts higher
+                    // than its painted facets; lift them onto its new bottom row so the support
+                    // generators (which keep only what overlaps the layer's slices) still see them.
+                    // From one row below: a facet on a slab boundary may land in the slab below.
+                    for (const RoundedBottom &rounded : m_rounded_bottoms) {
+                        if (rounded.new_bottom_row >= projected.size())
+                            continue;
+                        Polygons lifted;
+                        for (size_t row = rounded.first_row > 0 ? rounded.first_row - 1 : 0; row < rounded.new_bottom_row; ++ row)
+                            if (! projected[row].empty())
+                                polygons_append(lifted, intersection(projected[row], rounded.area));
+                        if (! lifted.empty())
+                            polygons_append(projected[rounded.new_bottom_row], std::move(lifted));
+                    }
                     // Merge these projections with the output, layer by layer.
                     assert(! projected.empty());
                     assert(out.empty() || out.size() == projected.size());

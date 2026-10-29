@@ -497,7 +497,8 @@ static const t_config_enum_values s_keys_map_SupportLayerHeightStep = {
     {"half",    slhsHalfLayer},
     {"quarter", slhsQuarterLayer},
     {"auto",    slhsAuto},
-    {"max",     slhsMaxHeight}
+    {"max",     slhsMaxHeight},
+    {"preferred", slhsPreferred}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SupportLayerHeightStep)
 
@@ -7850,9 +7851,11 @@ void PrintConfigDef::init_fff_params()
                      "Automatic picks the coarsest step whose multiples reach the tallest support layer the support "
                      "nozzle allows (e.g. quarter steps for a 0.14 mm maximum on a 0.08 mm object layer height); "
                      "every support layer under an overhang contact still ends exactly one support gap below it. "
-                     "Maximum uses the same step but lets every support layer be as tall as possible: the support "
-                     "top under each contact is then the nearest support layer, so the gap varies by up to half a "
-                     "support layer above the configured value. "
+                     "Maximum uses the same step and also keeps the gap exact. "
+                     "Preferred layer height prints support layers at the support nozzle's preferred layer height "
+                     "(the extruder's layer height), on the same layer steps as the parts printed with that nozzle "
+                     "size, and also ends exactly one support gap below each contact; without a preferred layer "
+                     "height it works as Automatic. "
                      "With whole layers, support layer heights are multiples of the object layer height. "
                      "Half or quarter steps also allow multiples like 1.5x or 1.25x, which helps when the support "
                      "nozzle's maximum layer height sits between two whole multiples. Support boundaries may then "
@@ -7869,13 +7872,15 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.emplace_back("quarter");
     def->enum_values.emplace_back("auto");
     def->enum_values.emplace_back("max");
+    def->enum_values.emplace_back("preferred");
     def->enum_labels.emplace_back(L("100% (whole layers)"));
     def->enum_labels.emplace_back(L("50%"));
     def->enum_labels.emplace_back(L("25%"));
     def->enum_labels.emplace_back(L("Automatic (exact gap)"));
-    def->enum_labels.emplace_back(L("Maximum (gap rounded to support layers)"));
+    def->enum_labels.emplace_back(L("Maximum (exact gap)"));
+    def->enum_labels.emplace_back(L("Support nozzle's preferred layer height (exact gap)"));
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<SupportLayerHeightStep>(slhsMaxHeight));
+    def->set_default_value(new ConfigOptionEnum<SupportLayerHeightStep>(slhsPreferred));
 
     def = this->add("independent_support_layer_height", coBool);
     def->label = L("Independent support layer height");
