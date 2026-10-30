@@ -4897,7 +4897,7 @@ void TabPrint::update_steps_heights()
         std::sort(seen.begin(), seen.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
         for (size_t k = 0; k < seen.size(); ++ k) {
             if (k > 0)
-                text += " \u00b7 ";
+                text += L" \u00b7 ";
             text += seen.size() == 1 ? wxString::Format(_L("= %.2f mm (%.1f mm nozzle)"), seen[k].second, seen[k].first) :
                                        wxString::Format("%s%.2f mm (%.1f)", k == 0 ? "= " : "", seen[k].second, seen[k].first);
         }

@@ -11219,7 +11219,8 @@ void Sidebar::on_bed_type_change(BedType bed_type)
 }
 
 // Snapmaker Orca Max: "215 (220) \u00b0C \u00b7 bed 60 (65) \u00b0C" under each filament: other layers, the first
-// layer in brackets where it differs; the bed for the current plate's type.
+// layer in brackets where it differs; the bed for the current plate's type. Wide literals: the AppImage
+// runs with LC_ALL=C, where wxString cannot convert narrow UTF-8 text (wxString::Format crashed on it).
 void Sidebar::update_filament_temperatures()
 {
     if (p == nullptr || wxGetApp().preset_bundle == nullptr || wxGetApp().plater() == nullptr)
@@ -11239,7 +11240,7 @@ void Sidebar::update_filament_temperatures()
     auto pair_text = [](int other, int first) {
         if (other < 0)
             return wxString();
-        return first >= 0 && first != other ? wxString::Format("%d (%d) \u00b0C", other, first) : wxString::Format("%d \u00b0C", other);
+        return first >= 0 && first != other ? wxString::Format(L"%d (%d) \u00b0C", other, first) : wxString::Format(L"%d \u00b0C", other);
     };
     bool changed = false;
     for (size_t i = 0; i < p->combos_filament.size(); ++ i) {
@@ -11255,7 +11256,7 @@ void Sidebar::update_filament_temperatures()
                 if (! bed_key.empty()) {
                     const wxString bed = pair_text(int_at(config, bed_key), int_at(config, bed_first_key));
                     if (! bed.empty())
-                        text += (text.empty() ? "" : " \u00b7 ") + wxString::Format(_L("bed %s"), bed);
+                        text += (text.empty() ? wxString() : wxString(L" \u00b7 ")) + wxString::Format(_L("bed %s"), bed);
                 }
             }
         if (combo->temp_label->GetLabel() != text) {
