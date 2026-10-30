@@ -774,6 +774,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             // ORCA: layer combining for thicker extruder layer heights happens at the slicing step.
             || opt_key == "extruder_layer_height"
             || opt_key == "extruder_layer_height_exact"
+            || opt_key == "multi_nozzle_layer_heights"
             || opt_key == "align_bottoms_to_coarse_layers"
             || opt_key == "dithering_z_step_size"
             || opt_key == "dithering_local_z_mode"
@@ -3132,8 +3133,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                     // unhonored-heights warnings below stay silent about it.
                     auto raw_wall_multiplier = [&](int filament_id) -> unsigned int {
                         const unsigned int filament = (unsigned int)std::max(0, filament_id);
-                        return object->extruder_preferred_layer_height(filament) > 0. ?
-                            object->layer_height_multiplier_for_filament(filament) : 0;
+                        return object->extruder_preferred_layer_height(filament, &region_config) > 0. ?
+                            object->layer_height_multiplier_for_filament(filament, &region_config) : 0;
                     };
                     const bool adjusted_outer = eff_outer != 0 &&
                         eff_outer != raw_wall_multiplier(region_config.outer_wall_filament_id.value);
@@ -3215,7 +3216,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                  "(\"Adjust wall layer height\"). Only this filament's walls print the adjusted "
                                                  "height; its other features keep the preferred one."),
                                             feature_filament_idx(adjusted_id) + 1,
-                                            object->extruder_preferred_layer_height((unsigned int)std::max(0, adjusted_id)),
+                                            object->extruder_preferred_layer_height((unsigned int)std::max(0, adjusted_id), &region_config),
                                             (adjusted_outer ? eff_outer : eff_inner) * layer_height),
                              "split_wall_adjust", object);
                     }
@@ -3300,7 +3301,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                                              region_config.sparse_infill_filament_id.value;
                         const FlowRole role        = solid_combined_infill ? frSolidInfill : frInfill;
                         const char    *width_key   = solid_combined_infill ? "internal_solid_infill_line_width" : "sparse_infill_line_width";
-                        const double   preferred   = object->extruder_preferred_layer_height((unsigned int)std::max(0, filament_id));
+                        const double   preferred   = object->extruder_preferred_layer_height((unsigned int)std::max(0, filament_id), &region_config);
                         if (preferred > layer_height + EPSILON) {
                             const unsigned int combine_filament0    = feature_filament_idx(filament_id);
                             const size_t       combine_extruder_idx = this->extruder_index_of(combine_filament0);
@@ -3398,7 +3399,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                     // infill reaches the preference too.
                     if (! warned_unhonored_heights)
                         for (const unsigned int filament : used_filaments) {
-                            const double preferred = object->extruder_preferred_layer_height(filament + 1);
+                            const double preferred = object->extruder_preferred_layer_height(filament + 1, &region_config);
                             if (preferred <= 0. || prints_nothing(filament))
                                 continue;
                             const bool combined_covered = ! (combined_infill_height > 0. && filament == combined_infill_filament) ||

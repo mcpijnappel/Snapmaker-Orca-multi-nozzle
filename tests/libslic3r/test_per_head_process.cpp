@@ -3508,6 +3508,9 @@ TEST_CASE("Preferred layer heights stay as entered in the presets and the config
     // Extruders of 0.6 / 0.8 / 0.4 / 0.2 mm on a 0.40 mm process, 0.32 mm entered on the 0.6 mm one.
     select_u1(*bundle, {0.6, 0.8, 0.4, 0.2}, {0.32, 0., 0., 0.});
     bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("layer_height", true)->value = 0.4;
+    // The printer's own preferred heights apply with "Custom" (Off, the default, prints one height).
+    bundle->prints.get_edited_preset().config.set_key_value("multi_nozzle_layer_heights",
+        new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
 
     const DynamicPrintConfig sliced = bundle->full_config_for_print(false);
     CHECK_THAT(sliced.opt_float("layer_height"), WithinAbs(0.11, 1e-9));

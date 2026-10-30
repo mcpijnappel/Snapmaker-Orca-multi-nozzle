@@ -524,9 +524,10 @@ public:
     // region's run boundaries lie at multiples of its pitch above it.
     static constexpr size_t first_combined_layer_idx = 1;
     // Preferred layer height (mm) of the extruder printing the given 1-based filament id; 0 when unset or not reliably resolvable.
-    double       extruder_preferred_layer_height(unsigned int filament_id) const;
+    // With `region`, its nozzle_layer_height_steps apply (whole grid steps within the nozzle's limits).
+    double       extruder_preferred_layer_height(unsigned int filament_id, const PrintRegionConfig *region = nullptr) const;
     // Object layers a region printing with the given 1-based filament id combines into one extrusion where its geometry allows it (1 = no combining).
-    unsigned int layer_height_multiplier_for_filament(unsigned int filament_id) const;
+    unsigned int layer_height_multiplier_for_filament(unsigned int filament_id, const PrintRegionConfig *region = nullptr) const;
     // 0-based filaments allowed to drive a region's layer pitch: its walls, or - when no wall filament carries an
     // explicit layer height preference - its top/bottom/solid feature filaments. Returns false when the region
     // involves a mixed (virtual) filament whose physical extruder varies per layer, in which case no pitch applies.
@@ -657,6 +658,10 @@ private:
     void slice_volumes();
     // Combine slices of regions configured with a thicker extruder layer height into every Nth layer where geometry allows. Called by slice().
     void apply_extruder_layer_heights();
+    // Snapmaker Orca Max: after a region's runs are committed, pieces printing thinner than its
+    // nozzle's minimum (min_run rows) merge with or share rows with the run next to them; sub-bead
+    // fragments under the run above are left to it. Called by apply_extruder_layer_heights().
+    void absorb_thin_region_pieces(size_t region_id, size_t mult, size_t min_run, float bead);
     // Snapmaker Orca Max: neighbouring regions of different filaments grow into each other by
     // multi_material_overlap (half each), so their beads overlap at the seam. Called by slice().
     void overlap_material_regions();

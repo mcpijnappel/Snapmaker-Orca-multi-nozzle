@@ -2667,6 +2667,8 @@ static DynamicPrintConfig entered_heights_config(const std::vector<double> &heig
     config.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
     config.set_key_value("min_layer_height",      new ConfigOptionFloats({0.08, 0.08, 0.08, 0.08}));
     config.set_key_value("max_layer_height",      new ConfigOptionFloats({0.42, 0.56, 0.28, 0.14}));
+    // The printer's own preferred heights ("Custom"; Off, the default, prints one layer height).
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
     return config;
 }
 
@@ -2990,6 +2992,75 @@ TEST_CASE("Auto support finds the underside of a part printed in thicker runs", 
             area = std::max(area, unscaled<double>(unscaled<double>(Slic3r::area(layer->support_islands))));
     CAPTURE(int(type), area);
     CHECK(area > 250.);
+}
+
+// Region layers (above the first layer) printed thinner than the minimum layer height of the
+// nozzle printing the region's outer walls, as "z region height<min" strings.
+static std::vector<std::string> thin_region_layers(const PrintObject &po)
+{
+    const PrintConfig &config = po.print()->config();
+    std::vector<std::string> out;
+    for (size_t idx = 1; idx < po.layers().size(); ++ idx) {
+        const Layer *layer = po.layers()[idx];
+        for (size_t r = 0; r < layer->regions().size(); ++ r) {
+            const LayerRegion *layerm = layer->regions()[r];
+            if (layerm->slices.empty() || layerm->combined_layer_count() == 0)
+                continue;
+            const int    filament = std::max(1, layerm->region().config().outer_wall_filament_id.value);
+            const double min_lh   = config.min_layer_height.get_at(po.print()->extruder_index_of(filament - 1));
+            const double height   = layerm->combined_height();
+            if (height < min_lh - EPSILON)
+                out.push_back("z " + std::to_string(layer->print_z) + " region " + std::to_string(r) + " " +
+                              std::to_string(height) + "<" + std::to_string(min_lh));
+        }
+    }
+    return out;
+}
+
+TEST_CASE("No region layer prints below its nozzle's minimum layer height", "[MultiNozzleLayerHeight][MinHeight]")
+{
+    // Heights that only meet every few rows: a part starting or ending between its own steps
+    // leaves a piece shorter than its nozzle's minimum, which must merge with its neighbour.
+    //   0.4 / 0.4 / 0.6 / 0.2 mm at 0.2 / 0.2 / 0.28 / 0.12 on a 0.04 grid (mins 0.08 / 0.08 / 0.12 / 0.04)
+    //   0.4 / 0.4 / 0.4 / 0.2 mm at 0.195 / 0.195 / 0.195 / 0.13 on a 0.065 grid
+    const bool mixed_sizes = GENERATE(true, false);
+    DynamicPrintConfig config = four_nozzle_config();
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    if (mixed_sizes) {
+        config.set_key_value("layer_height",          new ConfigOptionFloat(0.04));
+        config.set_key_value("nozzle_diameter",       new ConfigOptionFloats({0.4, 0.4, 0.6, 0.2}));
+        config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.2, 0.2, 0.28, 0.12}));
+        config.set_key_value("min_layer_height",      new ConfigOptionFloats({0.08, 0.08, 0.12, 0.04}));
+        config.set_key_value("max_layer_height",      new ConfigOptionFloats({0.32, 0.32, 0.42, 0.14}));
+    } else {
+        config.set_key_value("layer_height",          new ConfigOptionFloat(0.065));
+        config.set_key_value("nozzle_diameter",       new ConfigOptionFloats({0.4, 0.4, 0.4, 0.2}));
+        config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.195, 0.195, 0.195, 0.13}));
+        config.set_key_value("min_layer_height",      new ConfigOptionFloats({0.08, 0.08, 0.08, 0.04}));
+        config.set_key_value("max_layer_height",      new ConfigOptionFloats({0.32, 0.32, 0.32, 0.14}));
+    }
+    config.set_key_value("enable_support",             new ConfigOptionBool(true));
+    config.set_key_value("support_type",               new ConfigOptionEnum<SupportType>(stNormalAuto));
+    config.set_key_value("support_filament",           new ConfigOptionInt(2));
+    config.set_key_value("support_interface_filament", new ConfigOptionInt(2));
+    config.set_key_value("support_top_z_distance",     new ConfigOptionFloat(0.));
+    config.set_key_value("support_bottom_z_distance",  new ConfigOptionFloat(0.));
+    const float lift = GENERATE(0.f, 0.1f, 0.14f, 0.2f);
+    Print print;
+    Model model;
+    ModelObject *object = add_inlaid_plate(model, lift);
+    object->volumes[0]->config.set("extruder", 3);       // the plate
+    object->volumes[1]->config.set("extruder", 4);       // the insert
+    object->volumes[2]->config.set("extruder", 1);       // the leg
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const std::vector<std::string> thin = thin_region_layers(*print.objects().front());
+    std::string listed;
+    for (const std::string &t : thin)
+        listed += t + "\n";
+    CAPTURE(mixed_sizes, lift, listed);
+    CHECK(thin.empty());
 }
 
 TEST_CASE("A support enforcer under a fine part bottom lets it print on the support", "[MultiNozzleLayerHeight][Support]")
@@ -3684,4 +3755,166 @@ TEST_CASE("A flexible filament never prints the prime tower walls", "[WipeTower]
     CHECK(is_flexible_filament_type("TPU 95A"));
     CHECK(is_flexible_filament_type("tpe"));
     CHECK_FALSE(is_flexible_filament_type("PETG"));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Snapmaker Orca Max: multi-nozzle layer height strategies and per-part grid steps.
+
+TEST_CASE("Multi-nozzle strategies give every nozzle size its share on one grid", "[MultiNozzleLayerHeight][Strategy]")
+{
+    struct Nozzle { double d, min_lh, max_lh; };
+    const Nozzle nozzles[] = { { 0.2, 0.04, 0.14 }, { 0.4, 0.08, 0.28 }, { 0.6, 0.12, 0.42 }, { 0.8, 0.16, 0.56 } };
+    const struct { MultiNozzleLayerHeights strategy; double grid; double heights[4]; } table[] = {
+        { mnlhUltraFine,   0.06, { 0.06, 0.12, 0.18, 0.24 } },
+        { mnlhFine,        0.08, { 0.08, 0.16, 0.24, 0.32 } },
+        { mnlhNormal,      0.10, { 0.10, 0.20, 0.30, 0.40 } },
+        { mnlhCoarse,      0.12, { 0.12, 0.24, 0.36, 0.48 } },
+        { mnlhSuperCoarse, 0.14, { 0.14, 0.28, 0.42, 0.56 } },
+    };
+    for (const auto &row : table) {
+        CAPTURE(int(row.strategy));
+        CHECK(multi_nozzle_strategy_grid(row.strategy) == Catch::Approx(row.grid).margin(1e-9));
+        for (size_t i = 0; i < 4; ++ i) {
+            CAPTURE(nozzles[i].d);
+            CHECK(multi_nozzle_strategy_height(row.strategy, nozzles[i].d, nozzles[i].min_lh, nozzles[i].max_lh) ==
+                  Catch::Approx(row.heights[i]).margin(1e-9));
+        }
+    }
+    // A 0.8 mm nozzle capped at 0.48: Super coarse stops at the last grid multiple below it.
+    CHECK(multi_nozzle_strategy_height(mnlhSuperCoarse, 0.8, 0.24, 0.48) == Catch::Approx(0.42).margin(1e-9));
+    CHECK(multi_nozzle_strategy_grid(mnlhOff) == 0.);
+    CHECK(multi_nozzle_strategy_grid(mnlhCustom) == 0.);
+    // Grid steps on Normal for a 0.4 mm nozzle (0.08 .. 0.32), clamped to its limits.
+    CHECK(stepped_nozzle_layer_height(0.2, -1, 0.1, 0.4, 0.08, 0.32) == Catch::Approx(0.1).margin(1e-9));
+    CHECK(stepped_nozzle_layer_height(0.2, +1, 0.1, 0.4, 0.08, 0.32) == Catch::Approx(0.3).margin(1e-9));
+    CHECK(stepped_nozzle_layer_height(0.2, -3, 0.1, 0.4, 0.08, 0.32) == Catch::Approx(0.1).margin(1e-9));
+    CHECK(stepped_nozzle_layer_height(0.2, +3, 0.1, 0.4, 0.08, 0.32) == Catch::Approx(0.3).margin(1e-9));
+}
+
+TEST_CASE("The multi-nozzle switch plans the heights: Off, a strategy, Custom", "[MultiNozzleLayerHeight][Strategy]")
+{
+    DynamicPrintConfig config = four_nozzle_config();
+    config.set_key_value("layer_height",          new ConfigOptionFloat(0.2));
+    config.set_key_value("nozzle_diameter",       new ConfigOptionFloats({0.4, 0.4, 0.6, 0.2}));
+    config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.2, 0.2, 0.28, 0.12}));
+    config.set_key_value("min_layer_height",      new ConfigOptionFloats({0.08, 0.08, 0.12, 0.04}));
+    config.set_key_value("max_layer_height",      new ConfigOptionFloats({0.32, 0.32, 0.42, 0.14}));
+    SECTION("Normal") {
+        config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhNormal));
+        apply_extruder_layer_height_plan(config);
+        CHECK(config.opt_float("layer_height") == Catch::Approx(0.1).margin(1e-9));
+        const std::vector<double> expected { 0.2, 0.2, 0.3, 0.1 };
+        CHECK(config.option<ConfigOptionFloats>("extruder_layer_height")->values == expected);
+    }
+    SECTION("Off prints one layer height") {
+        config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
+        apply_extruder_layer_height_plan(config);
+        CHECK(config.opt_float("layer_height") == Catch::Approx(0.2).margin(1e-9));
+        for (double h : config.option<ConfigOptionFloats>("extruder_layer_height")->values)
+            CHECK(h == 0.);
+    }
+    SECTION("Custom keeps the printer's heights") {
+        config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
+        config.set_key_value("extruder_layer_height_exact", new ConfigOptionBool(true));
+        apply_extruder_layer_height_plan(config);
+        CHECK(config.opt_float("layer_height") == Catch::Approx(0.04).margin(1e-9));
+        const std::vector<double> expected { 0.2, 0.2, 0.28, 0.12 };
+        CHECK(config.option<ConfigOptionFloats>("extruder_layer_height")->values == expected);
+    }
+}
+
+TEST_CASE("Configs from before the strategies keep the printer's heights", "[MultiNozzleLayerHeight][Strategy]")
+{
+    DynamicPrintConfig with_heights;
+    with_heights.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.2, 0.1}));
+    PrintConfigDef::handle_legacy_composite(with_heights);
+    REQUIRE(with_heights.has("multi_nozzle_layer_heights"));
+    CHECK(with_heights.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value == mnlhCustom);
+
+    // A project file also lists the key as differing from its process preset, so loaders that
+    // rebuild the config from the system presets keep it.
+    DynamicPrintConfig project;
+    project.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.2, 0.1}));
+    project.set_key_value("different_settings_to_system", new ConfigOptionStrings({"enable_support;wall_loops", "", "nozzle_diameter"}));
+    PrintConfigDef::handle_legacy_composite(project);
+    CHECK(project.option<ConfigOptionStrings>("different_settings_to_system")->values.front() ==
+          "enable_support;wall_loops;multi_nozzle_layer_heights");
+
+    DynamicPrintConfig without_heights;
+    without_heights.set_key_value("extruder_layer_height", new ConfigOptionFloats({0., 0.}));
+    PrintConfigDef::handle_legacy_composite(without_heights);
+    CHECK_FALSE(without_heights.has("multi_nozzle_layer_heights"));
+
+    DynamicPrintConfig chosen;
+    chosen.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.2, 0.1}));
+    chosen.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
+    PrintConfigDef::handle_legacy_composite(chosen);
+    CHECK(chosen.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value == mnlhOff);
+}
+
+TEST_CASE("Off slices like stock even when the printer carries preferred heights", "[MultiNozzleLayerHeight][Strategy]")
+{
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
+    apply_extruder_layer_height_plan(config);
+    Print print;
+    Model model;
+    init_two_part_print(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    CHECK_FALSE(po.has_combined_layer_regions());
+    for (const Layer *layer : po.layers())
+        for (const LayerRegion *layerm : layer->regions())
+            CHECK(layerm->combined_layer_count() <= 1);
+}
+
+TEST_CASE("Grid steps let two parts on one nozzle print at different heights", "[MultiNozzleLayerHeight][Strategy][WipeTower]")
+{
+    // Normal on two 0.4 mm nozzles: both print 0.2 mm on a 0.1 mm grid. The first part steps down
+    // one grid step to 0.1 mm, the second keeps 0.2 mm; with the prime tower on.
+    DynamicPrintConfig config = two_extruder_config(0.2);
+    config.set_key_value("nozzle_diameter",            new ConfigOptionFloats({0.4, 0.4}));
+    config.set_key_value("min_layer_height",           new ConfigOptionFloats({0.08, 0.08}));
+    config.set_key_value("max_layer_height",           new ConfigOptionFloats({0.32, 0.32}));
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhNormal));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("enable_prime_tower",         new ConfigOptionBool(true));
+    config.set_key_value("single_extruder_multi_material", new ConfigOptionBool(false));
+    config.set_key_value("use_relative_e_distances",   new ConfigOptionBool(true));
+    config.set_key_value("layer_change_gcode",         new ConfigOptionString("G92 E0"));
+    config.set_key_value("wipe_tower_x",               new ConfigOptionFloats({10.}));
+    config.set_key_value("wipe_tower_y",               new ConfigOptionFloats({10.}));
+    apply_extruder_layer_height_plan(config);
+    REQUIRE(config.opt_float("layer_height") == Catch::Approx(0.1).margin(1e-9));
+    Print print;
+    Model model;
+    init_two_part_print(print, model, config, 0.25f, TestMesh::cube_20x20x20, 1, 2);
+    model.objects.front()->volumes[0]->config.set("nozzle_layer_height_steps", -1);
+    print.apply(model, config);
+    REQUIRE(print.validate().string.empty());
+    const std::string gcode = Slic3r::Test::gcode(print);
+    REQUIRE(! gcode.empty());
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    REQUIRE(coarse_region >= 0);
+    CHECK(po.region_layer_height_multiplier(po.printing_region(size_t(fine_region))) == 1);
+    CHECK(po.region_layer_height_multiplier(po.printing_region(size_t(coarse_region))) == 2);
+    // The fine part prints every 0.1 mm row, the coarse part in 0.2 mm runs.
+    size_t fine_rows = 0, coarse_runs = 0;
+    for (const Layer *layer : po.layers()) {
+        if (layer->id() == 0)
+            continue;
+        const LayerRegion *fine = layer->regions()[size_t(fine_region)], *coarse = layer->regions()[size_t(coarse_region)];
+        if (! fine->slices.empty()) {
+            CHECK(fine->combined_height() == Catch::Approx(0.1).margin(1e-6));
+            ++ fine_rows;
+        }
+        if (! coarse->slices.empty() && coarse->combined_layer_count() == 2)
+            ++ coarse_runs;
+    }
+    CHECK(fine_rows > 30);
+    CHECK(coarse_runs > 15);
 }

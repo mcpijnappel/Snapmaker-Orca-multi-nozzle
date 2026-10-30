@@ -3153,7 +3153,10 @@ void TabPrint::build()
             optgroup->append_line(line);
         }
         optgroup = page->new_optgroup(L("Layer height"), L"param_layer_height");
+        // Snapmaker Orca Max: layer height strategies for mixed nozzle sizes.
+        optgroup->append_single_option_line("multi_nozzle_layer_heights", "quality_settings_layer_height");
         optgroup->append_single_option_line("layer_height","quality_settings_layer_height");
+        optgroup->append_single_option_line("nozzle_layer_height_steps", "quality_settings_layer_height");
         optgroup->append_single_option_line("initial_layer_print_height","quality_settings_layer_height");
         optgroup->append_single_option_line("enable_mixed_color_sublayer");
 

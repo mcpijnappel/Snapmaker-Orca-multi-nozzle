@@ -402,6 +402,20 @@ enum SupportLayerHeightStep : int {
     slhsPreferred, // Snapmaker Orca Max: the support nozzle's preferred layer height, on the parts' ladder
 };
 
+// Snapmaker Orca Max: layer heights for printers whose extruders have different nozzle sizes.
+// Off slices with one layer height; the strategies give every nozzle the same share of its
+// diameter on one common grid (see multi_nozzle_strategy_fraction()); Custom uses the printer's
+// per-extruder "Preferred layer height" values (projects made before the strategies existed).
+enum MultiNozzleLayerHeights : int {
+    mnlhOff = 0,
+    mnlhUltraFine,
+    mnlhFine,
+    mnlhNormal,
+    mnlhCoarse,
+    mnlhSuperCoarse,
+    mnlhCustom,
+};
+
 enum SkirtType {
     stCombined, stPerObject
 };
@@ -738,6 +752,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TimelapseType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportLayerHeightStep)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(MultiNozzleLayerHeights)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BedType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SkirtType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(InputShaperType)
@@ -1378,6 +1393,8 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
+    // Snapmaker Orca Max: whole grid steps added to this part's nozzle height (multi-nozzle strategies).
+    ((ConfigOptionInt,   nozzle_layer_height_steps))
     ((ConfigOptionInts,  print_extruder_id))
     ((ConfigOptionStrings,  print_extruder_variant))
     // Snapmaker Orca: per column of the process layout, the keys set for the column's tool head
@@ -2084,6 +2101,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     // BBS: move from PrintObjectConfig
     ((ConfigOptionBool, independent_support_layer_height))
     ((ConfigOptionEnum<SupportLayerHeightStep>, support_layer_height_step))
+    ((ConfigOptionEnum<MultiNozzleLayerHeights>, multi_nozzle_layer_heights))
     ((ConfigOptionBool,               combine_brims))
     // SoftFever
     ((ConfigOptionPercents,            filament_shrink))

@@ -98,6 +98,11 @@ std::string default_print_profile_of(const Preset &machine)
 
 bool compatible(const PresetBundle &bundle, const Preset &process, const Preset &machine)
 {
+    // Snapmaker Orca Max: a multi-nozzle preset plans the whole print across all nozzle sizes; it is
+    // no preset of one tool head's size.
+    if (const auto *strategy = process.config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+        strategy != nullptr && strategy->value != mnlhOff && strategy->value != mnlhCustom)
+        return false;
     return is_compatible_with_printer(bundle.prints.get_preset_with_vendor_profile(process), bundle.printers.get_preset_with_vendor_profile(machine));
 }
 

@@ -660,6 +660,8 @@ bool ToolOrdering::insert_wipe_tower_extruder()
     return changed;
 }
 
+static std::map<unsigned int, double> filament_part_heights(const std::vector<const PrintObject*> &objects);
+
 void ToolOrdering::sort_and_build_data(const Print& print, unsigned int first_extruder, bool prime_multi_material)
 {
     // if first extruder is -1, we can decide the first layer tool order before doing reorder function
@@ -668,7 +670,7 @@ void ToolOrdering::sort_and_build_data(const Print& print, unsigned int first_ex
     this->resolve_mixed_filaments(print.config());
     reorder_extruders_for_minimum_flush_volume(reorder_first_layer);
     this->enforce_mixed_component_order();
-    this->plan_fine_finish_order(print.config());
+    this->plan_fine_finish_order(print.config(), filament_part_heights({ print.objects().begin(), print.objects().end() }));
     m_sorted = true;
 
     double max_layer_height = 0.;
@@ -702,7 +704,7 @@ void ToolOrdering::sort_and_build_data(const Print& print, unsigned int first_ex
         // Orca reorders a second time here (BBS has no such path); re-enforce so the
         // mixed sub-layer component order survives the extra pass.
         this->enforce_mixed_component_order();
-        this->plan_fine_finish_order(print.config());
+        this->plan_fine_finish_order(print.config(), filament_part_heights({ print.objects().begin(), print.objects().end() }));
         this->fill_wipe_tower_partitions(print.config(), object_bottom_z, raft_top_z, max_layer_height);
     }
 
@@ -717,7 +719,7 @@ void ToolOrdering::sort_and_build_data(const PrintObject& object , unsigned int 
     this->resolve_mixed_filaments(object.print()->config());
     reorder_extruders_for_minimum_flush_volume(reorder_first_layer);
     this->enforce_mixed_component_order();
-    this->plan_fine_finish_order(object.print()->config());
+    this->plan_fine_finish_order(object.print()->config(), filament_part_heights({ &object }));
     m_sorted = true;
 
     double max_layer_height = calc_max_layer_height(object.print()->config(), object.config().layer_height, used_heads(m_layer_tools, object.print()->config()));
@@ -728,7 +730,7 @@ void ToolOrdering::sort_and_build_data(const PrintObject& object , unsigned int 
         // Orca reorders a second time here (BBS has no such path); re-enforce so the
         // mixed sub-layer component order survives the extra pass.
         this->enforce_mixed_component_order();
-        this->plan_fine_finish_order(object.print()->config());
+        this->plan_fine_finish_order(object.print()->config(), filament_part_heights({ &object }));
         this->fill_wipe_tower_partitions(object.print()->config(), object.layers().front()->print_z - object.layers().front()->height, object.slicing_parameters().raft_layers() > 0 ? object.slicing_parameters().raft_contact_top_z : 0., max_layer_height);
     }
 
@@ -3289,7 +3291,26 @@ void ToolOrdering::resolve_mixed_filaments(const PrintConfig &config)
 // (flush-optimised) order. Every layer prints each of its filaments once, so only the first and the
 // last filament of a layer decide the changes: a dynamic programme over the layers, state = the
 // filament left loaded, finds the best chain.
-void ToolOrdering::plan_fine_finish_order(const PrintConfig &config)
+// Snapmaker Orca Max: the finest height each 0-based filament prints its parts' walls at, from the
+// objects' regions with their per-part grid steps (0 = Default: the object layer height).
+static std::map<unsigned int, double> filament_part_heights(const std::vector<const PrintObject*> &objects)
+{
+    std::map<unsigned int, double> heights;
+    for (const PrintObject *object : objects)
+        for (size_t r = 0; r < object->num_printing_regions(); ++ r) {
+            const PrintRegionConfig &config   = object->printing_region(r).config();
+            const unsigned int       filament = (unsigned int)std::max(1, config.outer_wall_filament_id.value);
+            double height = object->extruder_preferred_layer_height(filament, &config);
+            if (height <= 0.)
+                height = object->config().layer_height.value;
+            auto [it, inserted] = heights.emplace(filament - 1, height);
+            if (! inserted)
+                it->second = std::min(it->second, height);
+        }
+    return heights;
+}
+
+void ToolOrdering::plan_fine_finish_order(const PrintConfig &config, const std::map<unsigned int, double> &filament_heights)
 {
     for (LayerTools &lt : m_layer_tools)
         lt.pin_extruder_order = false;
@@ -3298,7 +3319,9 @@ void ToolOrdering::plan_fine_finish_order(const PrintConfig &config)
         return;
     // The preferred height of a zero based filament's nozzle; 0 (Default) prints the object grid,
     // the finest height there is.
-    auto height_of = [&config](unsigned int filament) {
+    auto height_of = [&config, &filament_heights](unsigned int filament) {
+        if (auto it = filament_heights.find(filament); it != filament_heights.end())
+            return it->second;
         return config.extruder_layer_height.get_at(Print::width_slot(config, filament + 1));
     };
 

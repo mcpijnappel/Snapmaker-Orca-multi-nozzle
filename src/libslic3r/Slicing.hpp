@@ -221,6 +221,17 @@ struct ExtruderLayerHeightPlan
     std::vector<size_t> pinned;                // Default extruders pinned to the previous height
 };
 
+// Snapmaker Orca Max: multi-nozzle layer height strategies (MultiNozzleLayerHeights, as int).
+// Share of the nozzle diameter a strategy prints at (0.3 .. 0.7), 0 for Off and Custom.
+double multi_nozzle_strategy_fraction(int strategy);
+// The strategy's common grid: the 0.2 mm nozzle's height (0 for Off and Custom).
+double multi_nozzle_strategy_grid(int strategy);
+// A height on `grid`: `steps` grid steps away from `height`, never below one step, and inside the
+// nozzle's min / max layer height and bore where a grid multiple fits there (max_lh <= 0: no max).
+double stepped_nozzle_layer_height(double height, int steps, double grid, double nozzle, double min_lh, double max_lh);
+// The strategy's height for a nozzle: its share of the diameter on the grid, within the limits.
+double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, double max_lh);
+
 // The coarsest object layer height every explicit height is a whole multiple of; with
 // `include_base` the given base joins in, so the result can only be finer than it. Capped to
 // `max_height` (largest divisor that fits) when that is > 0. 0 when nothing constrains it.

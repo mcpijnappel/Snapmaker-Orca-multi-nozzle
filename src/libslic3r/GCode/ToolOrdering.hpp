@@ -429,7 +429,9 @@ private:
     void                reorder_extruders_for_minimum_flush_volume(bool reorder_first_layer);
     void                resolve_mixed_filaments(const PrintConfig &config);
     void                enforce_mixed_component_order();
-    void                plan_fine_finish_order(const PrintConfig &config);
+    // Snapmaker Orca Max: filament_heights holds the finest height each (0-based) filament prints
+    // its parts at (per-part grid steps included); filaments missing there use their nozzle's height.
+    void                plan_fine_finish_order(const PrintConfig &config, const std::map<unsigned int, double> &filament_heights = {});
 
     // BBS
     std::vector<unsigned int> generate_first_layer_tool_order(const Print& print);

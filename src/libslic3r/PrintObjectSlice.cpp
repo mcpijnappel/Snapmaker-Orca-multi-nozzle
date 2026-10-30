@@ -993,6 +993,157 @@ void PrintObject::overlap_material_regions()
 // run are detected against the layer below the whole run. Only geometry too short for a whole run
 // prints thinner, and a run ends early where dropping part of a layer would expose another region's
 // colour. Uniform layer heights are required (Print::validate() rejects variable layer heights).
+void PrintObject::absorb_thin_region_pieces(size_t region_id, size_t mult, size_t min_run, float bead)
+{
+    const PrintConfig &print_config = m_print->config();
+    const double       h            = m_config.layer_height.value;
+    if (h <= EPSILON || m_layers.size() <= first_combined_layer_idx)
+        return;
+    // Tallest piece the region's nozzles may print: their max layer height and bore. Never below
+    // the region's own pitch, which Print::validate() checks on its own.
+    double max_height = std::numeric_limits<double>::max();
+    {
+        std::vector<unsigned int> filaments; // 0-based
+        bool                      pitch_from_features = false;
+        this->collect_region_pitch_filaments(this->printing_region(region_id).config(), filaments, pitch_from_features);
+        for (unsigned int filament : filaments) {
+            const size_t extruder = m_print->extruder_index_of(filament);
+            max_height = std::min(max_height, print_config.nozzle_diameter.get_at(extruder));
+            if (const double max_lh = print_config.max_layer_height.get_at(extruder); max_lh > EPSILON)
+                max_height = std::min(max_height, max_lh);
+        }
+    }
+    const size_t max_rows = std::max(mult, size_t(std::floor(max_height / h + EPSILON)));
+
+    auto layerm_at = [this, region_id](size_t row) { return m_layers[row]->regions()[region_id]; };
+    // A printed piece: a run (rows bottom..top, printed at top) or a single row.
+    struct Piece { size_t bottom, top; };
+    auto pieces_of = [&]() {
+        std::vector<Piece> out;
+        for (size_t row = first_combined_layer_idx; row < m_layers.size(); ++ row) {
+            const LayerRegion *layerm = layerm_at(row);
+            if (layerm->combined_layer_count() == 0 || layerm->slices.empty())
+                continue;
+            const size_t n = std::max<size_t>(1, layerm->combined_layer_count());
+            out.push_back({ row + 1 - std::min(n, row + 1), row });
+        }
+        return out;
+    };
+    auto shape_of = [&](const Piece &p) { return to_expolygons(layerm_at(p.top)->slices.surfaces); };
+    // The region's own shape at `row` before its runs were committed: the piece's shape plus what
+    // the piece dropped there.
+    auto original_row = [&](const Piece &p, size_t row) { return union_ex(shape_of(p), layerm_at(row)->combined_away_exposed()); };
+    auto commit = [&](size_t bottom, size_t top, const ExPolygons &shape, const std::vector<ExPolygons> &orig, size_t orig_bottom) {
+        double height = 0.;
+        for (size_t row = bottom; row <= top; ++ row)
+            height += m_layers[row]->height;
+        for (size_t row = bottom; row <= top; ++ row) {
+            LayerRegion *layerm = layerm_at(row);
+            layerm->m_combined_away_exposed = diff_ex(orig[row - orig_bottom], shape);
+            if (row < top) {
+                layerm->slices.clear();
+                layerm->m_combined_layer_count = 0;
+                layerm->m_combined_height      = 0.;
+            } else {
+                layerm->slices.set(shape, stInternal);
+                layerm->m_combined_layer_count = (unsigned short)(top - bottom + 1);
+                layerm->m_combined_height      = top > bottom ? height : 0.;
+            }
+        }
+    };
+
+    for (size_t pass = 0; pass < 4 * m_layers.size(); ++ pass) {
+        m_print->throw_if_canceled();
+        const std::vector<Piece> pieces  = pieces_of();
+        bool                     changed = false;
+        for (size_t i = 0; i < pieces.size() && ! changed; ++ i) {
+            const Piece thin = pieces[i];
+            if (thin.top + 1 - thin.bottom >= min_run)
+                continue;
+            const ExPolygons thin_shape = shape_of(thin);
+            const bool       has_above  = i + 1 < pieces.size() && pieces[i + 1].bottom == thin.top + 1;
+            if (opening_ex(thin_shape, bead).empty()) {
+                // A fragment narrower than a bead of the region's nozzle at the start of a slope:
+                // the region's piece right above covers it and prints that material.
+                if (has_above && diff_ex(thin_shape, offset_ex(shape_of(pieces[i + 1]), bead)).empty()) {
+                    for (size_t row = thin.bottom; row <= thin.top; ++ row) {
+                        LayerRegion *layerm = layerm_at(row);
+                        layerm->m_combined_away_exposed = original_row(thin, row);
+                        layerm->slices.clear();
+                        layerm->m_combined_layer_count = 1;
+                        layerm->m_combined_height      = 0.;
+                    }
+                    changed = true;
+                }
+                continue;
+            }
+            // Merge with the piece right below or right above, or share their rows evenly, as long
+            // as no row loses printable area (nothing wider than a bead) against the pieces now.
+            for (const bool below : { true, false }) {
+                if (below ? ! (i > 0 && pieces[i - 1].top + 1 == thin.bottom) : ! has_above)
+                    continue;
+                const Piece  lo    = below ? pieces[i - 1] : thin;
+                const Piece  hi    = below ? thin : pieces[i + 1];
+                const size_t total = hi.top + 1 - lo.bottom;
+                std::vector<ExPolygons> orig(total), printed(total);
+                for (const Piece &p : { lo, hi }) {
+                    const ExPolygons shape = shape_of(p);
+                    for (size_t row = p.bottom; row <= p.top; ++ row) {
+                        orig[row - lo.bottom]    = original_row(p, row);
+                        printed[row - lo.bottom] = shape;
+                    }
+                }
+                auto common = [&](size_t bottom, size_t top) {
+                    ExPolygons shape = orig[bottom - lo.bottom];
+                    for (size_t row = bottom + 1; row <= top; ++ row)
+                        shape = intersection_ex(shape, orig[row - lo.bottom]);
+                    return shape;
+                };
+                auto keeps_all = [&](size_t bottom, size_t top, const ExPolygons &shape) {
+                    if (opening_ex(shape, bead).empty())
+                        return false;
+                    for (size_t row = bottom; row <= top; ++ row)
+                        if (! opening_ex(diff_ex(printed[row - lo.bottom], shape), bead).empty())
+                            return false;
+                    return true;
+                };
+                using Split = std::vector<std::pair<size_t, size_t>>;
+                std::vector<Split> options;
+                const size_t lower_rows = total - total / 2;
+                const Split  merged     = { { lo.bottom, hi.top } };
+                const Split  shared     = { { lo.bottom, lo.bottom + lower_rows - 1 }, { lo.bottom + lower_rows, hi.top } };
+                const bool   can_merge  = total <= max_rows;
+                const bool   can_share  = total / 2 >= min_run && lower_rows <= max_rows;
+                // One piece while it stays near the region's pitch, else two even ones.
+                if (can_merge && (2 * total <= 3 * mult || ! can_share))
+                    options.push_back(merged);
+                if (can_share)
+                    options.push_back(shared);
+                if (can_merge && options.front() != merged)
+                    options.push_back(merged);
+                for (const Split &option : options) {
+                    std::vector<ExPolygons> shapes;
+                    bool ok = true;
+                    for (const auto &[bottom, top] : option) {
+                        shapes.emplace_back(common(bottom, top));
+                        ok &= keeps_all(bottom, top, shapes.back());
+                    }
+                    if (! ok)
+                        continue;
+                    for (size_t k = 0; k < option.size(); ++ k)
+                        commit(option[k].first, option[k].second, shapes[k], orig, lo.bottom);
+                    changed = true;
+                    break;
+                }
+                if (changed)
+                    break;
+            }
+        }
+        if (! changed)
+            break;
+    }
+}
+
 void PrintObject::apply_extruder_layer_heights()
 {
     m_rounded_bottoms.clear();
@@ -1392,6 +1543,8 @@ void PrintObject::apply_extruder_layer_heights()
             // top / bottom detection of the other regions, brim, supports and overhang handling.
             idx = commit_top + 1;
         }
+        if (! walls_only && mult > 1 && min_run > 1)
+            this->absorb_thin_region_pieces(region_id, mult, min_run, bead);
         // ORCA: split wall layer heights - group the fine cadence into coarse runs of
         // split_coarses[region_id] layers and mark them for LayerRegion::make_perimeters(): the
         // coarse wall class extrudes once per coarse run at the full run height and follows the

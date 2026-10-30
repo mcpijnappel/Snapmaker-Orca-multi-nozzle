@@ -1072,6 +1072,48 @@ int generate_layer_height_texture(
     return ncells;
 }
 
+double multi_nozzle_strategy_fraction(int strategy)
+{
+    switch (strategy) {
+    case mnlhUltraFine:   return 0.3;
+    case mnlhFine:        return 0.4;
+    case mnlhNormal:      return 0.5;
+    case mnlhCoarse:      return 0.6;
+    case mnlhSuperCoarse: return 0.7;
+    default:              return 0.;
+    }
+}
+
+double multi_nozzle_strategy_grid(int strategy)
+{
+    return std::round(multi_nozzle_strategy_fraction(strategy) * 0.2 / 0.005) * 0.005;
+}
+
+double stepped_nozzle_layer_height(double height, int steps, double grid, double nozzle, double min_lh, double max_lh)
+{
+    if (grid <= EPSILON || height <= EPSILON)
+        return height;
+    long n = std::max(1L, std::lround(height / grid) + steps);
+    double top = nozzle > EPSILON ? nozzle : std::numeric_limits<double>::max();
+    if (max_lh > EPSILON)
+        top = std::min(top, max_lh);
+    const long n_min = std::max(1L, long(std::ceil(min_lh / grid - EPSILON)));
+    const long n_max = long(std::floor(top / grid + EPSILON));
+    if (n_min <= n_max)
+        n = std::clamp(n, n_min, n_max);
+    else if (n_max >= 1)
+        n = std::min(n, n_max);
+    return std::round(n * grid * 1e6) / 1e6;
+}
+
+double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, double max_lh)
+{
+    const double grid = multi_nozzle_strategy_grid(strategy);
+    if (grid <= EPSILON || nozzle <= EPSILON)
+        return 0.;
+    return stepped_nozzle_layer_height(multi_nozzle_strategy_fraction(strategy) * nozzle, 0, grid, nozzle, min_lh, max_lh);
+}
+
 // ORCA multi-nozzle-size: see Slicing.hpp.
 double conforming_object_layer_height(const std::vector<double> &heights, double base, bool include_base, double max_height)
 {
@@ -1221,8 +1263,9 @@ DynamicPrintConfig extruder_layer_height_inputs(const DynamicPrintConfig &printe
     for (const char *key : { "extruder_layer_height", "extruder_layer_height_exact", "nozzle_diameter", "min_layer_height", "max_layer_height" })
         if (const ConfigOption *option = printer.option(key); option != nullptr)
             inputs.set_key_value(key, option->clone());
-    if (const ConfigOption *option = print.option("layer_height"); option != nullptr)
-        inputs.set_key_value("layer_height", option->clone());
+    for (const char *key : { "layer_height", "multi_nozzle_layer_heights" })
+        if (const ConfigOption *option = print.option(key); option != nullptr)
+            inputs.set_key_value(key, option->clone());
     return inputs;
 }
 
@@ -1242,10 +1285,33 @@ bool extruder_layer_heights_conform(const std::vector<double> &heights, double b
     return true;
 }
 
+// The configured multi-nozzle strategy; configs without the key keep the printer's heights.
+static int multi_nozzle_strategy_of(const DynamicPrintConfig &config)
+{
+    const auto *option = config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    return option == nullptr ? int(mnlhCustom) : int(option->value);
+}
+
 ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfig &config)
 {
     ExtruderLayerHeightPlan   effective;
     const std::vector<double> nozzles = floats_of(config, "nozzle_diameter");
+    const int                 strategy = multi_nozzle_strategy_of(config);
+    if (strategy != mnlhCustom) {
+        // Off: one layer height for everything (every extruder at Default). A strategy: each
+        // nozzle's share of its diameter on the strategy's grid, which becomes the layer height.
+        const auto  *base_option = config.option<ConfigOptionFloat>("layer_height");
+        effective.heights.assign(std::max<size_t>(1, nozzles.size()), 0.);
+        effective.grid = base_option != nullptr ? base_option->value : 0.;
+        if (strategy == mnlhOff || nozzles.empty())
+            return effective;
+        const std::vector<double> min_lh = floats_of(config, "min_layer_height");
+        const std::vector<double> max_lh = floats_of(config, "max_layer_height");
+        effective.grid = multi_nozzle_strategy_grid(strategy);
+        for (size_t j = 0; j < nozzles.size(); ++ j)
+            effective.heights[j] = multi_nozzle_strategy_height(strategy, nozzles[j], value_at(min_lh, j), value_at(max_lh, j));
+        return effective;
+    }
     effective.heights                 = floats_of(config, "extruder_layer_height");
     if (! nozzles.empty())
         effective.heights.resize(nozzles.size(), 0.);
@@ -1271,8 +1337,9 @@ ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfi
 
 bool apply_extruder_layer_height_plan(DynamicPrintConfig &config)
 {
-    const std::vector<double> stored = floats_of(config, "extruder_layer_height");
-    if (! has_explicit_height(stored))
+    const std::vector<double> stored   = floats_of(config, "extruder_layer_height");
+    const int                 strategy = multi_nozzle_strategy_of(config);
+    if (strategy == mnlhCustom ? ! has_explicit_height(stored) : (strategy == mnlhOff && ! has_explicit_height(stored)))
         return false;
     config.set_key_value(extruder_layer_height_planned_key, new ConfigOptionBool(true));
     const ExtruderLayerHeightPlan effective = effective_extruder_layer_heights(config);

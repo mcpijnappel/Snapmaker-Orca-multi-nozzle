@@ -9,6 +9,7 @@
 #include "DeviceCore/DevConfigUtil.h"
 #include "format.hpp"
 #include "libslic3r/Config.hpp"
+#include "libslic3r/Slicing.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/FilamentFlowColumns.hpp"
@@ -408,6 +409,16 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         new_conf.set_key_value("layer_height", new ConfigOptionFloat(0.2));
         apply(config, &new_conf);
         is_msg_dlg_already_exist = false;
+    }
+
+    // Snapmaker Orca Max: with a multi-nozzle strategy the layer height is the strategy's grid.
+    if (config->has("multi_nozzle_layer_heights")) {
+        const double grid = multi_nozzle_strategy_grid(config->option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value);
+        if (grid > EPSILON && std::abs(config->opt_float("layer_height") - grid) > EPSILON) {
+            DynamicPrintConfig new_conf = *config;
+            new_conf.set_key_value("layer_height", new ConfigOptionFloat(grid));
+            apply(config, &new_conf);
+        }
     }
 
     //BBS: ironing_spacing shouldn't be too small or equal to zero
@@ -1058,6 +1069,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     // classic supports synchronized with the object layers read its "preferred" choice too.
     const bool classic_synchronized = have_support_material && !support_is_tree &&
                                       (config->opt_bool("enable_prime_tower") || !config->opt_bool("independent_support_layer_height"));
+    // Snapmaker Orca Max: multi-nozzle layer heights. A strategy sets the layer height (its grid);
+    // the grid steps of objects and parts need one (or Custom's printer heights).
+    if (config->has("multi_nozzle_layer_heights")) {
+        const auto strategy = config->option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value;
+        toggle_field("layer_height", strategy == mnlhOff || strategy == mnlhCustom);
+        toggle_line("nozzle_layer_height_steps", strategy != mnlhOff);
+    }
     toggle_line("support_layer_height_step", ((support_is_normal_tree && config->opt_bool("independent_support_layer_height") &&
                                                config->opt_bool("enable_prime_tower")) || classic_synchronized) && !bSEMM);
 

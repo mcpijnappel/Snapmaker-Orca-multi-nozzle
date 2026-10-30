@@ -1340,7 +1340,7 @@ static std::vector<std::string> s_Preset_print_options{
     "print_extruder_id",
     "print_extruder_variant",
     "print_extruder_override", // Snapmaker Orca: the marker of the values set per tool head (libslic3r/PerHeadProcess.hpp)
-    "independent_support_layer_height", "support_layer_height_step",
+    "independent_support_layer_height", "support_layer_height_step", "multi_nozzle_layer_heights", "nozzle_layer_height_steps",
     "support_angle",
     "support_interface_top_layers",
     "support_interface_bottom_layers",

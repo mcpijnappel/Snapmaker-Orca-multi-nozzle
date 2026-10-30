@@ -1328,6 +1328,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "mmu_segmented_region_max_width"
             || opt_key == "mmu_segmented_region_interlocking_depth"
             || opt_key == "multi_material_overlap"
+            || opt_key == "nozzle_layer_height_steps"
             || opt_key == "raft_layers"
             || opt_key == "raft_contact_distance"
             || opt_key == "slice_closing_radius"
@@ -4202,7 +4203,7 @@ std::vector<unsigned int> PrintObject::object_extruders() const
 
 // Per-extruder layer height ("extruder_layer_height" printer option).
 // Raw preferred layer height (mm) of the extruder printing the given 1-based filament id, 0 when unset or not reliably resolvable.
-double PrintObject::extruder_preferred_layer_height(unsigned int filament_id) const
+double PrintObject::extruder_preferred_layer_height(unsigned int filament_id, const PrintRegionConfig *region) const
 {
     const PrintConfig &print_config = m_print->config();
     if (print_config.extruder_layer_height.empty())
@@ -4214,14 +4215,22 @@ double PrintObject::extruder_preferred_layer_height(unsigned int filament_id) co
     // different physical extruder on every layer, so no stable preferred height exists for them.
     if (filament_id > print_config.filament_diameter.values.size())
         return 0.;
-    return std::max(0., print_config.extruder_layer_height.get_at(m_print->extruder_index_of(filament_id - 1)));
+    const size_t extruder_idx = m_print->extruder_index_of(filament_id - 1);
+    const double height       = std::max(0., print_config.extruder_layer_height.get_at(extruder_idx));
+    // Snapmaker Orca Max: an object's or part's grid steps (multi-nozzle layer heights).
+    if (region == nullptr || height <= 0. || region->nozzle_layer_height_steps.value == 0)
+        return height;
+    return stepped_nozzle_layer_height(height, region->nozzle_layer_height_steps.value, m_config.layer_height.value,
+                                       print_config.nozzle_diameter.get_at(extruder_idx),
+                                       print_config.min_layer_height.get_at(extruder_idx),
+                                       print_config.max_layer_height.get_at(extruder_idx));
 }
 
 // Returns the number of object layers a region printing with the given 1-based filament id combines into one extrusion (1 = no combining).
 // The configured height must be a (near) integer multiple of the object layer height, otherwise it is ignored here and rejected by Print::validate().
-unsigned int PrintObject::layer_height_multiplier_for_filament(unsigned int filament_id) const
+unsigned int PrintObject::layer_height_multiplier_for_filament(unsigned int filament_id, const PrintRegionConfig *region) const
 {
-    const double extruder_height = this->extruder_preferred_layer_height(filament_id);
+    const double extruder_height = this->extruder_preferred_layer_height(filament_id, region);
     if (extruder_height <= 0.)
         return 1;
     const double layer_height = m_config.layer_height.value;
@@ -4299,7 +4308,7 @@ bool PrintObject::collect_region_pitch_filaments(const PrintRegionConfig &config
         if (has_mixed)
             return false;
         const bool walls_explicit = std::any_of(filaments.begin(), filaments.end(),
-            [this](unsigned int f) { return this->extruder_preferred_layer_height(f + 1) > 0.; });
+            [this, &config](unsigned int f) { return this->extruder_preferred_layer_height(f + 1, &config) > 0.; });
         if (! walls_explicit) {
             // Walls without an explicit preference follow the agreement of the part's other
             // pitch-bound features, so assigning e.g. the top surface to a coarse extruder
@@ -4338,9 +4347,9 @@ unsigned int PrintObject::region_layer_height_multiplier(const PrintRegion &regi
     for (unsigned int filament : filaments) {
         // A filament without a preference (0 = object layer height) follows the pitch of the
         // filaments that have one instead of vetoing it; only explicit preferences must agree.
-        if (this->extruder_preferred_layer_height(filament + 1) <= 0.)
+        if (this->extruder_preferred_layer_height(filament + 1, &config) <= 0.)
             continue;
-        unsigned int m = this->layer_height_multiplier_for_filament(filament + 1);
+        unsigned int m = this->layer_height_multiplier_for_filament(filament + 1, &config);
         if (pitch_from_features && m <= 1)
             // Feature filaments only OFFER a pitch: a non-conforming preference is skipped here
             // (Print::validate() warns) instead of blocking the remaining features' agreement.
@@ -4432,10 +4441,10 @@ bool PrintObject::wall_effective_multipliers(const PrintRegion &region, unsigned
         // Snapmaker mixed filament: virtual mixed ids resolve to a different physical extruder
         // per layer, no stable pitch exists for the walls.
         return false;
-    auto conforming_multiplier = [this](int filament_id) -> unsigned int {
-        if (this->extruder_preferred_layer_height((unsigned int)std::max(0, filament_id)) <= 0.)
+    auto conforming_multiplier = [this, &config](int filament_id) -> unsigned int {
+        if (this->extruder_preferred_layer_height((unsigned int)std::max(0, filament_id), &config) <= 0.)
             return 0;
-        return this->layer_height_multiplier_for_filament((unsigned int)std::max(0, filament_id));
+        return this->layer_height_multiplier_for_filament((unsigned int)std::max(0, filament_id), &config);
     };
     outer_m = config.wall_loops.value > 0 ? conforming_multiplier(config.outer_wall_filament_id.value) : 0;
     inner_m = config.wall_loops.value > 0 && region_prints_inner_walls(config) ?
@@ -5485,7 +5494,7 @@ void PrintObject::combine_top_surfaces()
         if (this->region_layer_height_multiplier(region) > 1)
             continue;
         const unsigned int mult = this->layer_height_multiplier_for_filament(
-            (unsigned int)std::max(0, config.top_surface_filament_id.value));
+            (unsigned int)std::max(0, config.top_surface_filament_id.value), &config);
         if (mult <= 1)
             continue;
         // Top-down, so the uppermost (most visible) top surfaces absorb first where columns are
@@ -5694,7 +5703,7 @@ void PrintObject::combine_internal_solid_infill()
         if (this->region_layer_height_multiplier(region) > 1)
             continue;
         const unsigned int mult = this->layer_height_multiplier_for_filament(
-            (unsigned int)std::max(0, config.internal_solid_filament_id.value));
+            (unsigned int)std::max(0, config.internal_solid_filament_id.value), &config);
         if (mult <= 1)
             continue;
         const double min_layer_height = m_print->config().min_layer_height.get_at(
@@ -5725,7 +5734,7 @@ void PrintObject::combine_infill()
         const int combine_filament_id = std::max(1, combine_solid ? region.config().internal_solid_filament_id.value :
                                                                     region.config().sparse_infill_filament_id.value);
         const size_t combine_extruder_idx = this->print()->extruder_index_of((unsigned int)(combine_filament_id - 1));
-        double preferred_infill_height = this->extruder_preferred_layer_height((unsigned int)combine_filament_id);
+        double preferred_infill_height = this->extruder_preferred_layer_height((unsigned int)combine_filament_id, &region.config());
         if (preferred_infill_height <= m_config.layer_height.value + EPSILON)
             preferred_infill_height = 0.;
         if ((enable_combine_infill == false && preferred_infill_height == 0.) || region.config().sparse_infill_density == 0.)
