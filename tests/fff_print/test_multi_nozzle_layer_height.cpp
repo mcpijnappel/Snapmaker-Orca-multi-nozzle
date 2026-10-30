@@ -2968,6 +2968,30 @@ TEST_CASE("A fine part bottom without support under it is printed by the neighbo
     CHECK(object_warns(po, "has no support under it"));
 }
 
+TEST_CASE("Auto support finds the underside of a part printed in thicker runs", "[MultiNozzleLayerHeight][Support]")
+{
+    // The coarse plate's ring hangs 0.8 mm over the bed, beside the fine insert and the leg. Inside
+    // its runs the ring has no slices of its own, so normal support used to see only the insert's
+    // underside and left the ring (20 x 20 - insert 8 x 8 - leg 4 x 4 = 320 mm2) unsupported.
+    DynamicPrintConfig config = two_extruder_config(0.4);
+    config.set_key_value("enable_support", new ConfigOptionBool(true));
+    const SupportType type = GENERATE(stNormalAuto, stTreeAuto);
+    config.set_key_value("support_type", new ConfigOptionEnum<SupportType>(type));
+    Print print;
+    Model model;
+    add_inlaid_plate(model);
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    double area = 0.;
+    for (const SupportLayer *layer : po.support_layers())
+        if (layer->print_z > 0.5 && layer->print_z < 0.8 + EPSILON)
+            area = std::max(area, unscaled<double>(unscaled<double>(Slic3r::area(layer->support_islands))));
+    CAPTURE(int(type), area);
+    CHECK(area > 250.);
+}
+
 TEST_CASE("A support enforcer under a fine part bottom lets it print on the support", "[MultiNozzleLayerHeight][Support]")
 {
     DynamicPrintConfig config = two_extruder_config(0.4);

@@ -1365,6 +1365,19 @@ static const double sharp_tail_xy_gap = 0.2f;
 static const double no_overlap_xy_gap = 0.2f;
 static const double sharp_tail_max_support_height = 16.f;
 
+// Snapmaker Orca Max: a region printed in thicker runs has no slices on the rows inside a run; the run
+// top above prints those rows with its shape. The object outline (lslices) does cover them, so reading
+// the empty slices there hid the region's whole underside from overhang detection.
+static Polygons region_printed_polygons(const Layer &layer, const LayerRegion &layerm)
+{
+    const size_t region_id = std::find(layer.regions().begin(), layer.regions().end(), &layerm) - layer.regions().begin();
+    const Layer *printing  = &layer;
+    while (region_id < printing->regions().size() && printing->regions()[region_id]->combined_layer_count() == 0 &&
+           printing->upper_layer != nullptr)
+        printing = printing->upper_layer;
+    return to_polygons(region_id < printing->regions().size() ? printing->regions()[region_id]->slices.surfaces : layerm.slices.surfaces);
+}
+
 // Tuple: overhang_polygons, contact_polygons, enforcer_polygons, no_interface_offset
 // no_interface_offset: minimum of external perimeter widths
 static inline ExPolygons detect_overhangs(
@@ -1442,7 +1455,7 @@ static inline ExPolygons detect_overhangs(
                     fw - float(scale_(object_config.support_threshold_overlap.get_abs_value(unscale_(fw)))));
             // Overhang polygons for this layer and region.
             Polygons diff_polygons;
-            Polygons layerm_polygons = to_polygons(layerm->slices.surfaces);
+            Polygons layerm_polygons = region_printed_polygons(layer, *layerm);
             if (lower_layer_offset == 0.f) {
                 // Support everything.
                 diff_polygons = diff(layerm_polygons, lower_layer_polygons);
@@ -1611,7 +1624,7 @@ static inline std::tuple<Polygons, Polygons, double> detect_contacts(
 
         float lower_layer_offset = 0;
         for (LayerRegion* layerm : layer.regions()) {
-            Polygons layerm_polygons = to_polygons(layerm->slices.surfaces);
+            Polygons layerm_polygons = region_printed_polygons(layer, *layerm);
 
             // Overhang polygons for this layer and region.
             Polygons diff_polygons = intersection(overhang_polygons, layerm_polygons);
