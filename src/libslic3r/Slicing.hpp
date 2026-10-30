@@ -231,6 +231,9 @@ double multi_nozzle_strategy_grid(int strategy);
 double stepped_nozzle_layer_height(double height, int steps, double grid, double nozzle, double min_lh, double max_lh);
 // The strategy's height for a nozzle: its share of the diameter on the grid, within the limits.
 double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, double max_lh);
+// The layer height a part on extruder `extruder_idx` prints with `steps` grid steps, from a full
+// config (strategy or Custom); 0 when the extruder prints the object layer height (Off, Default).
+double nozzle_layer_height_for(const DynamicPrintConfig &full_config, size_t extruder_idx, int steps);
 
 // The coarsest object layer height every explicit height is a whole multiple of; with
 // `include_base` the given base joins in, so the result can only be finer than it. Capped to

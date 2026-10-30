@@ -1739,7 +1739,9 @@ static inline std::pair<SupportGeneratorLayer*, SupportGeneratorLayer*> new_cont
     const SlicingParameters                             &slicing_params,
     const coordf_t                                       support_layer_height_min,
     const Layer                                         &layer, 
-    SupportGeneratorLayerStorage                        &layer_storage)
+    SupportGeneratorLayerStorage                        &layer_storage,
+    // Snapmaker Orca Max: object layers the contact layer spans (the support nozzle's minimum).
+    size_t                                               contact_rows = 1)
 {
     double print_z, bottom_z, height;
     SupportGeneratorLayer* bridging_layer = nullptr;
@@ -1758,6 +1760,20 @@ static inline std::pair<SupportGeneratorLayer*, SupportGeneratorLayer*> new_cont
         print_z  = layer.bottom_z();
         height   = layer.lower_layer->height;
         bottom_z = (layer_id == 1) ? slicing_params.object_print_z_min : layer.lower_layer->lower_layer->print_z;
+        // Snapmaker Orca Max: span enough object layers for the support nozzle's minimum layer height,
+        // as long as the contact stays above the first layer.
+        if (contact_rows > 1) {
+            const Layer *below = layer.lower_layer;
+            size_t       rows  = 1;
+            while (rows < contact_rows && below != nullptr && below->lower_layer != nullptr && below->lower_layer->lower_layer != nullptr) {
+                below = below->lower_layer;
+                ++ rows;
+            }
+            if (rows == contact_rows && below->lower_layer->print_z > slicing_params.first_print_layer_height - EPSILON) {
+                bottom_z = below->lower_layer->print_z;
+                height   = print_z - bottom_z;
+            }
+        }
     }
     else {
         // BBS: need to consider adaptive layer heights
@@ -2346,7 +2362,8 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::top_contact_layers(
         // Now apply the contact areas to the layer where they need to be made.
         if (!contact_polygons.empty() || !overhang_polygons.empty()) {
             // Allocate the two empty layers.
-            auto [new_layer, bridging_layer] = new_contact_layer(*m_print_config, *m_object_config, m_slicing_params, m_support_params.support_layer_height_min, layer, layer_storage);
+            auto [new_layer, bridging_layer] = new_contact_layer(*m_print_config, *m_object_config, m_slicing_params, m_support_params.support_layer_height_min, layer, layer_storage,
+                                                                 m_support_params.support_pitch > 1 ? m_support_params.support_min_rows : 1);
             if (new_layer) {
                 // Fill the non-bridging layer with polygons.
                 fill_contact_layer(*new_layer, layer_id, m_slicing_params,
@@ -2901,8 +2918,20 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                 const Layer *object_layer = object.layers()[idx_layer_object];
                 const coordf_t own_bottom = (idx_layer_object > 0) ? object.layers()[idx_layer_object - 1]->print_z : (object_layer->print_z - object_layer->height);
                 const bool last = idx_layer_object + 1 >= object.layers().size() || object.layers()[idx_layer_object + 1]->print_z >= extr2z + EPSILON;
+                // Snapmaker Orca Max: a rung that would leave fewer object layers than the support nozzle's
+                // minimum up to extr2z is skipped, the remainder joins this layer (within the maximum height).
+                bool short_remainder = false;
+                if (pitch > 1 && ! last && m_support_params.support_min_rows > 1) {
+                    size_t remaining = 0;
+                    for (size_t k = idx_layer_object + 1; k < object.layers().size() && object.layers()[k]->print_z < extr2z + EPSILON; ++ k)
+                        ++ remaining;
+                    const coordf_t bottom  = piece_bottom >= 0. ? piece_bottom : own_bottom;
+                    const coordf_t through = extr2z - bottom;
+                    short_remainder = remaining > 0 && remaining < m_support_params.support_min_rows &&
+                                      through <= m_slicing_params.max_suport_layer_height + EPSILON;
+                }
                 if (pitch > 1 && ! last && idx_layer_object >= PrintObject::first_combined_layer_idx &&
-                    (idx_layer_object - PrintObject::first_combined_layer_idx) % pitch != pitch - 1) {
+                    ((idx_layer_object - PrintObject::first_combined_layer_idx) % pitch != pitch - 1 || short_remainder)) {
                     if (piece_bottom < 0.)
                         piece_bottom = own_bottom;
                     continue;

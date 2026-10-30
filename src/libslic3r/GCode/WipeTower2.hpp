@@ -232,6 +232,9 @@ public:
         float               max_e_speed = std::numeric_limits<float>::max();
         std::vector<float>  ramming_speed;
         float               nozzle_diameter;
+        // Snapmaker Orca Max: the nozzle's minimum layer height (tower layers thinner than it get their
+        // walls and fill from another tool).
+        float               min_layer_height = 0.f;
         // ORCA: tower line width this tool extrudes (nozzle_diameter * Width_To_Nozzle_Ratio).
         float               perimeter_width = 0.f;
         float               filament_area;
@@ -434,8 +437,16 @@ private:
     void plan_material_bands();
     bool                          m_material_blocks = false;      // the option
     bool                          m_use_bands       = false;      // planned for this tower
-    std::map<int, std::pair<float, float>> m_bands;               // category -> (start, depth)
-    std::map<int, float>          m_band_cursor;                  // category -> next free y on this layer
+    std::map<int, std::pair<float, float>> m_bands;               // band key -> (start, depth)
+    std::map<int, float>          m_band_cursor;                  // band key -> next free y on this layer
+    // Snapmaker Orca Max: per-tool cadence. A tool whose nozzle cannot print a single tower layer (its
+    // minimum layer height is above it) gets a band of its own; the rows before each of its tool
+    // changes leave that band empty, and the purge fills it at the full gap ("purge height"). The old
+    // tool's ram goes into a ram band filled every layer instead, so it never hangs over the gap.
+    static constexpr int          BAND_CADENCE_BASE = 1000000;   // + tool
+    static constexpr int          BAND_SHARED       = 2000000;   // every other tool without material blocks
+    static constexpr int          BAND_RAM          = 3000000;
+    std::map<size_t, int>         m_tool_band;                    // cadence tool -> its band
 
     // Goes through m_plan, calculates border and finish_layer extrusions and subtracts them from last wipe
     void save_on_last_wipe();
@@ -450,6 +461,11 @@ private:
             float first_wipe_line;
             float wipe_volume;
 			float wipe_volume_total;
+            // Snapmaker Orca Max, per-tool cadence: > 0 when the purge fills the tool's own band at this
+            // height (the gap since the band was last filled); the old tool's ram then takes ram_box_depth
+            // of the ram band, required_depth is the wipe alone.
+            float purge_height { 0.f };
+            float ram_box_depth { 0.f };
             ToolChange(size_t old, size_t newtool, float depth=0.f, float ramming_depth=0.f, float fwl=0.f, float wv=0.f)
             : old_tool{old}, new_tool{newtool}, required_depth{depth}, ramming_depth{ramming_depth}, first_wipe_line{fwl}, wipe_volume{wv}, wipe_volume_total{wv} {}
 		};
@@ -464,6 +480,8 @@ private:
         // Snapmaker Orca Max: with material bands, the end of the last band this layer purges into
         // (purges no longer stack from the front, see WipeTower2::plan_material_bands()).
         float band_extent { 0.f };
+        // Snapmaker Orca Max: cadence bands left empty on this layer (their tool purges higher up).
+        std::vector<int> waiting_bands;
         float local_z_reserve_slot_depth { 0.f };
         size_t local_z_reserve_slot_count { 0 };
         float local_z_reserve_depth() const { return local_z_reserve_slot_depth * float(local_z_reserve_slot_count); }
@@ -495,10 +513,12 @@ private:
     // Return the index of the toolchange whose new filament should print the layer's
     // finish extrusions (sparse infill + wall + brim), or -1 to print them with the
     // layer's incoming filament before any toolchange happens.
-    int first_toolchange_to_nonsoluble_nonsupport(
-            const std::vector<WipeTowerInfo::ToolChange>& tool_changes) const;
+    int first_toolchange_to_nonsoluble_nonsupport(const std::vector<WipeTowerInfo::ToolChange>& tool_changes, float layer_height = 0.f) const;
+    int first_toolchange_to_nonsoluble_nonsupport_any(const std::vector<WipeTowerInfo::ToolChange>& tool_changes) const;
     bool layer_has_soluble_toolchange(const WipeTowerInfo &layer) const;
     float cumulative_toolchange_depth_before(const WipeTowerInfo::ToolChange *tool_change) const;
+    // Snapmaker Orca Max: the band a planned tool change purges into (material bands or cadence).
+    int   band_key(const WipeTowerInfo::ToolChange &tool_change) const;
     WipeTower::ToolChangeResult emit_planned_tool_change(const WipeTowerInfo::ToolChange *tool_change);
 
 	// new_tool: the tool that purges after this unload (the current tool for the final purge); its

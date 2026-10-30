@@ -1335,6 +1335,17 @@ ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfi
     return plan.grid > EPSILON ? plan : effective;
 }
 
+double nozzle_layer_height_for(const DynamicPrintConfig &full_config, size_t extruder_idx, int steps)
+{
+    const ExtruderLayerHeightPlan plan = effective_extruder_layer_heights(full_config);
+    if (extruder_idx >= plan.heights.size() || plan.heights[extruder_idx] <= EPSILON)
+        return 0.;
+    return stepped_nozzle_layer_height(plan.heights[extruder_idx], steps, plan.grid,
+                                       value_at(floats_of(full_config, "nozzle_diameter"), extruder_idx),
+                                       value_at(floats_of(full_config, "min_layer_height"), extruder_idx),
+                                       value_at(floats_of(full_config, "max_layer_height"), extruder_idx));
+}
+
 bool apply_extruder_layer_height_plan(DynamicPrintConfig &config)
 {
     const std::vector<double> stored   = floats_of(config, "extruder_layer_height");

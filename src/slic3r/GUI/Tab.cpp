@@ -2044,6 +2044,11 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         return;
     }
 
+    // Snapmaker Orca Max: the printer's per-extruder preferred heights only count with "Custom".
+    if (opt_key == "multi_nozzle_layer_heights")
+        if (Tab *printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER); printer_tab != nullptr && printer_tab != this)
+            printer_tab->toggle_options();
+
     // Keep this preset's "plugins" manifest in sync when a plugin picker changes, so full_config() and
     // save_to_json() always find resolved "name;uuid;capability" references and rebuild it nowhere else.
     // Also drop any plugin config override entries for a capability the change just stopped
@@ -3156,7 +3161,18 @@ void TabPrint::build()
         // Snapmaker Orca Max: layer height strategies for mixed nozzle sizes.
         optgroup->append_single_option_line("multi_nozzle_layer_heights", "quality_settings_layer_height");
         optgroup->append_single_option_line("layer_height","quality_settings_layer_height");
-        optgroup->append_single_option_line("nozzle_layer_height_steps", "quality_settings_layer_height");
+        {
+            // Snapmaker Orca Max: the steps, with the heights they give next to the value.
+            Line steps_line = optgroup->create_single_option_line("nozzle_layer_height_steps", "quality_settings_layer_height");
+            steps_line.append_widget([this](wxWindow *parent) {
+                m_steps_heights_text = new wxStaticText(parent, wxID_ANY, wxEmptyString);
+                m_steps_heights_text->SetForegroundColour(wxColour("#909090"));
+                auto *sizer = new wxBoxSizer(wxHORIZONTAL);
+                sizer->Add(m_steps_heights_text, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
+                return sizer;
+            });
+            optgroup->append_line(steps_line);
+        }
         optgroup->append_single_option_line("initial_layer_print_height","quality_settings_layer_height");
         optgroup->append_single_option_line("enable_mixed_color_sublayer");
 
@@ -4622,6 +4638,7 @@ void TabPrint::refresh_after_head_change(bool relayout_columns)
 void TabPrint::toggle_options()
 {
     if (!m_active_page) return;
+    this->update_steps_heights();
     // BBS: whether the preset is Bambu Lab printer
     if (m_preset_bundle) {
         bool is_BBL_printer = wxGetApp().preset_bundle->is_bbl_vendor();
@@ -4819,6 +4836,73 @@ void TabPrint::clear_pages()
     m_speed_source_combo    = nullptr;
     m_speed_source_reset    = nullptr;
     m_speed_source_items.clear();
+    m_steps_heights_text    = nullptr;
+}
+
+std::vector<size_t> TabPrint::steps_extruders() const
+{
+    std::vector<size_t> out;
+    const auto *nozzles = m_preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter");
+    for (size_t i = 0; nozzles != nullptr && i < nozzles->values.size(); ++ i)
+        out.push_back(i);
+    return out;
+}
+
+std::vector<size_t> TabPrintModel::steps_extruders() const
+{
+    std::vector<size_t> out;
+    auto add = [&out](int extruder) {
+        const size_t idx = size_t(std::max(1, extruder) - 1);
+        if (std::find(out.begin(), out.end(), idx) == out.end())
+            out.push_back(idx);
+    };
+    for (const auto &[base, config] : m_object_configs) {
+        if (const auto *volume = dynamic_cast<const ModelVolume *>(base))
+            add(volume->extruder_id());
+        else if (const auto *object = dynamic_cast<const ModelObject *>(base))
+            for (const ModelVolume *volume : object->volumes)
+                if (volume->is_model_part())
+                    add(volume->extruder_id());
+    }
+    return out.empty() ? TabPrint::steps_extruders() : out;
+}
+
+// Snapmaker Orca Max: "= 0.10 mm (0.4 mm nozzle)", one entry per nozzle size the steps apply to.
+void TabPrint::update_steps_heights()
+{
+    if (m_steps_heights_text == nullptr || m_config == nullptr || ! m_config->has("nozzle_layer_height_steps"))
+        return;
+    const DynamicPrintConfig full = m_preset_bundle->full_config();
+    const auto *strategy = full.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    wxString text;
+    if (strategy == nullptr || strategy->value == mnlhOff) {
+        text = _L("(multi-nozzle layer heights are off)");
+    } else {
+        const int  steps   = m_config->opt_int("nozzle_layer_height_steps");
+        const auto *nozzles = full.option<ConfigOptionFloats>("nozzle_diameter");
+        std::vector<std::pair<double, double>> seen; // nozzle, height
+        for (size_t idx : steps_extruders()) {
+            if (nozzles == nullptr || idx >= nozzles->values.size())
+                continue;
+            const double nozzle = nozzles->values[idx];
+            const double height = nozzle_layer_height_for(full, idx, steps);
+            if (height <= 0. || std::any_of(seen.begin(), seen.end(), [&](const auto &s) { return std::abs(s.first - nozzle) < EPSILON && std::abs(s.second - height) < EPSILON; }))
+                continue;
+            seen.emplace_back(nozzle, height);
+        }
+        std::sort(seen.begin(), seen.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+        for (size_t k = 0; k < seen.size(); ++ k) {
+            if (k > 0)
+                text += " \u00b7 ";
+            text += seen.size() == 1 ? wxString::Format(_L("= %.2f mm (%.1f mm nozzle)"), seen[k].second, seen[k].first) :
+                                       wxString::Format("%s%.2f mm (%.1f)", k == 0 ? "= " : "", seen[k].second, seen[k].first);
+        }
+    }
+    if (m_steps_heights_text->GetLabel() != text) {
+        m_steps_heights_text->SetLabel(text);
+        if (m_steps_heights_text->GetParent() != nullptr)
+            m_steps_heights_text->GetParent()->Layout();
+    }
 }
 
 //BBS: GUI refactor
@@ -8143,6 +8227,13 @@ void TabPrinter::on_gcode_flavor_changed()
     update_input_shaper_menu(flavor_option->value);
 }
 
+// Snapmaker Orca Max: whether the edited process uses the printer's per-extruder preferred layer heights.
+bool TabPrinter::multi_nozzle_custom() const
+{
+    const auto *strategy = m_preset_bundle->prints.get_edited_preset().config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    return strategy != nullptr && strategy->value == mnlhCustom;
+}
+
 void TabPrinter::toggle_options()
 {
     if (!m_active_page || m_presets->get_edited_preset().printer_technology() == ptSLA)
@@ -8169,6 +8260,9 @@ void TabPrinter::toggle_options()
     //}
     if (m_active_page->title() == L("Basic information")) {
         const auto &printer_cfg = m_preset_bundle->printers.get_edited_preset().config;
+
+        // Snapmaker Orca Max: like the per-extruder preferred heights, only with "Custom".
+        toggle_line("extruder_layer_height_exact", multi_nozzle_custom());
 
         // SoftFever: hide BBL specific settings
         for (auto el : {"scan_first_layer", "bbl_calib_mark_logo", "bbl_use_printhost"})
@@ -8238,6 +8332,9 @@ void TabPrinter::toggle_options()
         size_t i = size_t(val - 1);
         int variant_index = get_index_for_extruder(i);
         bool have_retract_length = m_config->opt_float("retraction_length", variant_index) > 0;
+
+        // Snapmaker Orca Max: the per-extruder preferred heights only count with "Custom" multi-nozzle layer heights.
+        toggle_line("extruder_layer_height", multi_nozzle_custom(), i);
 
         toggle_option("extruder_printable_area", false, i);          // disable
         toggle_line("extruder_printable_area", m_preset_bundle->get_printer_extruder_count() == 2, i);  //hide

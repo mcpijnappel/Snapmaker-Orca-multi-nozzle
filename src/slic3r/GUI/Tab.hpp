@@ -652,6 +652,14 @@ private:
 	wxStaticText*	m_speed_source_label = nullptr;
 	::ComboBox*		m_speed_source_combo = nullptr;
 	ScalableButton*	m_speed_source_reset = nullptr;
+protected:
+	// Snapmaker Orca Max: the heights "Layer height steps" gives, next to its value.
+	wxStaticText*	m_steps_heights_text = nullptr;
+	void			update_steps_heights();
+	// The 0-based extruders whose nozzles the steps apply to: every extruder here, the objects' and
+	// parts' own extruders in the object / part tab.
+	virtual std::vector<size_t> steps_extruders() const;
+private:
 	ogStaticText*	m_speed_source_note = nullptr;   // the line under the picker: what the preset supplies on this page
 	int				m_speed_source_label_em = 15;    // the label column of the page the picker is on (15 Speed, 20 Quality)
 	bool			m_speed_source_stacked = false;  // Quality page: the label on its own line above a full-width combo
@@ -675,6 +683,7 @@ public:
 	void set_model_config(std::map<ObjectBase *, ModelConfig *> const & object_configs);
 
 	bool has_model_config() const { return !m_object_configs.empty(); }
+	std::vector<size_t> steps_extruders() const override;
 
 	void update_model_config();
 
@@ -855,6 +864,7 @@ public:
 	void		reload_config() override;
 	void		activate_selected_page(std::function<void()> throw_if_canceled) override;
 	void		clear_pages() override;
+	bool		multi_nozzle_custom() const;
 	void		toggle_options() override;
     void		update() override;
     void		update_fff();

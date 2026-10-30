@@ -1052,6 +1052,16 @@ void PrintObject::absorb_thin_region_pieces(size_t region_id, size_t mult, size_
         }
     };
 
+    // Whether `area` holds anything wider than a bead. A zero-width leftover of a difference can come
+    // back from the opening as a sizeable blob, so the opening only counts inside the area itself.
+    const double min_area = double(scale_(0.1)) * double(scale_(0.1));
+    auto printable = [bead, min_area](const ExPolygons &area) {
+        double total = 0.;
+        for (const ExPolygon &expoly : area)
+            total += std::abs(expoly.area());
+        return total > min_area && ! intersection_ex(opening_ex(area, bead), area).empty();
+    };
+
     for (size_t pass = 0; pass < 4 * m_layers.size(); ++ pass) {
         m_print->throw_if_canceled();
         const std::vector<Piece> pieces  = pieces_of();
@@ -1062,7 +1072,7 @@ void PrintObject::absorb_thin_region_pieces(size_t region_id, size_t mult, size_
                 continue;
             const ExPolygons thin_shape = shape_of(thin);
             const bool       has_above  = i + 1 < pieces.size() && pieces[i + 1].bottom == thin.top + 1;
-            if (opening_ex(thin_shape, bead).empty()) {
+            if (! printable(thin_shape)) {
                 // A fragment narrower than a bead of the region's nozzle at the start of a slope:
                 // the region's piece right above covers it and prints that material.
                 if (has_above && diff_ex(thin_shape, offset_ex(shape_of(pieces[i + 1]), bead)).empty()) {
@@ -1103,7 +1113,7 @@ void PrintObject::absorb_thin_region_pieces(size_t region_id, size_t mult, size_
                     if (opening_ex(shape, bead).empty())
                         return false;
                     for (size_t row = bottom; row <= top; ++ row)
-                        if (! opening_ex(diff_ex(printed[row - lo.bottom], shape), bead).empty())
+                        if (printable(diff_ex(printed[row - lo.bottom], shape)))
                             return false;
                     return true;
                 };
@@ -1310,6 +1320,7 @@ void PrintObject::apply_extruder_layer_heights()
         // not just the walls).
         const PrintRegionConfig &region_config = this->printing_region(region_id).config();
         double min_layer_height = 0.;
+        double max_run_height   = std::numeric_limits<double>::max(); // the pitch filaments' max layer height and bore
         {
             std::vector<unsigned int> pitch_filaments; // 0-based filament indices
             if (walls_only) {
@@ -1321,8 +1332,13 @@ void PrintObject::apply_extruder_layer_heights()
                 bool pitch_from_features = false;
                 this->collect_region_pitch_filaments(region_config, pitch_filaments, pitch_from_features);
             }
-            for (unsigned int filament : pitch_filaments)
-                min_layer_height = std::max(min_layer_height, print_config.min_layer_height.get_at(m_print->extruder_index_of(filament)));
+            for (unsigned int filament : pitch_filaments) {
+                const size_t extruder = m_print->extruder_index_of(filament);
+                min_layer_height = std::max(min_layer_height, print_config.min_layer_height.get_at(extruder));
+                max_run_height   = std::min(max_run_height, print_config.nozzle_diameter.get_at(extruder));
+                if (const double max_lh = print_config.max_layer_height.get_at(extruder); max_lh > EPSILON)
+                    max_run_height = std::min(max_run_height, max_lh);
+            }
         }
         size_t min_run = 1;
         if (min_layer_height > m_config.layer_height.value + EPSILON)
@@ -1412,7 +1428,20 @@ void PrintObject::apply_extruder_layer_heights()
             // Grow the run upwards while its layers keep a common shape. Uniform layer heights only
             // (variable heights are rejected by Print::validate()).
             size_t top_idx = idx;
-            while (top_idx + 1 < m_layers.size() && top_idx + 1 - idx < mult) {
+            // Snapmaker Orca Max: a run starting one row off the ladder (pitch 2, after a break that is no
+            // column start) can never step back with runs of at least two rows: let it grow one pitch
+            // further (three rows, within the nozzle's maximum) so it ends on a rung again.
+            size_t grow_limit = mult;
+            if (! walls_only && mult > 1 && idx > first_idx) {
+                const size_t rung_len     = mult - (idx - first_idx) % mult;
+                const bool   column_start = m_layers[idx - 1]->regions()[region_id]->slices.empty() &&
+                                            m_layers[idx - 1]->regions()[region_id]->combined_layer_count() != 0;
+                if (rung_len < mult && rung_len < std::max<size_t>(min_run, 2) && std::max<size_t>(min_run, 2) >= mult &&
+                    ! (rung_len >= min_run && column_start) &&
+                    double(rung_len + mult) * m_config.layer_height.value <= max_run_height + EPSILON)
+                    grow_limit = rung_len + mult;
+            }
+            while (top_idx + 1 < m_layers.size() && top_idx + 1 - idx < grow_limit) {
                 const size_t next = top_idx + 1;
                 if (std::abs(m_layers[next]->height - m_layers[idx]->height) > EPSILON)
                     break;

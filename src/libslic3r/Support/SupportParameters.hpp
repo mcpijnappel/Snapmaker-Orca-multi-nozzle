@@ -253,6 +253,13 @@ struct SupportParameters {
                 support_pitch = std::max<size_t>(1, size_t(std::round(preferred / h)));
                 while (support_pitch > 1 && double(support_pitch) * h > std::max(slicing_params.max_suport_layer_height, h) + EPSILON)
                     -- support_pitch;
+                // The support nozzles' minimum layer height in object layers: the contact layer and
+                // the last layer under it span at least that many.
+                double min_height = 0.;
+                for (const auto &[filament, interface_role] : { std::make_pair(object_config.support_filament.value, false),
+                                                                std::make_pair(object_config.support_interface_filament.value, true) })
+                    min_height = std::max(min_height, print_config.min_layer_height.get_at(support_head(&object, filament, interface_role)));
+                support_min_rows = std::clamp<size_t>(size_t(std::ceil(min_height / h - EPSILON)), 1, support_pitch);
             }
             if (support_pitch > 1)
                 grid_height_step = 1;
@@ -398,8 +405,10 @@ struct SupportParameters {
     // ORCA: support pieces run through overhang contact layers; the gap rounds to support layers.
     // Snapmaker Orca Max: never set (the gap stays exact with every step).
     bool grid_max_height_priority = false;
-    // Snapmaker Orca Max: object layers per support layer with the "preferred" step (1 = off).
+    // Snapmaker Orca Max: object layers per support layer with the "preferred" step (1 = off), and the
+    // fewest object layers a support layer may span there (the support nozzles' minimum layer height).
     size_t support_pitch = 1;
+    size_t support_min_rows = 1;
     // Length of a big overhang (10 mm); area comparisons use its square.
     const double thresh_big_overhang = scale_(10);
 

@@ -5625,7 +5625,9 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("extruder_layer_height", coFloats);
     def->label = L("Preferred layer height");
-    def->tooltip = L("Layer height this extruder should print with, used for printers whose extruders have "
+    def->tooltip = L("Used when Multi-nozzle layer heights (Quality settings) is set to Custom; the other choices "
+                     "set every nozzle's height themselves. "
+                     "Layer height this extruder should print with, used for printers whose extruders have "
                      "different nozzle sizes. Any value can be entered and is kept as entered. For slicing, the object "
                      "layer height becomes the coarsest height on which every preferred layer height lands within 0.01 mm "
                      "of a whole multiple (from the finest preferred height down to a quarter of it), and the preferred "
