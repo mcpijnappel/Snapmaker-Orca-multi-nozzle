@@ -641,11 +641,12 @@ bool ToolOrdering::insert_wipe_tower_extruder()
 {
     if (!m_print_config_ptr || !m_print_config_ptr->enable_prime_tower)
         return false;
-    if (m_print_config_ptr->wipe_tower_filament == 0)
+    // Snapmaker Orca Max: a flexible wall filament is ignored (effective_wipe_tower_filament()).
+    if (effective_wipe_tower_filament(*m_print_config_ptr) == 0)
         return false;
 
     bool changed = false;
-    const unsigned int wipe_extruder = (unsigned int)(m_print_config_ptr->wipe_tower_filament - 1);
+    const unsigned int wipe_extruder = (unsigned int)(effective_wipe_tower_filament(*m_print_config_ptr) - 1);
     for (LayerTools &lt : m_layer_tools) {
         // Only layers that carry a tower slab (fill_wipe_tower_partitions has run): a
         // fractional support-only layer without one must not switch to the tower filament.

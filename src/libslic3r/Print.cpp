@@ -859,6 +859,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "wipe_tower_extra_flow"
             || opt_key == "wipe_tower_no_sparse_layers"
             || opt_key == "fine_nozzle_finishes_cycle"
+            || opt_key == "wipe_tower_material_blocks"
             || opt_key == "wipe_tower_sparse_layers_combination"
             || opt_key == "flush_volumes_matrix"
             || opt_key == "prime_volume"
@@ -1087,9 +1088,10 @@ std::vector<unsigned int> Print::extruders(bool conside_custom_gcode) const
 
     // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
     // append its extruder into the list too so it participates in tool ordering.
-    if (has_wipe_tower() && config().wipe_tower_filament != 0 && extruders.size() > 1) {
-        assert(config().wipe_tower_filament > 0 && config().wipe_tower_filament <= int(config().filament_diameter.size()));
-        extruders.emplace_back(config().wipe_tower_filament - 1); // the config value is 1-based
+    // Snapmaker Orca Max: never a flexible filament (effective_wipe_tower_filament()).
+    if (const int wall_filament = effective_wipe_tower_filament(config()); has_wipe_tower() && wall_filament != 0 && extruders.size() > 1) {
+        assert(wall_filament > 0 && wall_filament <= int(config().filament_diameter.size()));
+        extruders.emplace_back(wall_filament - 1); // the config value is 1-based
     }
 
     sort_remove_duplicates(extruders);

@@ -1078,7 +1078,7 @@ bool WipeTower2::wait_for_temp_enabled(const PrintConfig& config)
 WipeTower2::WipeTower2(const PrintConfig& config, const PrintRegionConfig& default_region_config,int plate_idx, Vec3d plate_origin, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
     m_semm(config.single_extruder_multi_material.value),
     m_enable_filament_ramming(config.enable_filament_ramming.value),
-    m_wipe_tower_filament(config.wipe_tower_filament.value),
+    m_wipe_tower_filament(effective_wipe_tower_filament(config)),
     m_wipe_tower_pos(config.wipe_tower_x.get_at(plate_idx), config.wipe_tower_y.get_at(plate_idx)),
     m_wipe_tower_width(float(config.prime_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
@@ -1167,6 +1167,9 @@ void WipeTower2::set_extruder(size_t idx, const PrintConfig& config)
     // The purge and ramming values of a filament hold one value per filament variant column.
     const size_t variant_column = first_filament_variant_column(config.filament_self_index.values, idx);
     m_filpar[idx].material = config.filament_type.get_at(idx);
+    // Snapmaker Orca Max: material bands (plan_material_bands()).
+    m_filpar[idx].category = config.filament_adhesiveness_category.values.empty() ? 0 : config.filament_adhesiveness_category.get_at(idx);
+    m_material_blocks      = config.wipe_tower_material_blocks.value;
     {
         // Snapmaker Orca: the tower prints this filament's lines with the speeds of the tool head
         // that holds it, not with the initial tool's. travel_speed and initial_layer_speed are
@@ -1410,6 +1413,15 @@ WipeTower::ToolChangeResult WipeTower2::emit_planned_tool_change(const WipeTower
         wipe_area     = tool_change->required_depth;
         ramming_depth = tool_change->ramming_depth;
     }
+    // Snapmaker Orca Max: the purge goes to the next free spot of its material band.
+    int band_category = -1;
+    if (m_use_bands && tool_change != nullptr && tool_change->new_tool < m_filpar.size()) {
+        band_category = m_filpar[tool_change->new_tool].category;
+        if (auto it = m_band_cursor.find(band_category); it != m_band_cursor.end())
+            m_depth_traversed = it->second;
+        else
+            band_category = -1;
+    }
     if (interface_layer && !is_no_tool_sentinel(tool) && tool < m_filpar.size()) {
         float extra_purge_length = m_filpar[tool].tower_interface_purge_length;
         if (extra_purge_length > 0.f) {
@@ -1504,6 +1516,8 @@ WipeTower::ToolChangeResult WipeTower2::emit_planned_tool_change(const WipeTower
 
     m_active_tool_change = nullptr;
     m_depth_traversed += wipe_area;
+    if (band_category >= 0)
+        m_band_cursor[band_category] = m_depth_traversed;
 
     if (m_set_extruder_trimpot)
         writer.set_extruder_trimpot(550); // Reset the extruder current to a normal value.
@@ -1682,7 +1696,7 @@ void WipeTower2::toolchange_Unload(WipeTowerWriter2&                 writer,
 
     // if the ending point of the ram would end up in mid air, align it with the end of the wipe tower:
     // (with a boundary wipe start the band is quantized to whole rows below, so no phase alignment is needed)
-    if (do_ramming && !boundary_wipe_start &&
+    if (do_ramming && !boundary_wipe_start && !m_use_bands &&
         (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info - 1 != m_plan.begin() || !m_adhesion))) {
         // this is y of the center of previous sparse infill border
         float sparse_beginning_y = 0.f;
@@ -2201,13 +2215,39 @@ WipeTower::ToolChangeResult WipeTower2::finish_layer()
     float reserve_depth = m_layer_info->local_z_reserve_depth();
     float current_depth = std::max(0.f, m_layer_info->depth - m_layer_info->toolchanges_depth() - reserve_depth);
     float fill_depth    = std::max(0.f, current_depth - m_perimeter_width);
-    WipeTower::box_coordinates fill_box(Vec2f(m_perimeter_width, m_layer_info->depth - fill_depth),
-                                        m_wipe_tower_width - 2 * m_perimeter_width, fill_depth);
+    // The areas no purge used on this layer. Snapmaker Orca Max: with material bands, what each band
+    // leaves of its depth plus the tower beyond the bands; otherwise the back of the tower.
+    std::vector<WipeTower::box_coordinates> fill_boxes;
+    if (m_use_bands) {
+        auto add_gap = [this, &fill_boxes](float begin, float end) {
+            const float depth = end - begin - m_perimeter_width;
+            if (depth > m_perimeter_width - WT_EPSILON)
+                fill_boxes.emplace_back(Vec2f(m_perimeter_width, begin + m_perimeter_width), m_wipe_tower_width - 2 * m_perimeter_width, depth);
+        };
+        float bands_end = 0.f;
+        for (const auto &[category, band] : m_bands) {
+            bands_end = std::max(bands_end, band.first + band.second);
+            if (band.first >= m_layer_info->depth - WT_EPSILON)
+                continue;
+            const auto cursor = m_band_cursor.find(category);
+            add_gap(cursor != m_band_cursor.end() ? cursor->second : band.first, std::min(band.first + band.second, m_layer_info->depth));
+        }
+        add_gap(std::min(bands_end, m_layer_info->depth), m_layer_info->depth);
+        // Front to back, so the nozzle sweeps the tower once.
+        std::sort(fill_boxes.begin(), fill_boxes.end(), [](const auto &l, const auto &r) { return l.ld.y() < r.ld.y(); });
+    }
+    if (fill_boxes.empty())
+        fill_boxes.emplace_back(Vec2f(m_perimeter_width, m_layer_info->depth - fill_depth), m_wipe_tower_width - 2 * m_perimeter_width, fill_depth);
 
-    writer.set_initial_position((m_left_to_right ? fill_box.ru : fill_box.lu), // so there is never a diagonal travel
+    writer.set_initial_position((m_left_to_right ? fill_boxes.front().ru : fill_boxes.front().lu), // so there is never a diagonal travel
                                 m_wipe_tower_width, m_wipe_tower_depth, m_internal_rotation);
 
     bool toolchanges_on_layer = m_layer_info->toolchanges_depth() > WT_EPSILON;
+
+    for (size_t box_idx = 0; box_idx < fill_boxes.size(); ++ box_idx) {
+    const WipeTower::box_coordinates &fill_box = fill_boxes[box_idx];
+    if (box_idx > 0)
+        writer.travel(fill_box.ld);
 
     // inner perimeter of the sparse section, if there is space for it:
     if (fill_box.ru.y() - fill_box.rd.y() > m_perimeter_width - WT_EPSILON)
@@ -2218,7 +2258,6 @@ WipeTower::ToolChangeResult WipeTower2::finish_layer()
         writer.travel(fill_box.ld.x(), writer.y());
     if (writer.y() > fill_box.ld.y() + EPSILON)
         writer.travel(writer.x(), fill_box.ld.y());
-
     // Extrude infill to support the material to be printed above.
     const float dy    = (fill_box.lu.y() - fill_box.ld.y() - m_perimeter_width);
     float       left  = fill_box.lu.x() + 2 * m_perimeter_width;
@@ -2268,6 +2307,7 @@ WipeTower::ToolChangeResult WipeTower2::finish_layer()
         writer.append("; CP EMPTY GRID END\n"
                       ";------------------\n\n\n\n\n\n\n");
     }
+    } // fill_boxes
 
     // Snapmaker: the brim (and the cone wall infill) is laid by the finishing tool, so the loops
     // sit one of its line widths apart; with the widest nozzle's pitch a 0.2 mm head left gaps.
@@ -2667,8 +2707,63 @@ void WipeTower2::plan_local_z_reserve(float z_par, float layer_height_par, size_
     layer.local_z_reserve_slot_count += reserve_slot_count;
 }
 
+// Snapmaker Orca Max ("wipe_tower_material_blocks"): the Type 2 tower stacks a layer's purges from the
+// front in tool change order, so a PLA purge often lands on the PETG or TPU purge of the layer below,
+// and materials that do not bond turn the tower into a mess. Give every adhesiveness category of the
+// purging (new) filaments a fixed band of tower depth instead: as deep as the deepest layer needs for
+// that category, the categories used up to the highest layer at the front (so the tower can narrow
+// where the others end). Each purge then goes to its category's band; what a layer leaves of a band
+// gets sparse infill (finish_layer()). Like the Type 1 tower's blocks, without its per-filament
+// purge sizing. Not with single-extruder multi-material or Local-Z sublayers, which plan the depth
+// in tool change order.
+void WipeTower2::plan_material_bands()
+{
+    m_use_bands = false;
+    m_bands.clear();
+    m_band_cursor.clear();
+    for (WipeTowerInfo &layer : m_plan)
+        layer.band_extent = 0.f;
+    if (! m_material_blocks || m_semm)
+        return;
+    std::map<int, float>  band_depth;  // category -> deepest per-layer total
+    std::map<int, size_t> last_layer;  // category -> highest layer purging it
+    for (size_t l = 0; l < m_plan.size(); ++ l) {
+        const WipeTowerInfo &layer = m_plan[l];
+        if (! layer.local_z_tool_changes.empty() || layer.local_z_reserve_slot_count > 0)
+            return;
+        std::map<int, float> per_layer;
+        for (const WipeTowerInfo::ToolChange &tc : layer.tool_changes)
+            if (tc.new_tool < m_filpar.size())
+                per_layer[m_filpar[tc.new_tool].category] += tc.required_depth;
+        for (const auto &[category, depth] : per_layer) {
+            band_depth[category] = std::max(band_depth[category], depth);
+            last_layer[category] = l;
+        }
+    }
+    if (band_depth.size() < 2)
+        return; // one material group: tool change order already stacks like on like
+    std::vector<int> order;
+    for (const auto &[category, depth] : band_depth)
+        order.push_back(category);
+    std::stable_sort(order.begin(), order.end(), [&last_layer](int a, int b) { return last_layer[a] > last_layer[b]; });
+    float start = 0.f;
+    for (int category : order) {
+        m_bands[category] = { start, band_depth[category] };
+        start += band_depth[category];
+    }
+    for (WipeTowerInfo &layer : m_plan)
+        for (const WipeTowerInfo::ToolChange &tc : layer.tool_changes)
+            if (tc.new_tool < m_filpar.size()) {
+                const auto &band  = m_bands[m_filpar[tc.new_tool].category];
+                layer.band_extent = std::max(layer.band_extent, band.first + band.second);
+            }
+    m_use_bands = true;
+    BOOST_LOG_TRIVIAL(info) << "Wipe tower: " << m_bands.size() << " material bands, total depth " << start;
+}
+
 void WipeTower2::plan_tower()
 {
+    this->plan_material_bands();
     // Calculate m_wipe_tower_depth (maximum depth for all the layers) and propagate depths downwards
     m_wipe_tower_depth = 0.f;
     for (auto& layer : m_plan)
@@ -2967,13 +3062,18 @@ void WipeTower2::generate(std::vector<std::vector<WipeTower::ToolChangeResult>>&
                                  << " reserve_slots=" << layer.local_z_reserve_slot_count
                                  << " planned_depth=" << layer.planned_depth();
         set_layer(layer.z, layer.height, 0, false /*layer.z == m_plan.front().z*/, layer.z == m_plan.back().z);
-        m_internal_rotation += 180.f;
+        // Snapmaker Orca Max: the 180 degree turn per layer mirrors the purge positions (the lines keep
+        // their direction); with material bands every band has to stay above itself.
+        if (! m_use_bands)
+            m_internal_rotation += 180.f;
         // Re-sync to the tool actually loaded at this layer: a filament change may have
         // happened off the tower since the previous layer.
         if (layer.start_tool >= 0 && size_t(layer.start_tool) != m_current_tool)
             m_current_tool = size_t(layer.start_tool);
 
-        if (m_layer_info->depth < m_wipe_tower_depth - m_perimeter_width)
+        if (m_use_bands)
+            m_y_shift = 0.f; // a narrower layer stays at the front, on its bands, instead of centred
+        else if (m_layer_info->depth < m_wipe_tower_depth - m_perimeter_width)
             m_y_shift = (m_wipe_tower_depth - m_layer_info->depth - m_perimeter_width) / 2.f;
 
         int idx = first_toolchange_to_nonsoluble_nonsupport(layer.tool_changes);

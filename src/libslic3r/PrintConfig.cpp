@@ -4955,6 +4955,20 @@ void PrintConfigDef::init_fff_params()
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
 
+    // Snapmaker Orca Max: neighbouring parts of different filaments overlap (PrintObject::overlap_material_regions).
+    def           = this->add("multi_material_overlap", coFloat);
+    def->label    = L("Material overlap");
+    def->tooltip  = L("Neighbouring parts printed with different filaments grow into each other by this width in "
+                      "total, half on each side, so their beads overlap at the seam. This closes the small holes where "
+                      "fine features of two colours meet (such as the corners of a QR code and its background) and "
+                      "bonds the materials better. Zero keeps the parts touching edge to edge.");
+    def->sidetext = L("mm");	// millimeters, CIS languages need translation
+    def->min      = 0;
+    def->max      = 1;
+    def->category = L("Advanced");
+    def->mode     = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
     def           = this->add("mmu_segmented_region_interlocking_depth", coFloat);
     def->label    = L("Interlocking depth of a segmented region");
     def->tooltip  = L("Interlocking depth of a segmented region. It will be ignored if "
@@ -7329,6 +7343,17 @@ void PrintConfigDef::init_fff_params()
                      "the edge the wider bead left. Support and prime tower extruders can go anywhere; within that rule "
                      "the order with the fewest tool changes is used. When disabled, the extruder already loaded goes "
                      "first, which can save a tool change on some of these layers.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    // Snapmaker Orca Max: one purge band per adhesiveness category in the Type 2 tower (WipeTower2::plan_material_bands).
+    def = this->add("wipe_tower_material_blocks", coBool);
+    def->label = L("Prime tower blocks per material");
+    def->category = L("Others");
+    def->tooltip = L("When the filaments on the prime tower belong to different material groups (their adhesiveness "
+                     "category, e.g. PLA, PETG, TPU), give every group its own block in the tower, so each purge lands "
+                     "on the same material as the layer below and the tower holds together. A block not used on a layer "
+                     "only gets sparse infill. When disabled, the purges are stacked in tool change order.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 

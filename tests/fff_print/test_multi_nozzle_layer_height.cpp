@@ -3534,3 +3534,130 @@ TEST_CASE("Support prints at the support nozzle's preferred height and ends exac
     CHECK(off_ladder == 0);
     CHECK(thin <= 3);
 }
+
+TEST_CASE("Neighbouring parts of different filaments overlap by the material overlap", "[Overlap]")
+{
+    // Two 10 x 10 x 2 mm boxes side by side, filament 1 and 2: with an overlap of 0.1 mm each grows
+    // 0.05 mm into the other along the shared 10 mm edge, never past the object outline.
+    const double overlap = GENERATE(0., 0.1, 0.2);
+    DynamicPrintConfig config = two_extruder_config(0.);
+    config.set_key_value("multi_material_overlap", new ConfigOptionFloat(overlap));
+    Print print;
+    Model model;
+    {
+        ModelObject *object = model.add_object();
+        object->name = "touching_boxes";
+        object->add_volume(test_box(0.f, 0.f, 0.f, 10.f, 10.f, 2.f))->config.set("extruder", 1);
+        object->add_volume(test_box(10.f, 0.f, 0.f, 10.f, 10.f, 2.f))->config.set("extruder", 2);
+        object->add_instance();
+    }
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    int fine_region = -1, coarse_region = -1;
+    find_regions(po, fine_region, coarse_region);
+    REQUIRE(fine_region >= 0);
+    REQUIRE(coarse_region >= 0);
+    const double z     = po.get_layer(3)->print_z;
+    const double first = region_slices_area(po, fine_region, z), second = region_slices_area(po, coarse_region, z);
+    double outline = 0.;
+    for (const ExPolygon &e : po.get_layer(3)->lslices)
+        outline += unscale<double>(unscale<double>(e.area()));
+    CAPTURE(overlap, first, second, outline);
+    CHECK(first == Catch::Approx(100. + 10. * overlap / 2.).margin(0.05));
+    CHECK(second == Catch::Approx(100. + 10. * overlap / 2.).margin(0.05));
+    CHECK(outline == Catch::Approx(200.).margin(0.05));   // the object itself does not grow
+    // The first layer keeps the parts edge to edge.
+    CHECK(region_slices_area(po, fine_region, po.get_layer(0)->print_z) == Catch::Approx(100.).margin(0.05));
+}
+
+// Purge Y range (min, max) of every tool change wipe, per purging tool, in G-code order.
+static std::map<int, std::vector<std::pair<double, double>>> purge_y_ranges(const std::string &gcode)
+{
+    std::map<int, std::vector<std::pair<double, double>>> ranges;
+    std::istringstream in(gcode);
+    std::string        line;
+    int                tool    = -1;
+    bool               in_wipe = false;
+    double             lo = 1e9, hi = -1e9;
+    while (std::getline(in, line)) {
+        if (line.size() > 1 && line[0] == 'T' && std::isdigit(static_cast<unsigned char>(line[1]))) {
+            tool = std::atoi(line.c_str() + 1);
+        } else if (line.rfind("; CP TOOLCHANGE WIPE", 0) == 0) {
+            in_wipe = true;
+            lo = 1e9; hi = -1e9;
+        } else if (in_wipe && line.rfind("; CP TOOLCHANGE END", 0) == 0) {
+            in_wipe = false;
+            if (hi >= lo)
+                ranges[tool].emplace_back(lo, hi);
+        } else if (in_wipe && line.rfind("G1 ", 0) == 0) {
+            const size_t y = line.find(" Y"), e = line.find(" E");
+            if (y != std::string::npos && e != std::string::npos && std::atof(line.c_str() + e + 2) > 0.) {
+                const double v = std::atof(line.c_str() + y + 2);
+                lo = std::min(lo, v);
+                hi = std::max(hi, v);
+            }
+        }
+    }
+    return ranges;
+}
+
+TEST_CASE("The prime tower keeps a band per material so purges land on their own material", "[WipeTower][MaterialBlocks]")
+{
+    // Two parts on two filaments of different adhesiveness categories (PLA 100, PETG 300), a tool
+    // change on every layer, a Type 2 tower.
+    const bool blocks = GENERATE(true, false);
+    DynamicPrintConfig config = two_extruder_config(0.);
+    config.set_key_value("filament_type", new ConfigOptionStrings({ "PLA", "PETG" }));
+    config.set_key_value("filament_adhesiveness_category", new ConfigOptionInts({ 100, 300 }));
+    config.set_key_value("enable_prime_tower", new ConfigOptionBool(true));
+    config.set_key_value("single_extruder_multi_material", new ConfigOptionBool(false));
+    config.set_key_value("use_relative_e_distances", new ConfigOptionBool(true));
+    config.set_key_value("layer_change_gcode", new ConfigOptionString("G92 E0"));
+    config.set_deserialize_strict({ { "wipe_tower_type", "type2" } });
+    config.set_key_value("wipe_tower_x", new ConfigOptionFloats({ 20. }));
+    config.set_key_value("wipe_tower_y", new ConfigOptionFloats({ 20. }));
+    config.set_key_value("wipe_tower_material_blocks", new ConfigOptionBool(blocks));
+    Print print;
+    Model model;
+    init_two_part_print(print, model, config, 0.1f); // 2 mm
+    {
+        const StringObjectException err = print.validate();
+        INFO(err.string);
+        REQUIRE(err.string.empty());
+    }
+    print.process();
+    const std::string gcode = Slic3r::Test::gcode(print);
+    REQUIRE(! gcode.empty());
+    const auto ranges = purge_y_ranges(gcode);
+    REQUIRE(ranges.count(0) == 1);
+    REQUIRE(ranges.count(1) == 1);
+    auto span = [](const std::vector<std::pair<double, double>> &rs) {
+        std::pair<double, double> s { 1e9, -1e9 };
+        for (const auto &r : rs) { s.first = std::min(s.first, r.first); s.second = std::max(s.second, r.second); }
+        return s;
+    };
+    const auto pla = span(ranges.at(0)), petg = span(ranges.at(1));
+    CAPTURE(blocks, pla.first, pla.second, petg.first, petg.second, ranges.at(0).size(), ranges.at(1).size());
+    const bool separate = pla.second < petg.first - 0.1 || petg.second < pla.first - 0.1;
+    if (blocks)
+        CHECK(separate);        // every PLA purge in the PLA band, every PETG purge in the PETG band
+    else
+        CHECK_FALSE(separate);  // both stack from the front of the tower
+}
+
+TEST_CASE("A flexible filament never prints the prime tower walls", "[WipeTower][MaterialBlocks]")
+{
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    PrintConfig        print_config;
+    print_config.apply(config, true);
+    print_config.filament_type.values = { "TPU", "PLA" };
+    print_config.wipe_tower_filament.value = 1;
+    CHECK(effective_wipe_tower_filament(print_config) == 0);
+    print_config.wipe_tower_filament.value = 2;
+    CHECK(effective_wipe_tower_filament(print_config) == 2);
+    CHECK(is_flexible_filament_type("TPU 95A"));
+    CHECK(is_flexible_filament_type("tpe"));
+    CHECK_FALSE(is_flexible_filament_type("PETG"));
+}

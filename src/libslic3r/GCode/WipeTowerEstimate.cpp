@@ -132,6 +132,18 @@ WipeTowerFootprint estimate_wipe_tower_footprint(const ConfigBase &config, WipeT
             closing_change = highest > EPSILON && highest > lowest + EPSILON;
         }
     }
+    // Snapmaker Orca Max: with material bands (wipe_tower_material_blocks, Type 2) each category keeps
+    // its own band, as deep as its deepest layer: plan room for every filament's own purge.
+    if (filaments_cnt > 1 && tower_type == WipeTowerType::Type2 && opt_bool("wipe_tower_material_blocks") &&
+        !opt_bool("single_extruder_multi_material")) {
+        if (const auto *categories = dynamic_cast<const ConfigOptionInts *>(option_of(config, "filament_adhesiveness_category"));
+            categories != nullptr && !categories->values.empty()) {
+            std::set<int> used;
+            for (unsigned int id : filament_ids)
+                used.insert(categories->get_at(id));
+            closing_change |= used.size() > 1;
+        }
+    }
 
     // A tower printed for one of the reasons above has no tool change to purge for; both
     // planners give it the idle depth below and nothing more.

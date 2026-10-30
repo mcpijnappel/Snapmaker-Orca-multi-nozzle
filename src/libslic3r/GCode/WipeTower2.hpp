@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <utility>
+#include <map>
 #include <algorithm>
 
 #include "libslic3r/Point.hpp"
@@ -146,6 +147,8 @@ public:
 		m_z_pos 				= print_z;
 		m_layer_height			= layer_height;
 		m_depth_traversed  = 0.f;
+        for (const auto &[category, band] : m_bands)
+            m_band_cursor[category] = band.first;
         m_current_layer_finished = false;
         m_prev_layer_had_interface = m_current_layer_has_interface;
 
@@ -205,6 +208,8 @@ public:
 
     struct FilamentParameters {
         std::string 	    material = "PLA";
+        // Snapmaker Orca Max: filament_adhesiveness_category; one tower band per category.
+        int                 category = 0;
         bool                is_soluble = false;
         bool                is_support = false;
         int  			    temperature = 0;
@@ -424,6 +429,13 @@ private:
 
 	// Calculates depth for all layers and propagates them downwards
 	void plan_tower();
+    // Snapmaker Orca Max ("wipe_tower_material_blocks"): one fixed band of tower depth per filament
+    // adhesiveness category, so each purge lands on its own material. Called by plan_tower().
+    void plan_material_bands();
+    bool                          m_material_blocks = false;      // the option
+    bool                          m_use_bands       = false;      // planned for this tower
+    std::map<int, std::pair<float, float>> m_bands;               // category -> (start, depth)
+    std::map<int, float>          m_band_cursor;                  // category -> next free y on this layer
 
     // Goes through m_plan, calculates border and finish_layer extrusions and subtracts them from last wipe
     void save_on_last_wipe();
@@ -449,10 +461,13 @@ private:
         float normal_toolchanges_depth() const { float sum = 0.f; for (const auto &a : tool_changes) sum += a.required_depth; return sum; }
         float local_z_toolchanges_depth() const { float sum = 0.f; for (const auto &a : local_z_tool_changes) sum += a.required_depth; return sum; }
 		float toolchanges_depth() const { return normal_toolchanges_depth() + local_z_toolchanges_depth(); }
+        // Snapmaker Orca Max: with material bands, the end of the last band this layer purges into
+        // (purges no longer stack from the front, see WipeTower2::plan_material_bands()).
+        float band_extent { 0.f };
         float local_z_reserve_slot_depth { 0.f };
         size_t local_z_reserve_slot_count { 0 };
         float local_z_reserve_depth() const { return local_z_reserve_slot_depth * float(local_z_reserve_slot_count); }
-        float planned_depth() const { return toolchanges_depth() + local_z_reserve_depth(); }
+        float planned_depth() const { return std::max(toolchanges_depth(), band_extent) + local_z_reserve_depth(); }
 
 		std::vector<ToolChange> tool_changes;
         std::vector<ToolChange> local_z_tool_changes;

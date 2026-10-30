@@ -657,6 +657,9 @@ private:
     void slice_volumes();
     // Combine slices of regions configured with a thicker extruder layer height into every Nth layer where geometry allows. Called by slice().
     void apply_extruder_layer_heights();
+    // Snapmaker Orca Max: neighbouring regions of different filaments grow into each other by
+    // multi_material_overlap (half each), so their beads overlap at the seam. Called by slice().
+    void overlap_material_regions();
     // Snapmaker Orca Max: bottom faces rounded up onto the coarse layers by
     // apply_extruder_layer_heights(): rows first_row .. new_bottom_row - 1 lost `area`, which now
     // starts at new_bottom_row. project_and_append_custom_facets() lifts painted support facets there.

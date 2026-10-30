@@ -901,6 +901,9 @@ void PrintObject::slice()
     // Must run before backup_untyped_slices() below so the combined slices survive the restore_untyped_slices*() calls in make_perimeters() / prepare_infill().
     this->apply_extruder_layer_heights();
     m_print->throw_if_canceled();
+    // On the final region shapes: after runs are committed and floating pieces are dropped.
+    this->overlap_material_regions();
+    m_print->throw_if_canceled();
 
     // Update bounding boxes, back up raw slices of complex models.
     tbb::parallel_for(
@@ -921,6 +924,64 @@ void PrintObject::slice()
 
     // BBS
     this->set_done(posSlice);
+}
+
+// Snapmaker Orca Max ("multi_material_overlap"): two regions printed with different filaments meet
+// edge to edge, and every bead rounds its corners by half its width, so where fine features of two
+// colours touch (a QR code's modules meeting at a corner, its background) small holes stay open.
+// Grow each region by half the overlap into its neighbours of another filament - never past the
+// object outline (lslices, unchanged) and not on the first layer - so the beads of both overlap.
+void PrintObject::overlap_material_regions()
+{
+    const float overlap = float(m_config.multi_material_overlap.value);
+    if (overlap <= 0.f || this->num_printing_regions() < 2 || m_layers.size() < 2)
+        return;
+    const float  grow      = float(scale_(0.5 * overlap));
+    const size_t n_regions = this->num_printing_regions();
+    std::vector<int> filament(n_regions);
+    for (size_t r = 0; r < n_regions; ++ r)
+        filament[r] = this->printing_region(r).config().outer_wall_filament_id.value;
+    // What each region prints for each row, before any growing. A row combined into a thicker run
+    // (combined_layer_count() == 0) is printed by the run top above it, with the run's shape.
+    std::vector<std::vector<ExPolygons>> printed(m_layers.size(), std::vector<ExPolygons>(n_regions));
+    for (size_t idx = 0; idx < m_layers.size(); ++ idx)
+        for (size_t r = 0; r < n_regions && r < m_layers[idx]->region_count(); ++ r)
+            printed[idx][r] = to_expolygons(m_layers[idx]->get_region(int(r))->slices.surfaces);
+    for (size_t r = 0; r < n_regions; ++ r)
+        for (size_t idx = m_layers.size(); idx -- > 0;) {
+            const LayerRegion *layerm = r < m_layers[idx]->region_count() ? m_layers[idx]->get_region(int(r)) : nullptr;
+            if (layerm == nullptr || layerm->combined_layer_count() < 2)
+                continue;
+            for (size_t row = idx - std::min<size_t>(idx, layerm->combined_layer_count() - 1); row < idx; ++ row)
+                if (printed[row][r].empty())
+                    printed[row][r] = printed[idx][r];
+        }
+    tbb::parallel_for(tbb::blocked_range<size_t>(1, m_layers.size()), [&](const tbb::blocked_range<size_t> &range) {
+        for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
+            m_print->throw_if_canceled();
+            Layer &layer = *m_layers[idx];
+            for (size_t r = 0; r < n_regions && r < layer.region_count(); ++ r) {
+                LayerRegion *layerm = layer.get_region(int(r));
+                if (layerm->slices.empty())
+                    continue;
+                // A run top prints every row of its run: reach into what the others print there.
+                const size_t count = std::max<size_t>(1, layerm->combined_layer_count());
+                const size_t first = idx - std::min(idx, count - 1);
+                Polygons others, outline;
+                for (size_t row = first; row <= idx; ++ row) {
+                    for (size_t q = 0; q < n_regions; ++ q)
+                        if (q != r && filament[q] != filament[r])
+                            polygons_append(others, to_polygons(printed[row][q]));
+                    polygons_append(outline, to_polygons(m_layers[row]->lslices));
+                }
+                if (others.empty())
+                    continue;
+                const Polygons reach = intersection(intersection(offset(printed[idx][r], grow), others), outline);
+                if (! reach.empty())
+                    layerm->slices.set(union_ex(printed[idx][r], reach), stInternal);
+            }
+        }
+    });
 }
 
 // ORCA: per-extruder layer height ("extruder_layer_height" printer option).

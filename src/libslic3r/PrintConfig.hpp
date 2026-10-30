@@ -20,6 +20,7 @@
 #include "CommonDefs.hpp"
 #include "Config.hpp"
 #include "Polygon.hpp"
+#include <cctype>
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
@@ -1225,6 +1226,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<WallSplitDirection>, split_wall_adjust_direction))
     ((ConfigOptionFloat,               mmu_segmented_region_max_width))
     ((ConfigOptionFloat,               mmu_segmented_region_interlocking_depth))
+    ((ConfigOptionFloat,               multi_material_overlap))
     ((ConfigOptionFloat,               raft_contact_distance))
     ((ConfigOptionFloat,               raft_expansion))
     ((ConfigOptionPercent,             raft_first_layer_density))
@@ -1762,6 +1764,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                wipe_tower_no_sparse_layers))
     ((ConfigOptionBool,                fine_nozzle_finishes_cycle))
     ((ConfigOptionBool,                align_bottoms_to_coarse_layers))
+    ((ConfigOptionBool,                wipe_tower_material_blocks))
     ((ConfigOptionBool,                wipe_tower_sparse_layers_combination))
     ((ConfigOptionString,              change_filament_gcode))
     ((ConfigOptionString,              change_extrusion_role_gcode))
@@ -2579,6 +2582,26 @@ private:
 
 // 0-based filament of a 1-based feature filament selector ("Default" = 0 falls back to filament 1).
 inline unsigned int feature_filament_idx(int filament_id) { return filament_id > 1 ? (unsigned int)(filament_id - 1) : 0u; }
+
+// Snapmaker Orca Max: flexible filaments (TPU, TPE, other FLEX types) bend under the tower's weight.
+inline bool is_flexible_filament_type(const std::string &type)
+{
+    std::string upper = type;
+    for (char &c : upper)
+        c = char(std::toupper(static_cast<unsigned char>(c)));
+    return upper.find("TPU") != std::string::npos || upper.find("TPE") != std::string::npos || upper.find("FLEX") != std::string::npos;
+}
+
+// The 1-based filament printing the prime tower walls (0 = whichever is loaded): wipe_tower_filament,
+// unless that is a flexible filament - a tower on flexible walls topples - then 0.
+inline int effective_wipe_tower_filament(const PrintConfig &config)
+{
+    const int filament = config.wipe_tower_filament.value;
+    if (filament > 0 && size_t(filament) <= config.filament_type.values.size() &&
+        is_flexible_filament_type(config.filament_type.get_at(size_t(filament - 1))))
+        return 0;
+    return filament;
+}
 
 // True when any extruder carries a per-extruder preferred layer height.
 inline bool has_extruder_layer_heights(const PrintConfig &config) {
