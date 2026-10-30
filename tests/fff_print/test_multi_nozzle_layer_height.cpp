@@ -2994,6 +2994,59 @@ TEST_CASE("Auto support finds the underside of a part printed in thicker runs", 
     CHECK(area > 250.);
 }
 
+TEST_CASE("Support cut to its gap between other parts' steps warns instead of refusing the print", "[MultiNozzleLayerHeight][Support][WipeTower]")
+{
+    // 0.2 / 0.28 / 0.12 mm on 0.4 / 0.6 / 0.2 mm nozzles plan a 0.04 mm grid. The leg and the support
+    // climb in 0.2 mm runs, the plate floats over the bed on 0.28 mm steps. The last support layer under
+    // the plate ends exactly at the gap, between the leg's steps, so it is taller than one row; the
+    // G-code check measured it by the row and refused the print for "empty layers".
+    DynamicPrintConfig config = four_nozzle_config();
+    config.set_key_value("layer_height",               new ConfigOptionFloat(0.04));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("nozzle_diameter",            new ConfigOptionFloats({0.4, 0.4, 0.6, 0.2}));
+    config.set_key_value("extruder_layer_height",      new ConfigOptionFloats({0.2, 0.2, 0.28, 0.12}));
+    config.set_key_value("min_layer_height",           new ConfigOptionFloats({0.08, 0.08, 0.12, 0.04}));
+    config.set_key_value("max_layer_height",           new ConfigOptionFloats({0.32, 0.32, 0.42, 0.14}));
+    config.set_key_value("enable_support",             new ConfigOptionBool(true));
+    config.set_key_value("support_type",               new ConfigOptionEnum<SupportType>(stNormalAuto));
+    config.set_key_value("support_filament",           new ConfigOptionInt(2));
+    config.set_key_value("support_interface_filament", new ConfigOptionInt(2));
+    config.set_key_value("support_top_z_distance",     new ConfigOptionFloat(0.));
+    config.set_key_value("support_bottom_z_distance",  new ConfigOptionFloat(0.));
+    config.set_key_value("enable_prime_tower",         new ConfigOptionBool(true));
+    config.set_key_value("single_extruder_multi_material", new ConfigOptionBool(false));
+    config.set_key_value("use_relative_e_distances",   new ConfigOptionBool(true));
+    config.set_key_value("layer_change_gcode",         new ConfigOptionString("G92 E0"));
+    config.set_deserialize_strict({ { "wipe_tower_type", "type2" }, { "printable_area", "0x0,270x0,270x270,0x270" } });
+    config.set_key_value("wipe_tower_x",               new ConfigOptionFloats({10.}));
+    config.set_key_value("wipe_tower_y",               new ConfigOptionFloats({10.}));
+    const float lift = GENERATE(0.1f, 0.14f, 0.2f);   // plate underside at 0.9, 0.94, 1.0
+    Print print;
+    Model model;
+    ModelObject *object = add_inlaid_plate(model, lift);
+    object->volumes[0]->config.set("extruder", 3);       // the plate
+    object->volumes[1]->config.set("extruder", 4);       // the insert
+    object->volumes[2]->config.set("extruder", 1);       // the leg
+    place_and_apply(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    const std::string gcode = Slic3r::Test::gcode(print);
+    std::string warnings;
+    bool        critical = false, tall_support = false;
+    for (const PrintStateBase::Warning &warning : print.step_state_with_warnings(psGCodeExport).warnings) {
+        warnings += warning.message + "\n";
+        critical |= warning.level == PrintStateBase::WarningLevel::CRITICAL;
+        tall_support |= warning.level == PrintStateBase::WarningLevel::NON_CRITICAL &&
+                        warning.message.find("only a support layer prints") != std::string::npos;
+    }
+    CAPTURE(lift, warnings);
+    CHECK(! gcode.empty());
+    CHECK(warnings.find("empty layers") == std::string::npos);
+    CHECK_FALSE(critical);
+    // The plate at 0.9: the last support layer runs from the leg's step at 0.8 up to 1.0.
+    if (std::abs(lift - 0.1f) < 1e-3f)
+        CHECK(tall_support);
+}
+
 // Region layers (above the first layer) printed thinner than the minimum layer height of the
 // nozzle printing the region's outer walls, as "z region height<min" strings.
 static std::vector<std::string> thin_region_layers(const PrintObject &po)

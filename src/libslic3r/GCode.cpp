@@ -2493,6 +2493,8 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
     }*/
 
     std::vector<std::pair<double, double>> warning_ranges;
+    // Snapmaker Orca Max: distances only a tall support layer covers (see below).
+    std::vector<std::pair<double, double>> tall_support_ranges;
 
     // Pair the object layers with the support layers by z.
     size_t              idx_object_layer     = 0;
@@ -2561,11 +2563,21 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
                     layer_span = std::max(layer_span, layerm->wall_combined_height());
             double maximal_print_z = (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.) + layer_span +
                                      std::max(0., extra_gap);
+            // Snapmaker Orca Max: a support layer on its own nozzle's steps can be taller than the object row it
+            // shares a print_z with (the last one under a contact is cut to end exactly at the gap). Such a
+            // layer covers the distance itself: reported as a warning, not as empty layers.
+            const double support_print_z = layer_to_print.support_layer == nullptr ? maximal_print_z :
+                (last_extrusion_layer ? last_extrusion_layer->print_z() : 0.) +
+                    std::max(layer_span, layer_to_print.support_layer->height) + std::max(0., extra_gap);
             // Negative support_contact_z is not taken into account, it can result in false positives in cases
 
-            if (has_extrusions && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON)
-                warning_ranges.emplace_back(
-                    std::make_pair((last_extrusion_layer ? last_extrusion_layer->print_z() : 0.), layers_to_print.back().print_z()));
+            if (has_extrusions && layer_to_print.print_z() > maximal_print_z + 2. * EPSILON) {
+                auto range = std::make_pair((last_extrusion_layer ? last_extrusion_layer->print_z() : 0.), layers_to_print.back().print_z());
+                if (layer_to_print.print_z() > support_print_z + 2. * EPSILON)
+                    warning_ranges.emplace_back(range);
+                else
+                    tall_support_ranges.emplace_back(range);
+            }
         }
         // Remember last layer with extrusions.
         if (has_extrusions)
@@ -2583,6 +2595,18 @@ std::vector<GCode::LayerToPrint> GCode::collect_layers_to_print(const PrintObjec
             layers_to_print.erase(layers_to_print.begin());
         if (layers_to_print.empty() || !has_extrusions_to_print(layers_to_print.front()))
             throw Slic3r::SlicingError(_(L("One object has an empty first layer and can't be printed. Please Cut the bottom or enable supports.")), object.id().id);
+    }
+
+    if (! tall_support_ranges.empty()) {
+        std::string warning;
+        for (size_t i = 0; i < std::min(tall_support_ranges.size(), size_t(5)); ++ i)
+            warning += Slic3r::format(_(L("Between %1% and %2% only a support layer prints: it is taller than one layer of the object, so the "
+                                          "support ends exactly at its top Z distance.")),
+                                      tall_support_ranges[i].first, tall_support_ranges[i].second) + "\n";
+        warning += Slic3r::format(_(L("Object: %1%")), object.model_object()->name) + "\n" +
+                   _(L("This happens where the support nozzle's layer steps do not meet the steps of the part above. Check the "
+                       "support under that part in the preview."));
+        const_cast<Print*>(object.print())->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, warning);
     }
 
     if (!warning_ranges.empty()) {
