@@ -5570,7 +5570,15 @@ void Sidebar::init_filament_combo(PlaterPresetComboBox **combo, const int filame
 
     (*combo)->clr_picker->SetLabel(wxString::Format("%d", filament_idx + 1));
     combo_and_btn_sizer->Add((*combo)->clr_picker, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(SidebarProps::ElementSpacing()) - FromDIP(2)); // ElementSpacing - 2 (from combo box))
-    combo_and_btn_sizer->Add(*combo, 1, wxALL | wxEXPAND, FromDIP(2))->SetMinSize({-1, FromDIP(30)});
+    // Snapmaker Orca Max: the filament's temperatures in a small line under the combo.
+    auto *combo_column = new wxBoxSizer(wxVERTICAL);
+    combo_column->Add(*combo, 0, wxEXPAND)->SetMinSize({-1, FromDIP(30)});
+    (*combo)->temp_label = new wxStaticText(p->m_panel_scrolled_filament_content, wxID_ANY, wxEmptyString);
+    (*combo)->temp_label->SetFont(Label::Body_10);
+    (*combo)->temp_label->SetForegroundColour(wxColour("#909090"));
+    combo_column->Add((*combo)->temp_label, 0, wxLEFT | wxTOP, FromDIP(2));
+    combo_and_btn_sizer->Add(combo_column, 1, wxALL | wxEXPAND, FromDIP(2));
+    wxTheApp->CallAfter([this]() { update_filament_temperatures(); });
 
     /* BBS hide del_btn
     ScalableButton* del_btn = new ScalableButton(p->m_panel_filament_content, wxID_ANY, "delete_filament");
@@ -6000,6 +6008,7 @@ void Sidebar::update_presets(Preset::Type preset_type)
 
     // Synchronize config.ini with the current selections.
     wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
+    update_filament_temperatures();
 
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": exit.");
 
@@ -11206,6 +11215,56 @@ void Sidebar::on_bed_type_change(BedType bed_type)
     int sel_idx = (int)bed_type - 1;
     if (m_bed_type_list != nullptr)
         m_bed_type_list->SetSelection(sel_idx);
+    update_filament_temperatures();
+}
+
+// Snapmaker Orca Max: "215 (220) \u00b0C \u00b7 bed 60 (65) \u00b0C" under each filament: other layers, the first
+// layer in brackets where it differs; the bed for the current plate's type.
+void Sidebar::update_filament_temperatures()
+{
+    if (p == nullptr || wxGetApp().preset_bundle == nullptr || wxGetApp().plater() == nullptr)
+        return;
+    PresetBundle &bundle = *wxGetApp().preset_bundle;
+    BedType bed_type = btDefault;
+    if (PartPlate *plate = wxGetApp().plater()->get_partplate_list().get_curr_plate(); plate != nullptr)
+        bed_type = plate->get_bed_type(true);
+    if (bed_type == btDefault && bundle.project_config.has("curr_bed_type"))
+        bed_type = bundle.project_config.opt_enum<BedType>("curr_bed_type");
+    const std::string bed_key       = get_bed_temp_key(bed_type);
+    const std::string bed_first_key = get_bed_temp_1st_layer_key(bed_type);
+    auto int_at = [](const DynamicPrintConfig &config, const std::string &key) -> int {
+        const auto *option = config.option<ConfigOptionInts>(key);
+        return option == nullptr || option->values.empty() ? -1 : option->values.front();
+    };
+    auto pair_text = [](int other, int first) {
+        if (other < 0)
+            return wxString();
+        return first >= 0 && first != other ? wxString::Format("%d (%d) \u00b0C", other, first) : wxString::Format("%d \u00b0C", other);
+    };
+    bool changed = false;
+    for (size_t i = 0; i < p->combos_filament.size(); ++ i) {
+        PlaterPresetComboBox *combo = p->combos_filament[i];
+        if (combo == nullptr || combo->temp_label == nullptr)
+            continue;
+        wxString text;
+        if (i < bundle.filament_presets.size())
+            if (const Preset *preset = bundle.filaments.find_preset(bundle.filament_presets[i]); preset != nullptr) {
+                const DynamicPrintConfig &config = preset->name == bundle.filaments.get_edited_preset().name ?
+                                                   bundle.filaments.get_edited_preset().config : preset->config;
+                text = pair_text(int_at(config, "nozzle_temperature"), int_at(config, "nozzle_temperature_initial_layer"));
+                if (! bed_key.empty()) {
+                    const wxString bed = pair_text(int_at(config, bed_key), int_at(config, bed_first_key));
+                    if (! bed.empty())
+                        text += (text.empty() ? "" : " \u00b7 ") + wxString::Format(_L("bed %s"), bed);
+                }
+            }
+        if (combo->temp_label->GetLabel() != text) {
+            combo->temp_label->SetLabel(text);
+            changed = true;
+        }
+    }
+    if (changed && p->m_panel_scrolled_filament_content != nullptr)
+        p->m_panel_scrolled_filament_content->Layout();
 }
 
 void Sidebar::show_sync_filament_dialog()
@@ -20474,6 +20533,7 @@ void Plater::priv::on_select_bed_type(wxCommandEvent &evt)
             // (even if values happen to be equal, we need to update global config, invalidate slices, etc.)
             if (old_bed_type != new_bed_type || saved_bed_type_str.empty()) {
                 proj_config.set_key_value("curr_bed_type", new ConfigOptionEnum<BedType>(new_bed_type));
+                sidebar->update_filament_temperatures();
 
                 wxGetApp().plater()->update_project_dirty_from_presets();
 
@@ -30873,6 +30933,8 @@ void Plater::apply_background_progress()
 int Plater::select_plate(int plate_index, bool need_slice)
 {
     int ret;
+    // Snapmaker Orca Max: the plate's bed type decides the bed temperatures under the filaments.
+    wxTheApp->CallAfter([this]() { sidebar().update_filament_temperatures(); });
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" %1%: plate %2%, need_slice %3% ")%__LINE__ %plate_index  %need_slice;
     take_snapshot("select partplate!");
     ret = p->partplate_list.select_plate(plate_index);

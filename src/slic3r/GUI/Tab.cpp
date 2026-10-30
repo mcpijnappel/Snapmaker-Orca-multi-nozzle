@@ -2044,6 +2044,10 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         return;
     }
 
+    // Snapmaker Orca Max: the temperatures under the filaments in the sidebar follow the filament tab.
+    if (m_type == Preset::TYPE_FILAMENT && (opt_key.find("temperature") != std::string::npos || opt_key.find("plate_temp") != std::string::npos))
+        wxGetApp().plater()->sidebar().update_filament_temperatures();
+
     // Snapmaker Orca Max: the printer's per-extruder preferred heights only count with "Custom".
     if (opt_key == "multi_nozzle_layer_heights")
         if (Tab *printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER); printer_tab != nullptr && printer_tab != this)

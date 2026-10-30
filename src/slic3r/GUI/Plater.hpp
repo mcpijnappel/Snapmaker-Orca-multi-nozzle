@@ -223,6 +223,8 @@ public:
     std::vector<unsigned int> get_ui_ordered_filament_ids() const;
     // BBS
     void on_bed_type_change(BedType bed_type);
+    // Snapmaker Orca Max: refresh the temperature line under each filament.
+    void update_filament_temperatures();
     void load_ams_list(MachineObject* obj);
     std::map<int, DynamicPrintConfig> build_filament_ams_list(MachineObject* obj);
     void sync_ams_list(bool is_from_big_sync_btn = false);

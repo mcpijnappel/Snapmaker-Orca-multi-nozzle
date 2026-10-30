@@ -210,6 +210,8 @@ public:
     // BBS
     wxButton* clr_picker { nullptr };
     wxColourData m_clrData;
+    // Snapmaker Orca Max: the filament's nozzle and bed temperatures, under the combo in the sidebar.
+    wxStaticText* temp_label { nullptr };
 
     wxColor get_color() { return m_color; }
 
