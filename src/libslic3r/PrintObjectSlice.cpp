@@ -14,6 +14,7 @@
 #include "ClipperUtils.hpp"
 #include "ElephantFootCompensation.hpp"
 #include "Exception.hpp"
+#include "format.hpp"
 #include "I18N.hpp"
 #include "Layer.hpp"
 #include "MixedFilament.hpp"
@@ -1686,7 +1687,7 @@ void PrintObject::apply_extruder_layer_heights()
         auto shape_at = [this](size_t l, size_t r) { return to_expolygons(m_layers[l]->regions()[r]->slices.surfaces); };
         // The layer a region's row l extrudes on: the row itself, or the run top above a cleared
         // run member. n_layers if none.
-        auto top_of = [this, count_at, n_layers](size_t l, size_t r) {
+        auto top_of = [count_at, n_layers](size_t l, size_t r) {
             size_t t = l;
             while (t < n_layers && count_at(t, r) == 0)
                 ++ t;
