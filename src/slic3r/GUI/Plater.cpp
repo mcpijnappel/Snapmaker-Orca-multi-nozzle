@@ -5161,7 +5161,16 @@ Sidebar::Sidebar(Plater *parent)
         p->combos_filament[0]->clr_picker->SetLabel("1");
         combo_and_btn_sizer->Add(p->combos_filament[0]->clr_picker, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT,FromDIP(SidebarProps::ElementSpacing()) - FromDIP(2)); // ElementSpacing - 2 (from combo box))
     }
-    combo_and_btn_sizer->Add(p->combos_filament[0], 1, wxALL | wxEXPAND, FromDIP(2))->SetMinSize({-1, FromDIP(30) });
+    // Snapmaker Orca Max: the filament's temperatures in a small line under the combo (as init_filament_combo()).
+    {
+        auto *combo_column = new wxBoxSizer(wxVERTICAL);
+        combo_column->Add(p->combos_filament[0], 0, wxEXPAND)->SetMinSize({-1, FromDIP(30)});
+        p->combos_filament[0]->temp_label = new wxStaticText(p->m_panel_scrolled_filament_content, wxID_ANY, wxEmptyString);
+        p->combos_filament[0]->temp_label->SetFont(Label::Body_10);
+        p->combos_filament[0]->temp_label->SetForegroundColour(wxColour("#909090"));
+        combo_column->Add(p->combos_filament[0]->temp_label, 0, wxLEFT | wxTOP, FromDIP(2));
+        combo_and_btn_sizer->Add(combo_column, 1, wxALL | wxEXPAND, FromDIP(2));
+    }
 
     /*ScalableButton* edit_btn = new ScalableButton(p->m_panel_filament_content, wxID_ANY, "edit");
     edit_btn->SetBackgroundColour(wxColour(255, 255, 255));
@@ -15011,9 +15020,16 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
             return emboss_svg(m_plater, filename, mouse_position);
         }
     }
-    bool res = m_plater.load_files(filenames);
-    m_mainframe.update_title();
-    return res;
+    // Snapmaker Orca Max: load once the drop has finished. A modal dialog opened from inside the drop
+    // handler (the "open as project / geometry only" question for a 3MF) gets no input on Linux while
+    // the drag still holds the pointer, so it could not be clicked.
+    Plater    &plater    = m_plater;
+    MainFrame &mainframe = m_mainframe;
+    wxGetApp().CallAfter([&plater, &mainframe, files = filenames]() {
+        plater.load_files(files);
+        mainframe.update_title();
+    });
+    return true;
 }
 
 Plater::priv::priv(Plater *q, MainFrame *main_frame)
