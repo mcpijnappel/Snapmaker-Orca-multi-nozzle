@@ -1,0 +1,18 @@
+{
+	"type": "process",
+	"name": "Multi-nozzle Normal @Snapmaker U1",
+	"inherits": "0.20mm Standard @Snapmaker U1 (0.4 nozzle)",
+	"from": "system",
+	"setting_id": "XdmHex5JX6A0dogV",
+	"instantiation": "true",
+	"description": "For U1 tool heads with different nozzle sizes: every nozzle prints 50% of its diameter on one shared 0.10 mm grid (0.2 mm nozzle 0.10, 0.4 mm 0.20, 0.6 mm 0.30, 0.8 mm 0.40 mm). Objects and parts can fine-tune with Layer height steps.",
+	"multi_nozzle_layer_heights": "normal",
+	"layer_height": "0.1",
+	"initial_layer_print_height": "0.2",
+	"compatible_printers": [
+		"Snapmaker U1 (0.2 nozzle)",
+		"Snapmaker U1 (0.4 nozzle)",
+		"Snapmaker U1 (0.6 nozzle)",
+		"Snapmaker U1 (0.8 nozzle)"
+	]
+}

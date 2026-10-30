@@ -1,6 +1,6 @@
 {
   "name": "Snapmaker",
-  "version": "02.03.03.11",
+  "version": "02.03.03.12",
   "force_update": "0",
   "description": "Snapmaker configurations",
   "machine_model_list": [
@@ -153,6 +153,26 @@
     {
       "name": "0.28mm Standard @Snapmaker U1 (0.4 nozzle)",
       "sub_path": "process/0.28mm Standard @Snapmaker U1 (0.4 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Ultra fine @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Ultra fine @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Fine @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Fine @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Normal @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Normal @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Coarse @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Coarse @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Super coarse @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Super coarse @Snapmaker U1.json"
     },
     {
       "name": "0.06 Standard @Snapmaker (0.2 nozzle)",

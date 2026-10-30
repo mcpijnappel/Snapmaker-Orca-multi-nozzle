@@ -1,0 +1,18 @@
+{
+	"type": "process",
+	"name": "Multi-nozzle Ultra fine @Snapmaker U1",
+	"inherits": "0.12mm Standard @Snapmaker U1 (0.4 nozzle)",
+	"from": "system",
+	"setting_id": "IHfeD4qpGpsqvSyu",
+	"instantiation": "true",
+	"description": "For U1 tool heads with different nozzle sizes: every nozzle prints 30% of its diameter on one shared 0.06 mm grid (0.2 mm nozzle 0.06, 0.4 mm 0.12, 0.6 mm 0.18, 0.8 mm 0.24 mm). Objects and parts can fine-tune with Layer height steps.",
+	"multi_nozzle_layer_heights": "ultra_fine",
+	"layer_height": "0.06",
+	"initial_layer_print_height": "0.2",
+	"compatible_printers": [
+		"Snapmaker U1 (0.2 nozzle)",
+		"Snapmaker U1 (0.4 nozzle)",
+		"Snapmaker U1 (0.6 nozzle)",
+		"Snapmaker U1 (0.8 nozzle)"
+	]
+}
