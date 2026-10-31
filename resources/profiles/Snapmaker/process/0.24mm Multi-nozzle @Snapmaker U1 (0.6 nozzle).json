@@ -1,0 +1,12 @@
+{
+	"type": "process",
+	"name": "0.24mm Multi-nozzle @Snapmaker U1 (0.6 nozzle)",
+	"inherits": "0.24mm Standard @Snapmaker U1 (0.6 nozzle)",
+	"from": "system",
+	"setting_id": "MSYKDyDNuC8sqZW0",
+	"instantiation": "true",
+	"description": "0.6 mm nozzle, 0.24 mm layers: 0.24mm Standard.",
+	"compatible_printers": [
+		"Snapmaker U1 (0.6 nozzle)"
+	]
+}

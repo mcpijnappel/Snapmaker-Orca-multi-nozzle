@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "h5UN6G8AyOR8PLPi",
 	"instantiation": "true",
-	"description": "Speeds, accelerations and line widths of a 0.2 mm nozzle under Multi-nozzle Normal: Snapmaker's 0.10 mm values for the 0.2 mm nozzle, with the settings of 0.12mm Standard @Snapmaker U1 (0.2 nozzle).",
+	"description": "0.2 mm nozzle, Multi-nozzle Normal: Snapmaker's 0.10 mm base with 0.12mm Standard settings.",
 	"bottom_color_penetration_layers": "3",
 	"top_color_penetration_layers": "5",
 	"elefant_foot_compensation": "0.15",

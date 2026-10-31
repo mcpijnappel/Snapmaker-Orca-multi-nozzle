@@ -110,9 +110,26 @@ std::string plate_quality_class(const PresetBundle &bundle);
 const Preset *multi_nozzle_size_preset(const PresetBundle &bundle, const Preset &multi_nozzle, double nozzle_size);
 
 // Hides the system presets "<multi-nozzle preset> (<size> nozzle)" of `prints` (they serve their
-// multi-nozzle preset alone and are never selected). Run after a vendor bundle is loaded; matches by
-// name, so it works on a collection that is not sorted yet.
+// multi-nozzle preset alone and are never selected) and the height presets below. Run after a vendor
+// bundle is loaded; matches by name, so it works on a collection that is not sorted yet.
 void hide_multi_nozzle_size_presets(PresetCollection &prints);
+
+// Snapmaker Orca Max: a generated preset of one nozzle size and layer height ("0.30mm Multi-nozzle
+// @Snapmaker U1 (0.4 nozzle)"). Chosen for a tool head in the per-extruder picker under a multi-nozzle
+// strategy, it sets the head's layer height as well as its speeds, accelerations, jerk and line widths.
+bool is_multi_nozzle_height_preset(const Preset &preset);
+
+// The layer height tool head `head` prints with height preset `preset` chosen: the preset's height when
+// the edited process plans a multi-nozzle strategy and the height is a whole multiple of its grid within
+// the head's nozzle and its minimum / maximum layer height, at most one grid step from the strategy's
+// height of the head; 0 otherwise (another preset, Off, off grid, too far).
+double chosen_layer_height(const PresetBundle &bundle, const Preset &preset, size_t head);
+
+// The strategy's layer height of tool head `head` (Slicing.hpp multi_nozzle_strategy_height); 0 under Off.
+double strategy_layer_height(const PresetBundle &bundle, size_t head);
+
+// Per tool head, the layer height its applied chosen height preset sets (0: the strategy's).
+std::vector<double> chosen_layer_heights(const PresetBundle &bundle, const std::vector<Source> &sources);
 
 // The layer height the rule matches: the saved selected preset's layer_height, so an unsaved edit
 // does not move the source.
@@ -314,9 +331,10 @@ struct Candidate
     bool is_automatic { false };    // the preset the rule gives the head today
     bool is_selected { false };     // the selected process preset
 };
-// The presets the Speed page picker lists for tool head `head`: system presets compatible with the
-// head's machine preset (any visibility), then fitting user and project presets (no bundle presets),
-// each group in collection order. Empty without a machine preset or on a printer the rule is off for.
+// The presets the per-extruder picker lists for tool head `head`. Snapmaker Orca Max: under a
+// multi-nozzle strategy the height presets of the head's nozzle size one grid step finer or coarser than
+// its strategy height (chosen_layer_height), by height; nothing under Off, where every head prints the
+// plate's height.
 std::vector<Candidate> picker_candidates(const PresetBundle &bundle, size_t head);
 
 // The column of a derived head's source the composer reads for `flow`: source_column, else a chosen

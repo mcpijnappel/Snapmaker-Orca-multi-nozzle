@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "ymbuIQUmwSw9SOh1",
 	"instantiation": "true",
-	"description": "Speeds, accelerations and line widths of a 0.8 mm nozzle under Multi-nozzle Ultra fine: Snapmaker's 0.24 mm values (the nearest it has to 0.20 mm) for the 0.8 mm nozzle, with the settings of 0.40mm Standard @Snapmaker U1 (0.8 nozzle).",
+	"description": "0.8 mm nozzle, Multi-nozzle Ultra fine: Snapmaker's 0.24 mm base (nearest) with 0.40mm Standard settings.",
 	"bottom_color_penetration_layers": "3",
 	"top_color_penetration_layers": "3",
 	"elefant_foot_compensation": "0.15",

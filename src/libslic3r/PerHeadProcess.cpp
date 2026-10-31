@@ -7,6 +7,7 @@
 #include "Preset.hpp"
 #include "PresetBundle.hpp"
 #include "PrintConfig.hpp"
+#include "Slicing.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
@@ -135,7 +136,8 @@ std::vector<const Preset*> candidates_for(const PresetBundle &bundle, const Pres
 {
     std::vector<const Preset*> out;
     for (const Preset &preset : bundle.prints)
-        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, machine) && !is_multi_nozzle_size(bundle, preset))
+        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, machine) && !is_multi_nozzle_size(bundle, preset) &&
+            !is_multi_nozzle_height_preset(preset))
             out.emplace_back(&preset);
     return out;
 }
@@ -265,9 +267,63 @@ void hide_multi_nozzle_size_presets(PresetCollection &prints)
             multi_nozzle.insert(preset.name);
     for (size_t idx = 0; idx < prints.size(); ++idx) {
         Preset &preset = prints.preset(idx);
-        if (preset.is_system && multi_nozzle.count(multi_nozzle_owner_name(preset.name)) > 0)
+        if (preset.is_system && (multi_nozzle.count(multi_nozzle_owner_name(preset.name)) > 0 || is_multi_nozzle_height_preset(preset)))
             preset.is_visible = false;
     }
+}
+
+bool is_multi_nozzle_height_preset(const Preset &preset)
+{
+    // "0.30mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)": a height, the class "Multi-nozzle", a size.
+    return preset.is_system && quality_class(preset.name) == "Multi-nozzle" && !multi_nozzle_owner_name(preset.name).empty();
+}
+
+double chosen_layer_height(const PresetBundle &bundle, const Preset &preset, size_t head)
+{
+    if (!is_multi_nozzle_height_preset(preset) || bundle.prints.get_selected_idx() == size_t(-1))
+        return 0.;
+    const auto *strategy = bundle.prints.get_edited_preset().config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    const double grid    = strategy == nullptr ? 0. : multi_nozzle_strategy_grid(int(strategy->value));
+    const double height  = layer_height_of(preset);
+    if (grid <= EPSILON || height <= EPSILON || std::abs(height / grid - std::round(height / grid)) > 1e-6)
+        return 0.;
+    const DynamicPrintConfig &printer = bundle.printers.get_edited_preset().config;
+    auto at = [&printer, head](const char *key) {
+        const auto *option = printer.option<ConfigOptionFloats>(key);
+        return option == nullptr || option->values.empty() ? 0. : option->get_at(head);
+    };
+    const double nozzle = at("nozzle_diameter"), min_lh = at("min_layer_height"), max_lh = at("max_layer_height");
+    if ((nozzle > EPSILON && height > nozzle + EPSILON) || height < min_lh - EPSILON || (max_lh > EPSILON && height > max_lh + EPSILON))
+        return 0.;
+    // One grid step finer or coarser than the strategy's height of the head, at most.
+    const double own = multi_nozzle_strategy_height(int(strategy->value), nozzle, min_lh, max_lh);
+    if (own > EPSILON && std::abs(height - own) > grid + EPSILON)
+        return 0.;
+    return height;
+}
+
+double strategy_layer_height(const PresetBundle &bundle, size_t head)
+{
+    if (bundle.prints.get_selected_idx() == size_t(-1))
+        return 0.;
+    const auto *strategy = bundle.prints.get_edited_preset().config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    if (strategy == nullptr)
+        return 0.;
+    const DynamicPrintConfig &printer = bundle.printers.get_edited_preset().config;
+    auto at = [&printer, head](const char *key) {
+        const auto *option = printer.option<ConfigOptionFloats>(key);
+        return option == nullptr || option->values.empty() ? 0. : option->get_at(head);
+    };
+    return multi_nozzle_strategy_height(int(strategy->value), at("nozzle_diameter"), at("min_layer_height"), at("max_layer_height"));
+}
+
+std::vector<double> chosen_layer_heights(const PresetBundle &bundle, const std::vector<Source> &sources)
+{
+    std::vector<double> out(sources.size(), 0.);
+    for (size_t head = 0; head < sources.size(); ++head)
+        if (sources[head].step == Step::Chosen && sources[head].derived && sources[head].preset != nullptr)
+            out[head] = chosen_layer_height(bundle, *sources[head].preset, head);
+    return out;
 }
 
 double target_layer_height(const PresetBundle &bundle)
@@ -677,8 +733,12 @@ bool fits(const PresetBundle &bundle, const Preset &preset, size_t head, std::st
         (list == nullptr || list->values.empty()) && preset.compatible_printers_condition().empty())
         if (const Preset *root = bundle.prints.get_preset_base(preset); root != nullptr && root->is_system)
             judged = root;
-    if (compatible(bundle, *judged, *machine))
+    if (compatible(bundle, *judged, *machine)) {
+        // Snapmaker Orca Max: a height preset applies while the head can print its height.
+        if (is_multi_nozzle_height_preset(preset) && chosen_layer_height(bundle, preset, head) <= 0.)
+            return answer(false, "grid");
         return answer(true, std::string());
+    }
     // The size of the preset's machine, when a machine preset of this printer model accepts it.
     const std::string model = printer.config.opt_string("printer_model");
     for (const Preset &candidate : bundle.printers)
@@ -727,17 +787,16 @@ std::vector<Candidate> picker_candidates(const PresetBundle &bundle, size_t head
         candidate.is_selected     = preset.name == selected.name;
         out.emplace_back(std::move(candidate));
     };
+    // Snapmaker Orca Max: the height presets of the head's size one grid step finer or coarser than its
+    // strategy height, by height; its own height is the automatic entry.
+    const double own = strategy_layer_height(bundle, head);
     for (const Preset &preset : bundle.prints)
-        // A multi-nozzle preset's per-size preset only as the head's automatic one.
-        if (preset.is_system && !preset.is_default && !preset.is_from_bundle() && compatible(bundle, preset, *machine) &&
-            (!is_multi_nozzle_size(bundle, preset) || preset.name == automatic->name))
-            add(preset, Candidate::System);
-    for (const Preset &preset : bundle.prints)
-        if (!preset.is_system && !preset.is_default && !preset.is_project_embedded && !preset.is_from_bundle() && fits(bundle, preset, head))
-            add(preset, Candidate::User);
-    for (const Preset &preset : bundle.prints)
-        if (preset.is_project_embedded && !preset.is_from_bundle() && fits(bundle, preset, head))
-            add(preset, Candidate::Project);
+        if (is_multi_nozzle_height_preset(preset) && compatible(bundle, preset, *machine)) {
+            const double height = chosen_layer_height(bundle, preset, head);
+            if (height > 0. && std::abs(height - own) > EPSILON)
+                add(preset, Candidate::System);
+        }
+    std::stable_sort(out.begin(), out.end(), [](const Candidate &a, const Candidate &b) { return layer_height_of(*a.preset) < layer_height_of(*b.preset); });
     return out;
 }
 

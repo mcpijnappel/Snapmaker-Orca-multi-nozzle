@@ -532,7 +532,7 @@ wxString PresetComboBox::get_tooltip(const Preset &preset)
                              (source.step == PerHeadProcess::Step::Chosen ? " " + into_u8(_L("(chosen)")) : std::string());
             if (!heads.empty())
                 // TRN Tooltip of the process combo of the sidebar. %1% lists tool heads with the process preset each prints with
-                tooltip += "\n" + format_wxstr(_L("Extruders of other nozzle sizes print with presets of this quality for their size: %1%."), from_u8(heads));
+                tooltip += "\n" + format_wxstr(_L("Other presets per extruder: %1%."), from_u8(heads));
         }
     }
 

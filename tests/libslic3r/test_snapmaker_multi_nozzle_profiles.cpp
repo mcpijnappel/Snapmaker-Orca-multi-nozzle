@@ -1,5 +1,6 @@
 #include <catch2/catch_all.hpp>
 
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -140,4 +141,29 @@ TEST_CASE("Every 0.4 mm multi-nozzle preset carries a High Flow column", "[Profi
         // High Flow is never slower than Standard.
         CHECK(std::stod(columns[1]) >= std::stod(columns[0]));
     }
+}
+
+TEST_CASE("Every nozzle size has a hidden height preset one grid step from each strategy's height", "[Profiles][MultiNozzle]")
+{
+    // One step finer or coarser than the 25 / 40 / 50 / 60 / 70 % heights, within the U1 machines' limits.
+    const std::vector<std::pair<std::string, std::vector<std::string>>> heights = {
+        {"0.2", {"0.10"}},
+        {"0.4", {"0.08", "0.10", "0.12", "0.14", "0.15", "0.24", "0.30"}},
+        {"0.6", {"0.16", "0.20", "0.24", "0.28", "0.32", "0.40"}},
+        {"0.8", {"0.24", "0.25", "0.30", "0.36", "0.40", "0.42", "0.50"}}};
+    auto bundle = load_snapmaker_bundle();
+    size_t count = 0;
+    for (const Preset &preset : bundle->prints)
+        count += preset.is_system && preset.name.find("mm Multi-nozzle @Snapmaker U1 (") != std::string::npos ? 1 : 0;
+    CHECK(count == 21);
+    for (const auto &[size, list] : heights)
+        for (const std::string &height : list) {
+            const std::string name = height + "mm Multi-nozzle @Snapmaker U1 (" + size + " nozzle)";
+            INFO(name);
+            const Preset *preset = bundle->prints.find_preset(name, false);
+            REQUIRE(preset != nullptr);
+            CHECK(preset->is_system);
+            CHECK_FALSE(preset->is_visible);
+            CHECK_THAT(preset->config.opt_float("layer_height"), Catch::Matchers::WithinAbs(std::stod(height), 1e-6));
+        }
 }

@@ -246,8 +246,10 @@ double conforming_object_layer_height(const std::vector<double> &heights, double
 extern const char *const extruder_layer_height_planned_key;
 
 // The object layer height (grid) and the per-extruder heights a config prints with (0 prints the grid);
-// `heights` has one entry per nozzle. A strategy sets both; Off prints layer_height everywhere. A config
-// without the strategy key (a test, a script) prints the extruder_layer_height it holds.
+// `heights` has one entry per nozzle. A strategy sets both; a height the config holds for an extruder
+// replaces the strategy's while it is a grid multiple within the nozzle's limits (a height chosen per
+// extruder). Off prints layer_height everywhere. A config without the strategy key (a test, a script)
+// prints the extruder_layer_height it holds.
 ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfig &config);
 
 // Writes the effective grid and heights into `config` and sets the marker under a strategy (and under

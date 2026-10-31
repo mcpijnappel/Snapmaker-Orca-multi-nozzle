@@ -251,8 +251,6 @@ wxString head_values_by_kind(size_t widths, size_t speeds);
 // The count sentence of the page under a selected tool head ("3 line widths set for this
 // extruder." / "2 speeds set for this extruder."); empty for zero.
 wxString head_values_set_sentence(bool quality_page, size_t count);
-// The closing sentence under a selected tool head, on both pages.
-wxString shared_settings_sentence();
 // The link under a selected tool head that clears the values set for it on this page.
 wxString clear_head_link_label(bool quality_page);
 // What an older version (one value per width) reads from a width written as a full array: the

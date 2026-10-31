@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "uaozOqtIxX4aspmi",
 	"instantiation": "true",
-	"description": "Speeds, accelerations and line widths of a 0.6 mm nozzle under Multi-nozzle Fine: 0.24mm Standard @Snapmaker U1 (0.6 nozzle).",
+	"description": "0.6 mm nozzle, Multi-nozzle Fine: 0.24mm Standard.",
 	"compatible_printers": [
 		"Snapmaker U1 (0.6 nozzle)"
 	]

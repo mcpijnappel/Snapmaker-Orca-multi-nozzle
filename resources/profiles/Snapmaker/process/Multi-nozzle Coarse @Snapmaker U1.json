@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "bTlmqhwp4Lf9kMqt",
 	"instantiation": "true",
-	"description": "For U1 tool heads with different nozzle sizes: every nozzle prints 60% of its diameter on one shared 0.12 mm grid (0.2 mm nozzle 0.12, 0.4 mm 0.24, 0.6 mm 0.36, 0.8 mm 0.48 mm). Objects and parts can fine-tune with Layer height steps.",
+	"description": "Mixed nozzle sizes: each prints 60% of its diameter (0.2: 0.12, 0.4: 0.24, 0.6: 0.36, 0.8: 0.48 mm).",
 	"multi_nozzle_layer_heights": "coarse",
 	"layer_height": "0.12",
 	"initial_layer_print_height": "0.2",

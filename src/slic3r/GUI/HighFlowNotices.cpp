@@ -644,11 +644,6 @@ wxString head_values_set_sentence(bool quality_page, size_t count)
         format_wxstr(_L_PLURAL("%1% speed set for this extruder.", "%1% speeds set for this extruder.", unsigned(count)), count);
 }
 
-wxString shared_settings_sentence()
-{
-    return _L("Greyed settings are shared by every extruder; the layer height of an extruder is set in the sidebar.");
-}
-
 wxString clear_head_link_label(bool quality_page)
 {
     // TRN Link under a selected tool head of the Quality / Speed page of the process settings

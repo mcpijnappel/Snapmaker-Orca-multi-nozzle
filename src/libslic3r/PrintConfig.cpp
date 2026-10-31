@@ -5638,14 +5638,9 @@ void PrintConfigDef::init_fff_params()
     def = this->add("multi_nozzle_layer_heights", coEnum);
     def->label    = L("Multi-nozzle layer heights");
     def->category = L("Quality");
-    def->tooltip  = L("For printers whose extruders have different nozzle sizes. Off: one layer height for the whole "
-                      "print, as usual. The strategies give every nozzle the same share of its diameter - Ultra fine "
-                      "25%, Fine 40%, Normal 50%, Coarse 60%, Super coarse 70% - on one common grid (the 0.2 mm "
-                      "nozzle's height), so all nozzle sizes always meet on shared layers: Normal prints a 0.2 mm "
-                      "nozzle at 0.10, 0.4 at 0.20, 0.6 at 0.30 and 0.8 at 0.40 mm. Each part prints in layers of its "
-                      "own nozzle's height where its shape allows, the finer nozzles finishing each cycle. A height "
-                      "is kept within the nozzle's minimum and maximum layer height. The layer height setting then "
-                      "shows the grid and is not used.");
+    def->tooltip  = L("For extruders with different nozzle sizes. Off: one layer height, as usual. A strategy prints "
+                      "every nozzle at the same share of its diameter on one shared grid: Normal (50%) prints 0.2 / 0.4 / "
+                      "0.6 / 0.8 mm nozzles at 0.10 / 0.20 / 0.30 / 0.40 mm.");
     def->enum_keys_map = &ConfigOptionEnum<MultiNozzleLayerHeights>::get_enum_values();
     // Entry order must follow the enum's numeric order: the choice field maps by position. Custom
     // (mnlhCustom, last) is left out: it is only read from older configs.

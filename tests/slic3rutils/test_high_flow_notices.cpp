@@ -975,8 +975,6 @@ TEST_CASE("The texts of the Quality page name line widths, the values by kind an
     CHECK(HighFlowNotices::head_values_set_sentence(false, 1) == "1 speed set for this extruder.");
     CHECK(HighFlowNotices::head_values_set_sentence(false, 2) == "2 speeds set for this extruder.");
     CHECK(HighFlowNotices::head_values_set_sentence(true, 0).IsEmpty());
-    CHECK(HighFlowNotices::shared_settings_sentence().Contains("Greyed settings are shared by every extruder"));
-    CHECK(HighFlowNotices::shared_settings_sentence().Contains("layer height of an extruder is set in the sidebar"));
     CHECK(HighFlowNotices::clear_head_link_label(true) == "Clear the line widths set for this extruder");
     CHECK(HighFlowNotices::clear_head_link_label(false) == "Clear the speeds set for this extruder");
 

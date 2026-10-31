@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "Gj9qr2dBSunGcKs4",
 	"instantiation": "true",
-	"description": "Speeds, accelerations and line widths of a 0.2 mm nozzle under Multi-nozzle Super coarse: Snapmaker's 0.14 mm values for the 0.2 mm nozzle, with the settings of 0.12mm Standard @Snapmaker U1 (0.2 nozzle).",
+	"description": "0.2 mm nozzle, Multi-nozzle Super coarse: Snapmaker's 0.14 mm base with 0.12mm Standard settings.",
 	"bottom_color_penetration_layers": "3",
 	"top_color_penetration_layers": "5",
 	"elefant_foot_compensation": "0.15",

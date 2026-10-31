@@ -5338,30 +5338,40 @@ DynamicPrintConfig PresetBundle::full_config_for_print(bool apply_extruder, std:
 {
     if (sources != nullptr)
         sources->clear();
-    // Snapmaker Orca: the preferred layer heights as entered are planned here, for slicing only
-    // (Slicing.hpp); the presets keep the entered values and the process preset's layer height.
-    auto planned = [](DynamicPrintConfig config) {
+    // Snapmaker Orca: the multi-nozzle strategy's heights are planned here, for slicing only
+    // (Slicing.hpp); the presets keep the process preset's layer height. Snapmaker Orca Max: a height
+    // preset chosen for a tool head sets that head's height (PerHeadProcess::chosen_layer_heights).
+    auto planned = [this](DynamicPrintConfig config, const std::vector<PerHeadProcess::Source> &heads) {
+        const std::vector<double> chosen = PerHeadProcess::chosen_layer_heights(*this, heads);
+        if (std::any_of(chosen.begin(), chosen.end(), [](double height) { return height > 0.; })) {
+            const auto *nozzles = config.option<ConfigOptionFloats>("nozzle_diameter");
+            auto       *heights = config.option<ConfigOptionFloats>("extruder_layer_height", true);
+            heights->values.resize(std::max(heights->values.size(), nozzles != nullptr ? nozzles->values.size() : chosen.size()), 0.);
+            for (size_t head = 0; head < chosen.size() && head < heights->values.size(); ++head)
+                if (chosen[head] > 0.)
+                    heights->values[head] = chosen[head];
+        }
         apply_extruder_layer_height_plan(config);
         return config;
     };
     // The preference off and no head with a chosen preset: the plain config (PerHeadProcess::active).
     if (!PerHeadProcess::active(*this) || this->printers.get_edited_preset().printer_technology() != ptFFF)
-        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps));
+        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps), {});
     std::vector<PerHeadProcess::Source> heads = PerHeadProcess::head_sources(*this);
     if (sources != nullptr)
         *sources = heads;
     // A head with a chosen flow (a High Flow nozzle printing the Standard speeds) composes too.
     const bool any_derived = std::any_of(heads.begin(), heads.end(), [](const PerHeadProcess::Source &source) { return source.derived || source.flow_chosen; });
     if (!any_derived)
-        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps));
+        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps), heads);
     // Composed on the unexpanded config: Print::apply narrows the composed per-head layout the
     // same way the expansion of full_fff_config(true) would.
     DynamicPrintConfig out = this->full_fff_config(false, filament_maps, filament_volume_maps);
     if (!PerHeadProcess::compose(out, PerHeadProcess::all_edited_keys(*this), heads))
-        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps));
+        return planned(this->full_config(apply_extruder, filament_maps, filament_volume_maps), heads);
     if (sources != nullptr)
         *sources = heads;
-    return planned(std::move(out));
+    return planned(std::move(out), heads);
 }
 
 DynamicPrintConfig PresetBundle::full_config_secure(std::optional<std::vector<int>>filament_maps) const

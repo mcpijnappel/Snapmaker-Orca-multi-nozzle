@@ -2184,16 +2184,6 @@ TEST_CASE("A tool head of the printer preset's size takes a chosen preset, and a
     CHECK(bundle->project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values == std::vector<std::string>{HQ_020_04, "", "", ""});
     CHECK(choices_of(*bundle) == std::vector<std::string>{HQ_020_04});
     CHECK(PerHeadProcess::load_report(*bundle).empty());
-    // The candidates of a home-size head list the selected preset, marked.
-    const std::vector<PerHeadProcess::Candidate> candidates = PerHeadProcess::picker_candidates(*bundle, 0);
-    bool selected_listed = false;
-    for (const PerHeadProcess::Candidate &candidate : candidates)
-        if (candidate.preset->name == STD_020_04) {
-            selected_listed = true;
-            CHECK(candidate.is_selected);
-            CHECK(candidate.is_automatic);
-        }
-    CHECK(selected_listed);
 
     // The plate takes the chosen preset: the choice is the selected preset now.
     REQUIRE(bundle->prints.select_preset_by_name(HQ_020_04, true));
@@ -2233,13 +2223,11 @@ TEST_CASE("A chosen preset applies with the preference off while the other tool 
 }
 
 // User presets in the picker, and the trap of an empty compatible_printers list.
-TEST_CASE("A user process preset is listed for the tool heads it is made for and composes when chosen", "[PerHeadProcess][Profiles][phs_choice][phs_picker]")
+TEST_CASE("A user process preset chosen for the tool heads it is made for composes", "[PerHeadProcess][Profiles][phs_choice]")
 {
     auto bundle = load_snapmaker_bundle();
     select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0.12, 0.30, 0.});
     add_user_process(*bundle, "My 0.2 fast", STD_012_02, 99.);
-    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 1), PerHeadProcess::Candidate::User) == std::vector<std::string>{"My 0.2 fast"});
-    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 2), PerHeadProcess::Candidate::User).empty());
     PerHeadProcess::set_chosen(*bundle, 1, "My 0.2 fast");
     std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
     REQUIRE(sources.size() == 4);
@@ -2256,8 +2244,6 @@ TEST_CASE("A user process preset is listed for the tool heads it is made for and
     CHECK(why.empty());
     CHECK_FALSE(PerHeadProcess::fits(*bundle, loose, 1, &why));
     CHECK(why == "size 0.4");
-    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 1), PerHeadProcess::Candidate::User) == std::vector<std::string>{"My 0.2 fast"});
-    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 0), PerHeadProcess::Candidate::User) == std::vector<std::string>{"Loose 0.4"});
     PerHeadProcess::set_chosen(*bundle, 1, "Loose 0.4");
     sources = PerHeadProcess::head_sources(*bundle);
     CHECK(sources[1].chosen_state == PerHeadProcess::ChosenState::Unfit);
@@ -2422,40 +2408,64 @@ TEST_CASE("A chosen preset that is not installed leaves the rule in charge and a
 }
 
 // The candidates of the picker.
-TEST_CASE("The picker lists the presets of a tool head's size with the automatic one and the flow column marked", "[PerHeadProcess][Profiles][phs_picker]")
+// Snapmaker Orca Max: the per-extruder picker under a multi-nozzle strategy.
+TEST_CASE("Under a multi-nozzle strategy the picker offers the height presets a tool head can print", "[PerHeadProcess][Profiles][phs_picker][MultiNozzle]")
 {
     auto bundle = load_snapmaker_bundle();
-    select_owner_plate(*bundle);
+    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, "Multi-nozzle Normal @Snapmaker U1");
     using Candidate = PerHeadProcess::Candidate;
-    const std::vector<Candidate> head_1 = PerHeadProcess::picker_candidates(*bundle, 0);
-    CHECK(candidate_names(head_1, Candidate::System) == std::vector<std::string>{"0.08mm High Quality @Snapmaker U1 (0.2 nozzle)", HQ_010_02, STD_012_02});
-    CHECK(candidate_names(head_1, Candidate::User).empty());
-    for (const Candidate &candidate : head_1) {
-        CHECK(candidate.is_automatic == (candidate.preset->name == HQ_010_02));
-        CHECK_FALSE(candidate.is_selected);
-        CHECK(candidate.has_flow_column);
-    }
-    const std::vector<std::string> head_4 = candidate_names(PerHeadProcess::picker_candidates(*bundle, 3), Candidate::System);
-    CHECK(std::find(head_4.begin(), head_4.end(), STRENGTH_08) != head_4.end());
-    CHECK(std::find(head_4.begin(), head_4.end(), STD_024_08) != head_4.end());
-    // The High Flow head of the home size: the selected preset among the candidates, marked; the
-    // High Flow column only 0.20mm Standard has; automatic is the High Flow rule's preset.
-    const std::vector<Candidate> head_2 = PerHeadProcess::picker_candidates(*bundle, 1);
-    REQUIRE(head_2.size() >= 2);
-    for (const Candidate &candidate : head_2) {
-        INFO(candidate.preset->name);
-        CHECK(candidate.has_flow_column == (candidate.preset->name == STD_020_04));
-        CHECK(candidate.is_selected == (candidate.preset->name == HQ_020_04));
-        CHECK(candidate.is_automatic == (candidate.preset->name == STD_020_04));
-    }
-    // A bundle preset is absent, a user preset present. The collection is a deque kept sorted by
-    // name: the second load inserts before "My 0.8" and re-points a reference to it, so the first
-    // preset is named by its literal.
-    add_user_process(*bundle, "My 0.8", STD_024_08, 70.);
-    Preset &local = add_user_process(*bundle, "Local 0.8", STD_024_08, 71.);
-    local.bundle_id = "abc"; // what a preset of a local or subscribed bundle carries
-    REQUIRE(local.is_from_bundle());
-    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 3), Candidate::User) == std::vector<std::string>{"My 0.8"});
+    // Normal: a 0.10 mm grid. A 0.4 mm head prints 0.20 and may go one step finer or coarser; a 0.2 mm
+    // head prints 0.10 and has no step within its 0.04 .. 0.14 mm.
+    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 0), Candidate::System) ==
+          std::vector<std::string>{"0.10mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)", "0.30mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)"});
+    CHECK(PerHeadProcess::picker_candidates(*bundle, 3).empty());
+    // Fine: a 0.08 mm grid, the 0.4 mm head at 0.16.
+    bundle->prints.get_edited_preset().config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhFine));
+    CHECK(candidate_names(PerHeadProcess::picker_candidates(*bundle, 0), Candidate::System) ==
+          std::vector<std::string>{"0.08mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)", "0.24mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)"});
+    // Off: every head prints the plate's height, nothing to pick.
+    bundle->prints.get_edited_preset().config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
+    CHECK(PerHeadProcess::picker_candidates(*bundle, 0).empty());
+    // The height presets serve the picker alone: hidden, and never a source of the automatic rule.
+    const Preset *height_preset = bundle->prints.find_preset("0.30mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)", false);
+    REQUIRE(height_preset != nullptr);
+    CHECK_FALSE(height_preset->is_visible);
+    CHECK(PerHeadProcess::is_multi_nozzle_height_preset(*height_preset));
+    CHECK_FALSE(PerHeadProcess::is_multi_nozzle_height_preset(*bundle->prints.find_preset(STD_020_04, false)));
+}
+
+TEST_CASE("A height preset chosen for a tool head sets its layer height and speeds while it fits the strategy's grid", "[PerHeadProcess][Profiles][phs_choice][MultiNozzle]")
+{
+    auto bundle = load_snapmaker_bundle();
+    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, "Multi-nozzle Normal @Snapmaker U1");
+    const char *const thirty = "0.30mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)";
+    PerHeadProcess::set_chosen(*bundle, 0, thirty);
+    std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
+    REQUIRE(sources.size() == 4);
+    CHECK(sources[0].chosen_state == PerHeadProcess::ChosenState::Applied);
+    CHECK(PerHeadProcess::chosen_layer_heights(*bundle, sources) == std::vector<double>{0.30, 0., 0., 0.});
+
+    const DynamicPrintConfig composed = bundle->full_config_for_print(false);
+    CHECK_THAT(composed.opt_float("layer_height"), Catch::Matchers::WithinAbs(0.10, 1e-9));
+    const std::vector<double> heights = floats_of(composed, "extruder_layer_height");
+    REQUIRE(heights.size() == 4);
+    CHECK_THAT(heights[0], Catch::Matchers::WithinAbs(0.30, 1e-9));
+    CHECK_THAT(heights[1], Catch::Matchers::WithinAbs(0.20, 1e-9));
+    CHECK_THAT(heights[3], Catch::Matchers::WithinAbs(0.10, 1e-9));
+    const Preset *preset = bundle->prints.find_preset(thirty, false);
+    REQUIRE(preset != nullptr);
+    CHECK_THAT(floats_of(composed, "outer_wall_speed")[0], Catch::Matchers::WithinAbs(floats_of(preset->config, "outer_wall_speed").front(), 1e-9));
+
+    // Fine: 0.30 is off its 0.08 mm grid. The choice stays in the project, inactive, and the head
+    // prints the strategy's 0.16.
+    bundle->prints.get_edited_preset().config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhFine));
+    sources = PerHeadProcess::head_sources(*bundle);
+    CHECK(sources[0].chosen_state == PerHeadProcess::ChosenState::Unfit);
+    CHECK(sources[0].chosen_reason == "grid");
+    CHECK(PerHeadProcess::chosen_of(*bundle, 0) == thirty);
+    const std::vector<double> fine = floats_of(bundle->full_config_for_print(false), "extruder_layer_height");
+    REQUIRE(fine.size() == 4);
+    CHECK_THAT(fine[0], Catch::Matchers::WithinAbs(0.16, 1e-9));
 }
 
 // What the command line does with the two keys.

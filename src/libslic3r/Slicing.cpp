@@ -1199,9 +1199,19 @@ ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfi
         return effective;
     const std::vector<double> min_lh = floats_of(config, "min_layer_height");
     const std::vector<double> max_lh = floats_of(config, "max_layer_height");
+    const std::vector<double> stored = floats_of(config, "extruder_layer_height");
     effective.grid = multi_nozzle_strategy_grid(strategy);
-    for (size_t j = 0; j < nozzles.size(); ++ j)
+    for (size_t j = 0; j < nozzles.size(); ++ j) {
         effective.heights[j] = multi_nozzle_strategy_height(strategy, nozzles[j], value_at(min_lh, j), value_at(max_lh, j));
+        // Snapmaker Orca Max: a height chosen for the extruder (a height preset in the per-extruder
+        // picker, written by PresetBundle::full_config_for_print) replaces the strategy's while it is a
+        // whole multiple of the grid within the nozzle and its minimum / maximum layer height.
+        const double chosen = j < stored.size() ? stored[j] : 0.;
+        const double max_j  = value_at(max_lh, j);
+        if (chosen > EPSILON && std::abs(chosen / effective.grid - std::round(chosen / effective.grid)) < 1e-6 &&
+            chosen <= nozzles[j] + EPSILON && chosen >= value_at(min_lh, j) - EPSILON && (max_j <= EPSILON || chosen <= max_j + EPSILON))
+            effective.heights[j] = chosen;
+    }
     return effective;
 }
 

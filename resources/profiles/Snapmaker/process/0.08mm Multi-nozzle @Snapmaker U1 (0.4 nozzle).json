@@ -1,0 +1,36 @@
+{
+	"type": "process",
+	"name": "0.08mm Multi-nozzle @Snapmaker U1 (0.4 nozzle)",
+	"inherits": "0.08mm Standard @Snapmaker U1 (0.4 nozzle)",
+	"from": "system",
+	"setting_id": "RamqsKIp6MRFrLD0",
+	"instantiation": "true",
+	"description": "0.4 mm nozzle, 0.08 mm layers: 0.08mm Standard.",
+	"compatible_printers": [
+		"Snapmaker U1 (0.4 nozzle)"
+	],
+	"outer_wall_speed": [
+		"90",
+		"90"
+	],
+	"inner_wall_speed": [
+		"120",
+		"120"
+	],
+	"sparse_infill_speed": [
+		"200",
+		"200"
+	],
+	"internal_solid_infill_speed": [
+		"150",
+		"150"
+	],
+	"print_extruder_id": [
+		"1",
+		"1"
+	],
+	"print_extruder_variant": [
+		"Direct Drive Standard",
+		"Direct Drive High Flow"
+	]
+}
