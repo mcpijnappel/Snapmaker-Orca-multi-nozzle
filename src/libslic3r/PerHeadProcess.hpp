@@ -16,6 +16,7 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Preset;
 class PresetBundle;
+class PresetCollection;
 
 namespace PerHeadProcess {
 
@@ -39,7 +40,10 @@ enum class Step {
     SameQuality,    // the nearest layer height among the presets of the plate's quality class
     ClassLadder,    // the plate's class has no preset of the head's size: the next class of the ladder (class_used)
     SizeDefault,    // no class matched: the default_print_profile of the head's machine preset
-    FirstByName     // no class matched and no default: the first compatible preset by name
+    FirstByName,    // no class matched and no default: the first compatible preset by name
+    // Snapmaker Orca Max: the selected multi-nozzle preset's hidden preset for the head's nozzle
+    // size, "<preset> (<size> nozzle)" (multi_nozzle_size_preset)
+    MultiNozzleSize
 };
 
 // The state of the process preset the project chose for a tool head (choice_key).
@@ -99,6 +103,16 @@ std::string quality_class(const std::string &preset_name);
 // the name has none (a user preset "My fast PLA" inheriting 0.20mm Standard is Standard). May be
 // empty (a detached preset, a vendor without classes).
 std::string plate_quality_class(const PresetBundle &bundle);
+
+// Snapmaker Orca Max: the hidden preset "<multi_nozzle> (<size> nozzle)" of a multi-nozzle system preset, which
+// holds its speeds, accelerations and line widths for a nozzle of `nozzle_size`; nullptr when `multi_nozzle` plans
+// no strategy or ships none for that size (the size its own values are made for).
+const Preset *multi_nozzle_size_preset(const PresetBundle &bundle, const Preset &multi_nozzle, double nozzle_size);
+
+// Hides the system presets "<multi-nozzle preset> (<size> nozzle)" of `prints` (they serve their
+// multi-nozzle preset alone and are never selected). Run after a vendor bundle is loaded; matches by
+// name, so it works on a collection that is not sorted yet.
+void hide_multi_nozzle_size_presets(PresetCollection &prints);
 
 // The layer height the rule matches for tool head `head`: extruder_layer_height of the edited printer
 // when set, else the saved selected preset's layer_height, so an unsaved edit does not move the

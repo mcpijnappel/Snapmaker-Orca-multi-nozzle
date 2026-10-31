@@ -3562,3 +3562,64 @@ TEST_CASE("A line width override set in one flow column applies to extruders of 
     set_variant_override(speed, speed_source, variant_index, 1, rule, "outer_wall_speed");
     CHECK_FALSE(speed.get_at(3) == Catch::Approx(300.));
 }
+
+TEST_CASE("A multi-nozzle preset gives a tool head of another size its own preset of that size, whatever size the printer preset is based on", "[PerHeadProcess][Profiles][MultiNozzle]")
+{
+    const char *const multi   = "Multi-nozzle Normal @Snapmaker U1";
+    const char *const of_0_2  = "Multi-nozzle Normal @Snapmaker U1 (0.2 nozzle)";
+    const char *const printer = GENERATE(U1_04, U1_02);
+    INFO(printer);
+    auto bundle = load_snapmaker_bundle();
+    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, multi, printer);
+
+    // The 0.4 mm heads print with the selected preset (its own values are made for 0.4 mm), the
+    // 0.2 mm head with the hidden 0.2 mm preset of the strategy.
+    std::vector<PerHeadProcess::Source> sources;
+    const DynamicPrintConfig composed = bundle->full_config_for_print(false, std::nullopt, std::nullopt, &sources);
+    REQUIRE(sources.size() == 4);
+    CHECK(source_names(sources) == std::vector<std::string>{"", "", "", of_0_2});
+    for (size_t head = 0; head < 3; ++head)
+        CHECK(sources[head].reason == PerHeadProcess::Reason::HomeSize);
+    CHECK(sources[3].step == PerHeadProcess::Step::MultiNozzleSize);
+    CHECK(sources[3].composed_keys.size() == 41);
+
+    const Preset *size_preset = bundle->prints.find_preset(of_0_2, false);
+    REQUIRE(size_preset != nullptr);
+    const double size_speed = floats_of(size_preset->config, "outer_wall_speed").front();
+    const std::vector<double> speeds = floats_of(composed, "outer_wall_speed");
+    REQUIRE(speeds.size() == 4);
+    // 0.20mm Standard (0.4), which Multi-nozzle Normal inherits, prints its outer wall at 200.
+    CHECK_THAT(speeds[0], Catch::Matchers::WithinAbs(200., 1e-9));
+    CHECK_THAT(speeds[3], Catch::Matchers::WithinAbs(size_speed, 1e-9));
+    // The line widths of the 0.2 mm head are the 0.2 mm preset's.
+    auto serialized = [](const DynamicPrintConfig &config, const char *key) {
+        const auto *option = dynamic_cast<const ConfigOptionVectorBase *>(config.option(key));
+        REQUIRE(option != nullptr);
+        return option->vserialize();
+    };
+    const std::vector<std::string> widths = serialized(composed, "outer_wall_line_width");
+    REQUIRE(widths.size() == 4);
+    CHECK(widths[3] == serialized(size_preset->config, "outer_wall_line_width").front());
+}
+
+TEST_CASE("A High Flow tool head under a multi-nozzle preset prints the preset's High Flow speeds", "[PerHeadProcess][Profiles][MultiNozzle][HighFlow]")
+{
+    auto bundle = load_snapmaker_bundle();
+    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, "Multi-nozzle Fine @Snapmaker U1");
+    bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {int(nvtHighFlow), int(nvtStandard), int(nvtStandard), int(nvtStandard)};
+    std::vector<PerHeadProcess::Source> sources;
+    const DynamicPrintConfig composed = bundle->full_config_for_print(false, std::nullopt, std::nullopt, &sources);
+    REQUIRE(sources.size() == 4);
+    // The selected preset has a High Flow column itself: no re-pick.
+    CHECK_FALSE(sources[0].derived);
+    const std::vector<double> outer = floats_of(composed, "outer_wall_speed");
+    const std::vector<double> inner = floats_of(composed, "inner_wall_speed");
+    REQUIRE(outer.size() == 4);
+    REQUIRE(inner.size() == 4);
+    CHECK_THAT(outer[0], Catch::Matchers::WithinAbs(500., 1e-9));
+    CHECK_THAT(inner[0], Catch::Matchers::WithinAbs(600., 1e-9));
+    // A Standard 0.4 mm head keeps the Standard column of 0.16mm Standard (0.4), which Fine inherits.
+    const Preset *standard = bundle->prints.find_preset("0.16mm Standard @Snapmaker U1 (0.4 nozzle)", false);
+    REQUIRE(standard != nullptr);
+    CHECK_THAT(outer[1], Catch::Matchers::WithinAbs(floats_of(standard->config, "outer_wall_speed").front(), 1e-9));
+}

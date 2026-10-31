@@ -291,7 +291,7 @@ TEST_CASE("A multi column filament of another vendor gets its per filament value
     }
 }
 
-TEST_CASE("Only the 0.20mm Standard process of the U1 carries High Flow speeds", "[Profiles][HighFlow][hf_profiles_process]")
+TEST_CASE("Of the U1 single-size processes only 0.20mm Standard carries High Flow speeds", "[Profiles][HighFlow][hf_profiles_process]")
 {
     const auto    loaded = load_snapmaker_bundle();
     PresetBundle &bundle = *loaded;

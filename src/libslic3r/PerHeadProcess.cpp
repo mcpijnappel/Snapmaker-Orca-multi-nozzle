@@ -96,12 +96,35 @@ std::string default_print_profile_of(const Preset &machine)
     return option == nullptr ? std::string() : option->value;
 }
 
+// Snapmaker Orca Max: whether `preset` plans a multi-nozzle strategy (Custom plans none of its own).
+bool plans_strategy(const Preset &preset)
+{
+    const auto *strategy = preset.config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+    return strategy != nullptr && strategy->value != mnlhOff && strategy->value != mnlhCustom;
+}
+
+// Snapmaker Orca Max: "Multi-nozzle Normal @Snapmaker U1" for "Multi-nozzle Normal @Snapmaker U1
+// (0.2 nozzle)"; empty for a name without the " (<size> nozzle)" suffix.
+std::string multi_nozzle_owner_name(const std::string &name)
+{
+    const size_t open = name.rfind(" (");
+    return open == std::string::npos || !boost::ends_with(name, " nozzle)") ? std::string() : name.substr(0, open);
+}
+
+// Snapmaker Orca Max: a hidden per-size preset of a multi-nozzle preset ("Multi-nozzle Normal
+// @Snapmaker U1 (0.2 nozzle)"), which serves that preset alone.
+bool is_multi_nozzle_size(const PresetBundle &bundle, const Preset &preset)
+{
+    const std::string owner_name = multi_nozzle_owner_name(preset.name);
+    const Preset     *owner      = owner_name.empty() ? nullptr : bundle.prints.find_preset(owner_name);
+    return owner != nullptr && plans_strategy(*owner);
+}
+
 bool compatible(const PresetBundle &bundle, const Preset &process, const Preset &machine)
 {
     // Snapmaker Orca Max: a multi-nozzle preset plans the whole print across all nozzle sizes; it is
     // no preset of one tool head's size.
-    if (const auto *strategy = process.config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
-        strategy != nullptr && strategy->value != mnlhOff && strategy->value != mnlhCustom)
+    if (plans_strategy(process))
         return false;
     return is_compatible_with_printer(bundle.prints.get_preset_with_vendor_profile(process), bundle.printers.get_preset_with_vendor_profile(machine));
 }
@@ -112,7 +135,7 @@ std::vector<const Preset*> candidates_for(const PresetBundle &bundle, const Pres
 {
     std::vector<const Preset*> out;
     for (const Preset &preset : bundle.prints)
-        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, machine))
+        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, machine) && !is_multi_nozzle_size(bundle, preset))
             out.emplace_back(&preset);
     return out;
 }
@@ -226,6 +249,27 @@ std::string plate_quality_class(const PresetBundle &bundle)
     return quality_class_of(bundle, bundle.prints.get_selected_preset());
 }
 
+const Preset *multi_nozzle_size_preset(const PresetBundle &bundle, const Preset &multi_nozzle, double nozzle_size)
+{
+    if (!plans_strategy(multi_nozzle) || nozzle_size <= 0.)
+        return nullptr;
+    const Preset *preset = bundle.prints.find_preset(multi_nozzle.name + " (" + float_to_string_decimal_point(nozzle_size) + " nozzle)");
+    return preset != nullptr && preset->is_system ? preset : nullptr;
+}
+
+void hide_multi_nozzle_size_presets(PresetCollection &prints)
+{
+    std::set<std::string> multi_nozzle;
+    for (size_t idx = 0; idx < prints.size(); ++idx)
+        if (const Preset &preset = prints.preset(idx); preset.is_system && plans_strategy(preset))
+            multi_nozzle.insert(preset.name);
+    for (size_t idx = 0; idx < prints.size(); ++idx) {
+        Preset &preset = prints.preset(idx);
+        if (preset.is_system && multi_nozzle.count(multi_nozzle_owner_name(preset.name)) > 0)
+            preset.is_visible = false;
+    }
+}
+
 double target_layer_height(const PresetBundle &bundle, size_t head, bool *preferred)
 {
     const auto  *heights = bundle.printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height");
@@ -303,6 +347,16 @@ const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine,
 
 namespace {
 
+// Snapmaker Orca Max: whether the multi-nozzle system preset ships hidden presets per nozzle size.
+bool has_multi_nozzle_sizes(const PresetBundle &bundle, const Preset &multi_nozzle)
+{
+    if (!plans_strategy(multi_nozzle))
+        return false;
+    return std::any_of(bundle.prints.begin(), bundle.prints.end(), [&multi_nozzle](const Preset &preset) {
+        return preset.is_system && multi_nozzle_owner_name(preset.name) == multi_nozzle.name;
+    });
+}
+
 // head_sources with or without the project's choices (the latter says what the rule alone would
 // give a chosen head: Source::automatic).
 std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choices)
@@ -316,6 +370,7 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
     const Preset *parent   = system_parent(bundle);
     const double  home     = NozzleFilament::home_nozzle_size(printer.config);
     const auto   *heights  = printer.config.option<ConfigOptionFloats>("extruder_layer_height");
+    const bool    multi_nozzle = parent != nullptr && has_multi_nozzle_sizes(bundle, *parent);
     const std::set<std::string> edited = all_edited_keys(bundle);
     auto split_keys = [&edited](Source &source) {
         source.composed_keys.clear();
@@ -376,6 +431,23 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
         }
         if (!bundle.process_follows_nozzle) {
             source.reason = Reason::Off;
+            continue;
+        }
+        // Snapmaker Orca Max: a multi-nozzle preset carries its values per nozzle size. A head
+        // prints with the preset's hidden preset of its size; a size without one is the size the
+        // selected preset's own values are made for, whatever size the printer preset is based on.
+        if (multi_nozzle && !same_as_selected) {
+            const Preset *of_size = multi_nozzle_size_preset(bundle, *parent, state.head_size[head]);
+            if (of_size == nullptr) {
+                source.reason = Reason::HomeSize;
+                continue;
+            }
+            source.preset     = of_size;
+            source.derived    = true;
+            source.reason     = carried;
+            source.step       = Step::MultiNozzleSize;
+            source.class_used = quality_class(parent->name);
+            split_keys(source);
             continue;
         }
         if (machine == &printer) {
@@ -665,7 +737,9 @@ std::vector<Candidate> picker_candidates(const PresetBundle &bundle, size_t head
         out.emplace_back(std::move(candidate));
     };
     for (const Preset &preset : bundle.prints)
-        if (preset.is_system && !preset.is_default && !preset.is_from_bundle() && compatible(bundle, preset, *machine))
+        // A multi-nozzle preset's per-size preset only as the head's automatic one.
+        if (preset.is_system && !preset.is_default && !preset.is_from_bundle() && compatible(bundle, preset, *machine) &&
+            (!is_multi_nozzle_size(bundle, preset) || preset.name == automatic->name))
             add(preset, Candidate::System);
     for (const Preset &preset : bundle.prints)
         if (!preset.is_system && !preset.is_default && !preset.is_project_embedded && !preset.is_from_bundle() && fits(bundle, preset, head))

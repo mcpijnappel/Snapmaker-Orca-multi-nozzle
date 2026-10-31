@@ -8372,6 +8372,9 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::install_vendor_read(
                             " install_ms=" + std::to_string(install_ms));
     }
 
+    // Snapmaker Orca Max: the per nozzle size presets of a multi-nozzle preset are never listed.
+    PerHeadProcess::hide_multi_nozzle_size_presets(this->prints);
+
     //BBS: add config related logs
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(", finished, presets_loaded %1%")%presets_loaded;
     return std::make_pair(std::move(substitutions), presets_loaded);

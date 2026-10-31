@@ -4510,7 +4510,7 @@ wxString TabPrint::head_selection_description() const
                 sentence = _L("\"Process speeds and line widths follow the nozzle size\" is off in Preferences, so the extruder prints with the selected process preset; a preset chosen here still applies.");
                 break;
             case Reason::HomeSize:
-                sentence = _L("This extruder has the nozzle size of the printer preset and prints with the selected process preset.");
+                sentence = _L("This extruder prints with the selected process preset, which is made for its nozzle size.");
                 break;
             case Reason::NoMachinePreset:
             case Reason::NoProcessPreset:

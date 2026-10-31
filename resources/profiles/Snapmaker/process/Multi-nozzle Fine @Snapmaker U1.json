@@ -14,5 +14,29 @@
 		"Snapmaker U1 (0.4 nozzle)",
 		"Snapmaker U1 (0.6 nozzle)",
 		"Snapmaker U1 (0.8 nozzle)"
+	],
+	"outer_wall_speed": [
+		"200",
+		"500"
+	],
+	"inner_wall_speed": [
+		"300",
+		"600"
+	],
+	"sparse_infill_speed": [
+		"270",
+		"600"
+	],
+	"internal_solid_infill_speed": [
+		"250",
+		"600"
+	],
+	"print_extruder_id": [
+		"1",
+		"1"
+	],
+	"print_extruder_variant": [
+		"Direct Drive Standard",
+		"Direct Drive High Flow"
 	]
 }

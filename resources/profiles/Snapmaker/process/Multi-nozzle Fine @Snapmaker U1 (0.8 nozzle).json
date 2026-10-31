@@ -1,0 +1,12 @@
+{
+	"type": "process",
+	"name": "Multi-nozzle Fine @Snapmaker U1 (0.8 nozzle)",
+	"inherits": "0.32mm Standard @Snapmaker U1 (0.8 nozzle)",
+	"from": "system",
+	"setting_id": "Pon6vrpSC6lMvc2S",
+	"instantiation": "true",
+	"description": "Speeds, accelerations and line widths of a 0.8 mm nozzle under Multi-nozzle Fine: 0.32mm Standard @Snapmaker U1 (0.8 nozzle).",
+	"compatible_printers": [
+		"Snapmaker U1 (0.8 nozzle)"
+	]
+}

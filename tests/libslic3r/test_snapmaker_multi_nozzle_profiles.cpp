@@ -96,3 +96,48 @@ TEST_CASE("Mixed nozzle sizes list only the multi-nozzle process presets and the
         CHECK(multi->is_compatible);
     }
 }
+
+TEST_CASE("Every multi-nozzle preset ships a hidden preset per other nozzle size at the strategy's layer height", "[Profiles][MultiNozzle]")
+{
+    // The strategy's share of the nozzle diameter (Slicing.hpp multi_nozzle_strategy_height).
+    const std::vector<std::pair<std::string, double>> strategies = {
+        {"Ultra fine", 0.3}, {"Fine", 0.4}, {"Normal", 0.5}, {"Coarse", 0.6}, {"Super coarse", 0.7}};
+    auto bundle = load_snapmaker_bundle();
+    for (const auto &[strategy, share] : strategies)
+        for (const char *size : {"0.2", "0.6", "0.8"}) {
+            const std::string name = "Multi-nozzle " + strategy + " @Snapmaker U1 (" + size + " nozzle)";
+            INFO(name);
+            const Preset *preset = bundle->prints.find_preset(name, false);
+            REQUIRE(preset != nullptr);
+            CHECK(preset->is_system);
+            CHECK_FALSE(preset->is_visible);
+            const double nozzle = std::stod(size);
+            CHECK_THAT(preset->config.opt_float("layer_height"), Catch::Matchers::WithinAbs(share * nozzle, 1e-6));
+            CHECK(preset->config.option<ConfigOptionStrings>("compatible_printers")->values ==
+                  std::vector<std::string>{std::string("Snapmaker U1 (") + size + " nozzle)"});
+            // Speeds and line widths of the size: no strategy of its own.
+            const auto *own_strategy = preset->config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+            CHECK((own_strategy == nullptr || own_strategy->value == mnlhOff));
+        }
+    // The 0.4 mm presets carry their values themselves: no hidden 0.4 mm preset.
+    CHECK(bundle->prints.find_preset("Multi-nozzle Normal @Snapmaker U1 (0.4 nozzle)", false) == nullptr);
+}
+
+TEST_CASE("Every 0.4 mm multi-nozzle preset carries a High Flow column", "[Profiles][MultiNozzle][HighFlow]")
+{
+    auto bundle = load_snapmaker_bundle();
+    for (const char *strategy : {"Ultra fine", "Fine", "Normal", "Coarse", "Super coarse"}) {
+        const std::string name = std::string("Multi-nozzle ") + strategy + " @Snapmaker U1";
+        INFO(name);
+        const Preset *preset = bundle->prints.find_preset(name, false);
+        REQUIRE(preset != nullptr);
+        CHECK(preset->config.option<ConfigOptionStrings>("print_extruder_variant")->values ==
+              std::vector<std::string>{"Direct Drive Standard", "Direct Drive High Flow"});
+        const auto *outer = dynamic_cast<const ConfigOptionVectorBase *>(preset->config.option("outer_wall_speed"));
+        REQUIRE(outer != nullptr);
+        const std::vector<std::string> columns = outer->vserialize();
+        REQUIRE(columns.size() == 2);
+        // High Flow is never slower than Standard.
+        CHECK(std::stod(columns[1]) >= std::stod(columns[0]));
+    }
+}

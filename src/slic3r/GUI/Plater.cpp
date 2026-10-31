@@ -12490,9 +12490,12 @@ void Sidebar::update_nozzle_process_hints()
                 const wxString why       = HighFlowNotices::automatic_reason(source->step, PerHeadProcess::plate_quality_class(*bundle), source->class_used,
                                                                              HighFlowNotices::head_nozzle_size_label(*printer, i), height, preferred);
                 // TRN Tooltip of the line under a nozzle tab. %1% is a process preset, %2% a sentence that says why the rule chose it, %3% the default line width the tool head prints ("110 % (0.22 mm)"), %4% a list of settings or "none"
-                tip = format_wxstr(_L("This extruder has another nozzle size than the printer preset. Its speeds, accelerations, jerk and line widths come from %1%. %2% "
+                tip = format_wxstr(_L("This extruder has another nozzle size than the selected process preset is made for. Its speeds, accelerations, jerk and line widths come from %1%. %2% "
                                       "Line width %3%. Every other setting comes from the selected process preset. Values you changed in the selected preset are kept: %4%."),
                                    from_u8(preset.name), why, from_u8(effective_width(i, source)), kept.empty() ? _L("none") : from_u8(kept));
+                // Snapmaker Orca Max: what a multi-nozzle preset's hidden preset of this size is made of.
+                if (source->step == PerHeadProcess::Step::MultiNozzleSize && !preset.description.empty())
+                    tip += " " + from_u8(preset.description);
             }
             if (source != nullptr && !source->fallback_variants.empty())
                 tip += " " + format_wxstr(_L("Its High Flow speeds are those of the selected process preset, as %1% has no High Flow values."), from_u8(preset.name));

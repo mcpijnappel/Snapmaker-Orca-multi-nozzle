@@ -1,0 +1,12 @@
+{
+	"type": "process",
+	"name": "Multi-nozzle Normal @Snapmaker U1 (0.8 nozzle)",
+	"inherits": "0.40mm Standard @Snapmaker U1 (0.8 nozzle)",
+	"from": "system",
+	"setting_id": "JXztE7K3d8kbWDAd",
+	"instantiation": "true",
+	"description": "Speeds, accelerations and line widths of a 0.8 mm nozzle under Multi-nozzle Normal: 0.40mm Standard @Snapmaker U1 (0.8 nozzle).",
+	"compatible_printers": [
+		"Snapmaker U1 (0.8 nozzle)"
+	]
+}
