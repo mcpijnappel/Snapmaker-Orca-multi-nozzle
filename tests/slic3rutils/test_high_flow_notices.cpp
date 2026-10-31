@@ -1084,3 +1084,38 @@ TEST_CASE("A user preset made from a filament High Flow nozzles cannot print is 
     CHECK(HighFlowCompat::check("PLA", "Snapmaker PLA Wood @U1 0.4 nozzle", "Generic PLA").level == CompatibilityLevel::NotRecommended);
     CHECK(HighFlowCompat::check("PETG", "My PETG", "Generic PETG").level == CompatibilityLevel::Compatible);
 }
+
+TEST_CASE("The Nozzle combo lists every size and High Flow where the size has High Flow values", "[HighFlow][NozzleCombo]")
+{
+    using HighFlowNotices::NozzleChoice;
+    const std::vector<std::string> sizes = { "0.2", "0.4", "0.6", "0.8" };
+    const int                      std_  = int(nvtStandard);
+    const int                      hf    = int(nvtHighFlow);
+    const std::vector<NozzleChoice> u1 = { { "0.2", std_ }, { "0.4", std_ }, { "0.4", hf }, { "0.6", std_ }, { "0.8", std_ } };
+
+    SECTION("a printer preset of the 0.4 machine") {
+        const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4, 0.6, 0.2 });
+        for (size_t head = 0; head < 4; ++head) {
+            INFO("head " << head);
+            CHECK(HighFlowNotices::nozzle_choices(printer, head, sizes, offers({ 0.4 })) == u1);
+        }
+    }
+    SECTION("a printer preset of the 0.2 machine, which declares no High Flow itself") {
+        DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4, 0.4, 0.2 }, "Direct Drive Standard");
+        printer.set_key_value("printer_variant", new ConfigOptionString("0.2"));
+        for (size_t head = 0; head < 4; ++head) {
+            INFO("head " << head);
+            CHECK(HighFlowNotices::nozzle_choices(printer, head, sizes, offers({ 0.4 })) == u1);
+        }
+    }
+    SECTION("a head's own size the model has no preset for is listed") {
+        const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.25 });
+        const std::vector<NozzleChoice> choices = HighFlowNotices::nozzle_choices(printer, 1, { "0.4", "0.6" }, offers({ 0.4 }));
+        CHECK(choices == std::vector<NozzleChoice>{ { "0.25", std_ }, { "0.4", std_ }, { "0.4", hf }, { "0.6", std_ } });
+    }
+    SECTION("without High Flow anywhere only the sizes are listed") {
+        const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4 }, "");
+        CHECK(HighFlowNotices::nozzle_choices(printer, 0, { "0.4", "0.6" }, offers({})) ==
+              std::vector<NozzleChoice>{ { "0.4", std_ }, { "0.6", std_ } });
+    }
+}

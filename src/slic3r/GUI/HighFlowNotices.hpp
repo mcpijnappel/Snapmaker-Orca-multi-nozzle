@@ -188,6 +188,22 @@ enum class SelectorFit {
 };
 SelectorFit head_selector_fit(const std::vector<int> &long_widths, const std::vector<int> &short_widths, int available);
 
+// Snapmaker Orca Max: one item of a tool head's Nozzle combo in the sidebar: a nozzle size as the
+// printer presets name it ("0.4") and a volume type (NozzleVolumeType).
+struct NozzleChoice
+{
+    std::string size;
+    int         volume_type;
+    bool operator==(const NozzleChoice &other) const { return size == other.size && volume_type == other.volume_type; }
+};
+
+// The items of tool head `head`'s Nozzle combo, by size: `sizes` (the printer model's sizes as named)
+// plus the head's own size when missing. Each size lists Standard, then the other volume types the
+// head can print with at that size: for its own size the types of its Flow row (offered_volume_types,
+// High Flow only when usable), for another size High Flow when that size's machine preset has it.
+std::vector<NozzleChoice> nozzle_choices(const DynamicPrintConfig &printer_config, size_t head, const std::vector<std::string> &sizes,
+                                         const SizeOffersHighFlow &size_offers = {});
+
 // Fills a read-only Flow combo with the offered types of `head` (type as client data), shown_volume_type()
 // selected; disabled with the reason as tooltip when High Flow is ruled out. Items are rebuilt only
 // when they differ, so the combo may be refreshed from its own selection event.

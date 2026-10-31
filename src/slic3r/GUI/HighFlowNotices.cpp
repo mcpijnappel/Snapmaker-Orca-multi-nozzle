@@ -421,6 +421,40 @@ std::string head_nozzle_size_label(const DynamicPrintConfig &printer_config, siz
     return label;
 }
 
+std::vector<NozzleChoice> nozzle_choices(const DynamicPrintConfig &printer_config, size_t head, const std::vector<std::string> &sizes,
+                                         const SizeOffersHighFlow &size_offers)
+{
+    std::vector<std::pair<double, std::string>> listed;
+    for (const std::string &name : sizes)
+        if (const double size = string_to_double_decimal_point(name); size > 0.)
+            listed.emplace_back(size, name);
+    const std::string own_name = head_nozzle_size_label(printer_config, head);
+    const double      own_size = own_name.empty() ? 0. : string_to_double_decimal_point(own_name);
+    auto same = [](double a, double b) { return std::abs(a - b) < EPSILON; };
+    if (own_size > 0. && std::none_of(listed.begin(), listed.end(), [&](const auto &entry) { return same(entry.first, own_size); }))
+        listed.emplace_back(own_size, own_name);
+    std::stable_sort(listed.begin(), listed.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+
+    std::vector<NozzleChoice> out;
+    for (const auto &[size, name] : listed) {
+        std::vector<int> types;
+        if (same(size, own_size)) {
+            types = offered_volume_types(printer_config, head, size_offers);
+            if (!flow_choice_usable(printer_config, head, size_offers))
+                types.erase(std::remove(types.begin(), types.end(), int(nvtHighFlow)), types.end());
+        } else {
+            types = { int(nvtStandard) };
+            if (size_offers && size_offers(size, head))
+                types.push_back(int(nvtHighFlow));
+        }
+        if (std::find(types.begin(), types.end(), int(nvtStandard)) == types.end())
+            types.insert(types.begin(), int(nvtStandard));
+        for (int type : types)
+            out.push_back({ name, type });
+    }
+    return out;
+}
+
 SelectorFit head_selector_fit(const std::vector<int> &long_widths, const std::vector<int> &short_widths, int available)
 {
     auto total = [](const std::vector<int> &widths) {

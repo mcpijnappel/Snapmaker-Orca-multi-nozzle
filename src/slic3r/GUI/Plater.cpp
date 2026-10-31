@@ -1463,12 +1463,9 @@ struct NozzlePage
 {
     wxPanel      *panel { nullptr };
     wxStaticText *diameter_label { nullptr };
-    wxStaticText *flow_label { nullptr };
-    ogStaticText *flow_hint { nullptr };            // the reason line of a ruled out Flow row, wrapped to the page; may be nullptr
     wxStaticText *layer_height_label { nullptr };
     ogStaticText *process_hint { nullptr };         // the process preset the tool head prints with (PerHeadProcess), wrapped to the page; may be nullptr
-    ComboBox     *diameter { nullptr };
-    ComboBox     *flow { nullptr };
+    ComboBox     *diameter { nullptr };      // Snapmaker Orca Max: size and flow type ("0.4mm High Flow"), fill_nozzle_combo
     ComboBox     *layer_height { nullptr };            // editable: a listed height or any typed one
     ogStaticText *layer_height_hint { nullptr };       // the height the extruder prints when it differs; a warning for a typed height off the grid
     ogStaticText *layer_height_link { nullptr };       // "Print exact heights" under the warning
@@ -1487,20 +1484,18 @@ static void layout_nozzle_page(const NozzlePage &page)
     const int hint_gap = panel->FromDIP(2);
 
     // One label column: the widest label, at most 170 DIP. A minimum size is what a sizer reads
-    // (wxSizerItem::CalcMin ignores the maximum size). The hidden Flow label counts, so the column
-    // stays where it is when the Flow row appears.
+    // (wxSizerItem::CalcMin ignores the maximum size).
     int label_w = 0;
-    for (wxStaticText *label : { page.diameter_label, page.flow_label, page.layer_height_label })
+    for (wxStaticText *label : { page.diameter_label, page.layer_height_label })
         label_w = std::max(label_w, label->GetTextExtent(label->GetLabel()).x + panel->FromDIP(4));
     label_w = std::min(label_w, panel->FromDIP(170));
-    for (wxStaticText *label : { page.diameter_label, page.flow_label, page.layer_height_label })
+    for (wxStaticText *label : { page.diameter_label, page.layer_height_label })
         label->SetMinSize({ label_w, -1 });
 
     // An explicit minimum width: ComboBox and TextInput report their last width as best width, which
     // would keep a row from shrinking. The height is passed: TextInput::SetMinSize keeps it for -1.
     const wxSize control_min(panel->FromDIP(80), panel->FromDIP(30));
     page.diameter->SetMinSize(control_min);
-    page.flow->SetMinSize(control_min);
     page.layer_height->SetMinSize(control_min);
 
     auto *rows = new wxBoxSizer(wxVERTICAL);
@@ -1512,13 +1507,6 @@ static void layout_nozzle_page(const NozzlePage &page)
         rows->Add(row, 0, wxEXPAND | wxTOP, row_gap);
     };
     add_row(page.diameter_label, page.diameter);
-    add_row(page.flow_label, page.flow);
-    if (page.flow_hint != nullptr) {
-        page.flow_hint->SetMinSize({ panel->FromDIP(40), -1 });   // never widen the page: the hint wraps to it (ogStaticText::WrapToWidth)
-        auto *hint_row = new wxBoxSizer(wxHORIZONTAL);
-        hint_row->Add(page.flow_hint, 1, wxLEFT, label_w + col_gap);
-        rows->Add(hint_row, 0, wxEXPAND | wxTOP, hint_gap);
-    }
     add_row(page.layer_height_label, page.layer_height);
     for (ogStaticText *hint : { page.layer_height_hint, page.layer_height_link }) {
         if (hint == nullptr)
@@ -1935,7 +1923,6 @@ struct Sidebar::priv
     std::vector<ComboBox*>       m_nozzle_diameter_lists;
     // Flow row: one combo per nozzle tab (always created, shown only on tool heads that declare
     // more than one nozzle volume type).
-    std::vector<ComboBox*>       m_nozzle_flow_lists;
     // Every window of the nozzle tabs, one entry per tab. Window pointers only: they die with
     // DeleteAllPages().
     std::vector<NozzlePage>      m_nozzle_pages;
@@ -6133,7 +6120,6 @@ void Sidebar::msw_rescale()
         p->m_nozzle_notebook->Rescale();
         for (const NozzlePage &page : p->m_nozzle_pages) {
             page.diameter->Rescale();
-            page.flow->Rescale();
             page.layer_height->Rescale();
             layout_nozzle_page(page);      // after Rescale(): TextInput::messureSize pins the old height
         }
@@ -11509,31 +11495,78 @@ static wxString nozzle_combo_number(wxString label)
     return label;
 }
 
-// Show THIS nozzle's own diameter (per-nozzle sizes are supported), selecting the matching
-// "x.xmm" item so the read-only combo accepts it. Falls back to the uniform printer_variant
-// label only when the per-nozzle value is unavailable.
-static void select_nozzle_diameter_label(ComboBox *diameter_combo, double this_nd)
+// Snapmaker Orca Max: the size of a Nozzle combo item ("0.4mm High Flow" -> "0.4"), as the printer
+// presets name it.
+static wxString nozzle_choice_size(const wxString &label)
 {
-    wxString this_label;
-    for (unsigned int n = 0; n < diameter_combo->GetCount(); ++n) {
-        const wxString item = diameter_combo->GetString(n);
-        double item_nd = 0.;
-        if (nozzle_combo_number(item).ToCDouble(&item_nd) && std::abs(item_nd - this_nd) < EPSILON) {
-            this_label = item;
-            break;
-        }
+    const int mm = label.Find("mm");
+    return mm == wxNOT_FOUND ? label : label.Left(size_t(mm));
+}
+
+// Snapmaker Orca Max: fills the Nozzle combo of tool head `head` with HighFlowNotices::nozzle_choices
+// (the volume type as client data, the size in the label: "0.4mm", "0.4mm High Flow") and shows the
+// head's size with the type it prints. Items are rebuilt only when they differ, so the combo may be
+// refreshed from its own selection event.
+static void fill_nozzle_combo(const NozzlePage &page, size_t head)
+{
+    ComboBox *combo = page.diameter;
+    if (combo == nullptr)
+        return;
+    PresetBundle             &bundle         = *wxGetApp().preset_bundle;
+    const DynamicPrintConfig &printer_config = bundle.printers.get_edited_preset().config;
+    const auto                size_offers    = HighFlowNotices::size_offers_high_flow(bundle);
+    // Visible presets for this printer_model (system + user). Imported multi-nozzle variants are
+    // usually non-system; diameters_for_same_printer_model() only counted system and kept the combo disabled.
+    std::vector<std::string> sizes = bundle.printers.diameters_of_selected_printer();
+    if (sizes.empty())
+        if (const auto *variant = printer_config.option<ConfigOptionString>("printer_variant"); variant != nullptr && !variant->value.empty())
+            sizes.push_back(variant->value);
+    const std::vector<HighFlowNotices::NozzleChoice> choices = HighFlowNotices::nozzle_choices(printer_config, head, sizes, size_offers);
+    auto label_of = [](const HighFlowNotices::NozzleChoice &choice) {
+        wxString label = from_u8(choice.size) + "mm";
+        if (choice.volume_type != int(nvtStandard))
+            label += " " + _L(get_nozzle_volume_type_string(NozzleVolumeType(choice.volume_type)));
+        return label;
+    };
+
+    bool same_items = combo->GetCount() == choices.size();
+    for (size_t item = 0; same_items && item < choices.size(); ++item)
+        same_items = combo->GetString(unsigned(item)) == label_of(choices[item]) &&
+                     intptr_t(combo->GetClientData(unsigned(item))) == intptr_t(choices[item].volume_type);
+    if (!same_items) {
+        combo->Clear();
+        for (const HighFlowNotices::NozzleChoice &choice : choices)
+            combo->Append(label_of(choice), {}, (void*)intptr_t(choice.volume_type));
     }
-    if (this_label.empty() && this_nd > 0.) {
-        // A per-nozzle diameter not among the printer's variant list (e.g. an imported config):
-        // add it so the combo can display the true value.
-        this_label = nozzle_combo_label(this_nd);
-        diameter_combo->AppendString(this_label);
+
+    // The head's size with the type it prints: the stored one where the head can run it, else Standard.
+    const auto  *volume_types = bundle.project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
+    const int    stored       = volume_types != nullptr && head < volume_types->values.size() ? volume_types->values[head] : int(nvtStandard);
+    const int    shown        = HighFlowNotices::shown_volume_type(printer_config, head, stored, size_offers);
+    const auto  *diameters    = printer_config.option<ConfigOptionFloats>("nozzle_diameter");
+    const double own          = diameters != nullptr && head < diameters->values.size() ? diameters->values[head] : 0.;
+    int          selection    = -1;
+    for (size_t item = 0; item < choices.size(); ++item) {
+        double size = 0.;
+        if (!from_u8(choices[item].size).ToCDouble(&size) || std::abs(size - own) >= EPSILON)
+            continue;
+        if (selection < 0 || choices[item].volume_type == shown)
+            selection = int(item);
     }
-    if (this_label.empty()) {
-        const auto *pv = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionString>("printer_variant");
-        this_label = (pv ? wxString(pv->value) : wxString()) + "mm";
-    }
-    diameter_combo->SetValue(this_label);
+    if (combo->GetSelection() != selection)
+        combo->SetSelection(selection);
+    combo->Enable(choices.size() > 1);
+
+    // On the label as well: a disabled control shows no tooltip on Windows and GTK.
+    const bool     any_high_flow = std::any_of(choices.begin(), choices.end(),
+                                               [](const HighFlowNotices::NozzleChoice &choice) { return choice.volume_type != int(nvtStandard); });
+    const wxString tip = choices.size() < 2 ? _L("Diameter of this nozzle. This printer has presets for one nozzle diameter only.") :
+                         any_high_flow      ? _L("Size and flow type of this nozzle. Its layer height limits and the filament presets it prints follow the size; "
+                                                 "a High Flow nozzle prints with the High Flow values of the filament and process presets.") :
+                                              _L("Diameter of this nozzle. Its layer height limits and the filament presets it prints follow the diameter.");
+    combo->SetToolTip(tip);
+    if (page.diameter_label != nullptr)
+        page.diameter_label->SetToolTip(tip);
 }
 
 // Snapmaker Orca: the inputs of the layer height plan from the edited printer and print presets.
@@ -11991,7 +12024,6 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
     const int prev_page = p->m_nozzle_notebook->GetSelection();
     p->m_nozzle_notebook->DeleteAllPages();
     p->m_nozzle_diameter_lists.clear();
-    p->m_nozzle_flow_lists.clear();
     p->m_nozzle_pages.clear();
     p->m_nozzle_layer_height_lists.clear();
 
@@ -12031,70 +12063,36 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
             return hint;
         };
 
-        // The labels share the contextual msgids of the device dialogs ("Nozzle Diameter" / "Nozzle Flow").
-        page.diameter_label = make_text(_L_CONTEXT(L_CONTEXT("Diameter", "Nozzle Diameter"), "Nozzle Diameter"), Label::Body_14, *wxBLACK);
-
+        // Snapmaker Orca Max: one Nozzle row for the size and the flow type ("0.4mm High Flow"). Items,
+        // selection and state come from fill_nozzle_combo().
+        page.diameter_label = make_text(_L("Nozzle"), Label::Body_14, *wxBLACK);
         ComboBox* diameter_combo = new ComboBox(nozzle_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, {-1, FromDIP(30)}, 0,
                                                 nullptr, wxCB_READONLY);
         page.diameter = diameter_combo;
-
-
-        // Visible presets for this printer_model (system + user). Imported multi-nozzle variants are
-        // usually non-system; diameters_for_same_printer_model() only counted system and kept the combo disabled.
-        auto diameters = wxGetApp().preset_bundle->printers.diameters_of_selected_printer();
-        for (auto& diameter : diameters) {
-            diameter_combo->AppendString(wxString(diameter) + "mm");
-        }
-        if (diameter_combo->GetCount() == 0) {
-            const auto *pv = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionString>("printer_variant");
-            if (pv)
-                diameter_combo->AppendString(wxString(pv->value) + "mm");
-        }
-        if (diameters.size() < 2) {
-            diameter_combo->Enable(false);
-        }
-        // On the label as well: a disabled control shows no tooltip on Windows and GTK.
-        const wxString diameter_tip = diameters.size() < 2 ?
-            _L("Diameter of this nozzle. This printer has presets for one nozzle diameter only.") :
-            _L("Diameter of this nozzle. Its layer height limits and the filament presets it prints follow the diameter.");
-        diameter_combo->SetToolTip(diameter_tip);
-        page.diameter_label->SetToolTip(diameter_tip);
-
         diameter_combo->Bind(wxEVT_COMBOBOX, [this, diameter_combo, i](wxCommandEvent& event) {
-            // ORCA multi-nozzle-size: set ONLY this nozzle's diameter (see apply_nozzle_diameter).
-            apply_nozzle_diameter(i, nozzle_combo_number(diameter_combo->GetValue()));
+            const int selection = event.GetInt();
+            if (selection < 0 || selection >= int(diameter_combo->GetCount()))
+                return;
+            const wxString size = nozzle_choice_size(diameter_combo->GetString(unsigned(selection)));
+            const int      type = int(intptr_t(diameter_combo->GetClientData(unsigned(selection))));
+            // ORCA multi-nozzle-size: set ONLY this nozzle's diameter (see apply_nozzle_diameter). A size
+            // without High Flow values sets the head back to Standard on the way.
+            apply_nozzle_diameter(i, size);
+            const auto *volume_types = wxGetApp().preset_bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
+            const int   stored       = volume_types != nullptr && i < volume_types->values.size() ? volume_types->values[i] : int(nvtStandard);
+            if (stored != type) {
+                apply_nozzle_flow_type(i, NozzleVolumeType(type));
+                // The filaments of this tool head are passed with the new flow type: a slot that holds
+                // the preset of another size moves to the version of the tool head's size, the one
+                // whose High Flow values the tool head reads.
+                if (Plater *plater = wxGetApp().plater(); plater != nullptr)
+                    plater->show_nozzle_follow_notice(plater->follow_nozzle_sizes({i}, Plater::FollowReason::FlowType));
+            }
             // Do not event.Skip(): this is a plain ComboBox; skipping would let the sidebar treat
             // it as the bed-type combo (Plater::priv::on_combobox_select) and mishandle it.
         });
-        
-        const double this_nd = (nozzle_diameter && i < nozzle_diameter->values.size()) ? nozzle_diameter->values[i] : 0.;
-        select_nozzle_diameter_label(diameter_combo, this_nd);
-
+        fill_nozzle_combo(page, i);
         p->m_nozzle_diameter_lists.push_back(diameter_combo);
-
-        // Flow row: the nozzle volume type of this tool head (project config "nozzle_volume_type").
-        // Items, visibility and state come from update_nozzle_flow_values(): the row shows only
-        // on tool heads offered more than one type (HighFlowNotices::flow_row_state).
-        page.flow_label = make_text(_L_CONTEXT(L_CONTEXT("Flow", "Nozzle Flow"), "Nozzle Flow"), Label::Body_14, *wxBLACK);
-        ComboBox* flow_combo = new ComboBox(nozzle_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, {-1, FromDIP(30)}, 0,
-                                            nullptr, wxCB_READONLY);
-        page.flow = flow_combo;
-        flow_combo->Bind(wxEVT_COMBOBOX, [flow_combo, i](wxCommandEvent& event) {
-            const int selection = event.GetInt();
-            if (selection < 0 || selection >= int(flow_combo->GetCount()))
-                return;
-            apply_nozzle_flow_type(i, NozzleVolumeType(intptr_t(flow_combo->GetClientData(selection))));
-            // The filaments of this tool head are passed with the new flow type: a slot that holds
-            // the preset of another size moves to the version of the tool head's size, the one
-            // whose High Flow values the tool head reads.
-            if (Plater *plater = wxGetApp().plater(); plater != nullptr)
-                plater->show_nozzle_follow_notice(plater->follow_nozzle_sizes({i}, Plater::FollowReason::FlowType));
-            // Do not event.Skip(): see the diameter combo.
-        });
-        p->m_nozzle_flow_lists.push_back(flow_combo);
-        // The reason of a ruled out Flow row, under it: a fact in the colour of the disabled combo
-        // text, no warning. Text and visibility come from update_nozzle_flow_values().
-        page.flow_hint = make_hint();
 
         // Preferred layer height row: the layer height this extruder should print with (the
         // "extruder_layer_height" printer option), stored as entered.
@@ -12254,15 +12252,13 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
         page.layer_height_link->Bind(wxEVT_LEFT_DOWN, [](wxMouseEvent &) { wxGetApp().CallAfter([]() { print_exact_layer_heights(); }); });
 
         // The process preset a tool head of another nozzle size prints with (PerHeadProcess), under
-        // the rows, in the style of the Flow hint. Text and visibility come from
+        // the rows. Text and visibility come from
         // update_nozzle_process_hints(). A click leads to the speed picker of the Process tab.
         page.process_hint = make_hint();
         page.process_hint->SetCursor(wxCursor(wxCURSOR_HAND));
         page.process_hint->Bind(wxEVT_LEFT_DOWN, [i](wxMouseEvent &) { open_speed_source_picker(i); });
 
-        // Diameter -> Flow -> Preferred layer height; a hidden or disabled Flow combo is skipped.
-        page.flow->MoveAfterInTabOrder(page.diameter);
-        page.layer_height->MoveAfterInTabOrder(page.flow);
+        page.layer_height->MoveAfterInTabOrder(page.diameter);
         layout_nozzle_page(page);
         p->m_nozzle_pages.push_back(page);
 
@@ -12333,10 +12329,8 @@ void Sidebar::update_nozzle_values()
         }
         return;
     }
-    if (nozzle_diameter != nullptr)
-        for (size_t i = 0; i < p->m_nozzle_diameter_lists.size() && i < nozzle_diameter->values.size(); ++i)
-            if (p->m_nozzle_diameter_lists[i] != nullptr)
-                select_nozzle_diameter_label(p->m_nozzle_diameter_lists[i], nozzle_diameter->values[i]);
+    for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i)
+        fill_nozzle_combo(p->m_nozzle_pages[i], i);
     for (size_t i = 0; i < p->m_nozzle_layer_height_lists.size(); ++i)
         if (p->m_nozzle_layer_height_lists[i] != nullptr)
             fill_nozzle_layer_height_field(p->m_nozzle_layer_height_lists[i], i);
@@ -12549,37 +12543,9 @@ void Sidebar::update_nozzle_flow_values()
     // The process hint of every page follows the same events as the Flow row.
     update_nozzle_process_hints();
 
-    const DynamicPrintConfig &printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-    const auto               *volume_types   = wxGetApp().preset_bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
-    const auto                size_offers    = HighFlowNotices::size_offers_high_flow(*wxGetApp().preset_bundle);
-
-    for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i) {
-        const NozzlePage &page = p->m_nozzle_pages[i];
-        const HighFlowNotices::FlowRowState state = HighFlowNotices::flow_row_state(printer_config, i, size_offers);
-        // The row sizer of a page counts as hidden when both of its windows are.
-        const bool row       = state != HighFlowNotices::FlowRowState::Hidden;
-        // The reason names the head's own size; a head without a diameter is never ruled out.
-        const std::string size      = HighFlowNotices::head_nozzle_size_label(printer_config, i);
-        const bool        ruled_out = state == HighFlowNotices::FlowRowState::RuledOut && !size.empty();
-        page.flow_label->Show(row);
-        page.flow->Show(row);
-        page.flow_hint->Show(ruled_out);
-        if (!row)
-            continue;
-        HighFlowNotices::fill_flow_combo(page.flow, printer_config, i,
-                                         volume_types != nullptr && i < volume_types->values.size() ? volume_types->values[i] : int(nvtStandard),
-                                         size_offers);
-        // On the label as well: a disabled combo shows no tooltip on Windows and GTK.
-        const wxString tip = HighFlowNotices::flow_tooltip(state, size);
-        page.flow_label->SetToolTip(tip);
-        if (ruled_out) {
-            // TRN Line under the disabled Flow row of a nozzle tab in the sidebar. %1% is the nozzle size of this tool head, e.g. 0.2
-            const wxString hint = format_wxstr(_L("High Flow is not available for a %1% mm nozzle."), size);
-            if (page.flow_hint->GetUnwrappedText() != hint)
-                page.flow_hint->SetText(hint, false);
-            page.flow_hint->SetToolTip(tip);
-        }
-    }
+    // The Nozzle combo shows the size with the flow type.
+    for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i)
+        fill_nozzle_combo(p->m_nozzle_pages[i], i);
 
     // The rows a page shows decide its height.
     p->fit_nozzle_block();
@@ -12601,8 +12567,8 @@ void Sidebar::select_nozzle_tab(size_t head)
     }
     if (head < p->m_nozzle_notebook->GetPageCount())
         p->m_nozzle_notebook->SetSelection(head);
-    if (head < p->m_nozzle_flow_lists.size() && p->m_nozzle_flow_lists[head] != nullptr && p->m_nozzle_flow_lists[head]->IsShownOnScreen())
-        p->m_nozzle_flow_lists[head]->SetFocus();
+    if (head < p->m_nozzle_pages.size() && p->m_nozzle_pages[head].diameter != nullptr && p->m_nozzle_pages[head].diameter->IsShownOnScreen())
+        p->m_nozzle_pages[head].diameter->SetFocus();
 }
 
 void Sidebar::show_nozzle_tab(size_t head)

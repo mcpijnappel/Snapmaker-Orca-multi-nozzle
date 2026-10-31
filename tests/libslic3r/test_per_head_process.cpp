@@ -3604,8 +3604,10 @@ TEST_CASE("A multi-nozzle preset gives a tool head of another size its own prese
 
 TEST_CASE("A High Flow tool head under a multi-nozzle preset prints the preset's High Flow speeds", "[PerHeadProcess][Profiles][MultiNozzle][HighFlow]")
 {
+    const char *const printer = GENERATE(U1_04, U1_02);
+    INFO(printer);
     auto bundle = load_snapmaker_bundle();
-    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, "Multi-nozzle Fine @Snapmaker U1");
+    select_u1(*bundle, {0.4, 0.4, 0.4, 0.2}, {0., 0., 0., 0.}, "Multi-nozzle Fine @Snapmaker U1", printer);
     bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {int(nvtHighFlow), int(nvtStandard), int(nvtStandard), int(nvtStandard)};
     std::vector<PerHeadProcess::Source> sources;
     const DynamicPrintConfig composed = bundle->full_config_for_print(false, std::nullopt, std::nullopt, &sources);
