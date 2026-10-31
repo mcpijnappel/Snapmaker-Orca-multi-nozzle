@@ -749,16 +749,11 @@ void Tab::create_preset_tab()
 
 void Tab::parse_extruder_selection(int selection, int &extruder_id, NozzleVolumeType &nozzle_type)
 {
-    // Snapmaker Orca: the speed selector. Entry 0 is All tool heads (no head, the toggle's flow),
-    // entry k tool head k-1 with its own flow.
+    // Snapmaker Orca: the speed selector. Snapmaker Orca Max: entry k is tool head k, with its own
+    // flow; there is no All entry.
     if (m_head_selector) {
-        if (selection <= 0) {
-            extruder_id = -1;
-            nozzle_type = m_all_flow;
-        } else {
-            extruder_id = selection - 1;
-            nozzle_type = head_speed_flow(size_t(extruder_id));
-        }
+        extruder_id = std::max(0, selection);
+        nozzle_type = head_speed_flow(size_t(extruder_id));
         return;
     }
     // Snapmaker Orca: in flow selector mode selection s is column s of a preset whose columns belong
@@ -3979,7 +3974,7 @@ bool TabPrint::before_head_change(const std::string &opt_key, int &opt_index)
         if (relayout_heads_to_printer(*m_config, m_preset_bundle->printers.get_edited_preset().config))
             switch_excluder(-1, false);
     }
-    opt_index = head_selection_column(head + 1);
+    opt_index = head_selection_column(head);
     return true;
 }
 
@@ -10499,10 +10494,9 @@ void Tab::update_extruder_variants(int extruder_id, bool reload)
 
             m_extruder_switch->SetOptions(generate_extruder_options());
             m_head_labels_short_shown = false;
-            // The selection stays: All stays All, a selected tool head stays selected; a changed
-            // flow or size of a tool head never moves it (its label and columns are refreshed).
-            int selection_index = was_head_selector && previous_selection >= 0 && previous_selection <= extruder_nums ? previous_selection : 0;
-            // The toggle's entries follow the selection (show_flow_toggle, from switch_excluder).
+            // The selection stays: a selected tool head stays selected; a changed flow or size of a
+            // tool head never moves it (its label and columns are refreshed). First the first head.
+            int selection_index = was_head_selector && previous_selection >= 0 && previous_selection < extruder_nums ? previous_selection : 0;
             update_head_entries();
             m_extruder_switch->SetSelection(selection_index);
             m_extruder_switch->Enable(true);
@@ -10706,7 +10700,7 @@ int Tab::filament_column() const
 void Tab::select_tool_head(size_t head, NozzleVolumeType type)
 {
     if (m_head_selector && m_extruder_switch != nullptr && m_extruder_switch->IsThisEnabled()) {
-        const int selection = int(head) + 1;
+        const int selection = int(head);
         if (selection < int(m_extruder_switch->GetCount()) && selection != m_extruder_switch->GetSelection()) {
             // The selection event resolves the columns; the sidebar asked, so it is not moved back.
             m_head_selection_by_program = true;
@@ -10733,7 +10727,8 @@ int Tab::head_selection() const
 {
     if (!m_head_selector || m_extruder_switch == nullptr)
         return 0;
-    return std::max(0, m_extruder_switch->GetSelection());
+    // Snapmaker Orca Max: the switch holds the tool heads alone; entry k is selection k + 1.
+    return std::max(0, m_extruder_switch->GetSelection()) + 1;
 }
 
 NozzleVolumeType Tab::head_flow(size_t head) const
@@ -10754,9 +10749,8 @@ int Tab::head_selection_column(int selection) const
 {
     if (m_config == nullptr)
         return 0;
-    if (selection <= 0)
-        return PerHeadProcess::shared_column(*m_config, m_all_flow);
-    const size_t head  = size_t(selection - 1);
+    // Snapmaker Orca Max: entry `selection` of the switch is tool head `selection`.
+    const size_t head  = size_t(std::max(0, selection));
     const auto  *types = m_preset_bundle->printers.get_edited_preset().config.option<ConfigOptionEnumsGeneric>("extruder_type");
     const ExtruderType extruder_type = types != nullptr && !types->values.empty() ? ExtruderType(types->get_at(head)) : etDirectDrive;
     // The head's column at the flow whose speeds it prints (the Standard column of a High Flow
@@ -10770,19 +10764,17 @@ void Tab::update_head_entries()
     if (!m_head_selector || m_extruder_switch == nullptr || m_config == nullptr)
         return;
     const int extruder_nums = m_preset_bundle->get_printer_extruder_count();
-    if (int(m_extruder_switch->GetCount()) != extruder_nums + 1)
+    if (int(m_extruder_switch->GetCount()) != extruder_nums)
         return;
     const DynamicPrintConfig &printer_config = m_preset_bundle->printers.get_edited_preset().config;
     const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::active(*m_preset_bundle) ? PerHeadProcess::head_sources(*m_preset_bundle) : std::vector<PerHeadProcess::Source>();
-    if (Button *all = m_extruder_switch->GetButton(0); all != nullptr)
-        all->SetToolTip(_L("The values below apply to every extruder that has no value of its own for them."));
     for (int head = 0; head < extruder_nums; ++head) {
         const std::vector<std::string> keys        = PerHeadProcess::head_override_keys(*m_config, size_t(head));
         const std::string              chosen      = PerHeadProcess::chosen_of(*m_preset_bundle, size_t(head));
         const bool                     flow_chosen = PerHeadProcess::flow_chosen(*m_preset_bundle, size_t(head));
         // The dot: the tool head has something of its own, values set, a chosen preset or a chosen flow.
-        m_extruder_switch->SetOptionIndicator(unsigned(head + 1), !keys.empty() || !chosen.empty() || flow_chosen);
-        Button *button = m_extruder_switch->GetButton(unsigned(head + 1));
+        m_extruder_switch->SetOptionIndicator(unsigned(head), !keys.empty() || !chosen.empty() || flow_chosen);
+        Button *button = m_extruder_switch->GetButton(unsigned(head));
         if (button == nullptr)
             continue;
         wxString tip = HighFlowNotices::head_entry_tooltip(size_t(head), HighFlowNotices::head_nozzle_size_label(printer_config, size_t(head)), head_flow(size_t(head)), flow_chosen);
@@ -10816,68 +10808,20 @@ void Tab::update_head_entries()
     }
 }
 
-// The active page has an indexed key whose columns differ by flow (a speed): the toggle has
-// something to choose there. The Quality page holds the line widths alone, which are
-// flow-independent (PerHeadProcess::flow_independent_keys): no toggle.
-bool Tab::page_has_flow_dependent_key() const
-{
-    if (m_active_page == nullptr)
-        return false;
-    for (const ConfigOptionsGroupShp &group : m_active_page->m_optgroups)
-        for (const auto &kvp : group->opt_map())
-            if (kvp.second.second >= 0 && PerHeadProcess::flow_independent_keys().count(kvp.second.first) == 0)
-                return true;
-    return false;
-}
-
 // Snapmaker Orca: the Standard / High Flow toggle. Under All it picks the shared column edited (if the
 // preset has two); under a High Flow head the speeds column it prints (PerHeadProcess::flow_key); else hidden.
 // Called after every m_main_sizer->Show(m_variant_sizer, ...), which shows all windows of the row.
 void Tab::show_flow_toggle()
 {
-    if (m_flow_toggle == nullptr)
+    // Snapmaker Orca Max: the speed selector shows no flow toggle: a selected tool head edits the
+    // column of its own nozzle (High Flow for a High Flow nozzle), and there is no All entry whose
+    // shared columns it would pick.
+    if (m_flow_toggle == nullptr || !m_flow_toggle->IsShown())
         return;
-    const bool            row_shown = m_extruder_switch != nullptr && m_extruder_switch->IsShown();
-    bool                  show      = false;
-    int                   head      = -1;
-    int                   selection = 0;
-    std::vector<wxString> options;
-    if (row_shown && m_head_selector && m_preset_bundle != nullptr && page_has_flow_dependent_key()) {
-        const int selected = selected_head();
-        if (selected < 0) {
-            for (NozzleVolumeType type : m_head_flow_types)
-                options.push_back(get_nozzle_volume_type_name(type));
-            const auto it = std::find(m_head_flow_types.begin(), m_head_flow_types.end(), m_all_flow);
-            selection     = it == m_head_flow_types.end() ? 0 : int(it - m_head_flow_types.begin());
-            show          = options.size() > 1;
-        } else if (PerHeadProcess::nozzle_flow(m_preset_bundle->project_config, size_t(selected)) == NozzleVolumeType::nvtHighFlow) {
-            head      = selected;
-            options   = {get_nozzle_volume_type_name(NozzleVolumeType::nvtHighFlow), get_nozzle_volume_type_name(NozzleVolumeType::nvtStandard)};
-            selection = head_speed_flow(size_t(selected)) == NozzleVolumeType::nvtHighFlow ? 0 : 1;
-            show      = true;
-        }
-    }
-    bool changed = m_flow_toggle->IsShown() != show;
-    if (show) {
-        // SetOptions and SetSelection fire the selection event: muted, this is no choice.
-        m_flow_toggle_updating = true;
-        bool same = m_flow_toggle->GetCount() == options.size();
-        for (size_t i = 0; same && i < options.size(); ++i)
-            same = m_flow_toggle->GetOptionText(unsigned(i)) == options[i];
-        if (!same) {
-            m_flow_toggle->SetOptions(options);
-            changed = true;
-        }
-        m_flow_toggle->SetSelection(selection);
-        m_flow_toggle_head     = head;
-        m_flow_toggle_updating = false;
-    }
-    if (!changed)
-        return;
-    m_flow_toggle->Show(show);
+    m_flow_toggle->Hide();
+    m_flow_toggle_head = -1;
     if (m_variant_sizer != nullptr)
         m_variant_sizer->Layout();
-    // The toggle takes width from the row: the labels are fitted to what is left.
     fit_head_selector();
 }
 
@@ -11013,17 +10957,23 @@ std::vector<wxString> Tab::generate_extruder_options()
     // nozzle size when the sizes differ ("Extruder 2 · 0.2"). The short labels ("All", "E2 · 0.2") are
     // kept beside them for a panel the long ones do not fit (fit_head_selector).
     if (m_head_selector) {
+        // Snapmaker Orca Max: one entry per tool head, no All: a value edited on these pages is the
+        // value of the selected head. The nozzle is named when the heads' nozzles differ ("E3 · 0.4 HF").
         const DynamicPrintConfig &printer_config = m_preset_bundle->printers.get_edited_preset().config;
         std::set<std::string>     sizes;
         for (int head = 0; head < extruder_nums; ++head)
-            sizes.insert(HighFlowNotices::head_nozzle_size_label(printer_config, size_t(head)));
+            sizes.insert(HighFlowNotices::head_nozzle_size_label(printer_config, size_t(head)) +
+                         (head_flow(size_t(head)) == NozzleVolumeType::nvtHighFlow ? " HF" : ""));
         m_head_labels_short.clear();
-        options.push_back(_L("All extruders"));
-        // TRN The first entry of the speed selector on the Process tab, in a narrow sidebar (short for "All extruders")
-        m_head_labels_short.push_back(_L("All"));
         for (int head = 0; head < extruder_nums; ++head) {
-            const wxString size = from_u8(HighFlowNotices::head_nozzle_size_label(printer_config, size_t(head)));
-            if (sizes.size() > 1) {
+            const bool     high_flow = head_flow(size_t(head)) == NozzleVolumeType::nvtHighFlow;
+            const wxString size      = from_u8(HighFlowNotices::head_nozzle_size_label(printer_config, size_t(head)));
+            if (sizes.size() > 1 && high_flow) {
+                // TRN An entry of the speed selector on the Process tab: the tool head and its High Flow nozzle ("Extruder 2 · 0.4 High Flow")
+                options.push_back(format_wxstr(_L("Extruder %1% · %2% High Flow"), head + 1, size));
+                // TRN An entry of the speed selector in a narrow sidebar: the tool head and its High Flow nozzle ("E2 · 0.4 HF")
+                m_head_labels_short.push_back(format_wxstr(_L("E%1% · %2% HF"), head + 1, size));
+            } else if (sizes.size() > 1) {
                 // TRN An entry of the speed selector on the Process tab: the tool head and its nozzle size ("Extruder 2 · 0.2")
                 options.push_back(format_wxstr(_L("Extruder %1% · %2%"), head + 1, size));
                 // TRN An entry of the speed selector in a narrow sidebar: the tool head and its nozzle size ("E2 · 0.2")
@@ -11160,7 +11110,7 @@ void Tab::switch_excluder(int extruder_id, bool reload)
         // All edits the shared column of the toggle's flow, a head its own column (on a narrow
         // preset the shared column of its flow until a write widens it, before_head_change).
         const int selection = std::max(0, m_extruder_switch->GetSelection());
-        if (extruder_id >= 0 && extruder_id + 1 != selection) {
+        if (extruder_id >= 0 && extruder_id != selection) {
             update_head_entries();
             return;
         }
@@ -11168,7 +11118,7 @@ void Tab::switch_excluder(int extruder_id, bool reload)
         m_extruder_sync->Enable(false);
         m_extruder_sync->Show(false);
         show_flow_toggle();
-        extruder_id = std::max(0, selection - 1);
+        extruder_id = selection;
     } else {
     if (m_extruder_switch) {
         int current_extruder = get_current_active_extruder();

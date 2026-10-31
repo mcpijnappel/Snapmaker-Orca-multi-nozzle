@@ -348,9 +348,9 @@ public:
     // per flow type (HighFlowNotices::flow_selector_types) and the switch offers these types
     // instead of extruders; empty in every other case.
     std::vector<NozzleVolumeType> m_flow_selector_types;
-    // Snapmaker Orca: Process-tab speed selector (PerHeadProcess.hpp), "All extruders" plus one entry per tool head
-    // (not on Bambu two-head printers). All edits the shared columns of m_all_flow (set by m_flow_toggle);
-    // a head edits its own columns, created on first edit.
+    // Snapmaker Orca: Process-tab speed selector (PerHeadProcess.hpp), one entry per tool head (not on Bambu
+    // two-head printers); a head edits its own columns, created on first edit. Snapmaker Orca Max: no All
+    // entry and no flow toggle; m_all_flow and m_flow_toggle stay for the shared columns of older code paths.
     bool                          m_head_selector { false };
     std::vector<NozzleVolumeType> m_head_flow_types;
     NozzleVolumeType              m_all_flow { NozzleVolumeType::nvtStandard };
@@ -373,9 +373,6 @@ public:
     // Applies the rule of the flow toggle's visibility (see the definition); called after every
     // show of the row, which wxSizer::ShowItems shows the toggle with.
     void                          show_flow_toggle();
-    // The active page has an indexed key whose columns differ by flow (a speed); the Quality page
-    // (line widths alone, flow-independent) has none and shows no toggle.
-    bool                          page_has_flow_dependent_key() const;
 
 public:
 	// BBS
@@ -545,7 +542,7 @@ public:
     void                   select_tool_head(size_t head, NozzleVolumeType type);
     // Activates the page of category `category` ("Speed") without focusing or highlighting a field.
     void                   select_page_by_category(const wxString &category);
-    // Snapmaker Orca, speed selector: selected entry (0 = All, k = tool head k-1) and its head (-1 for All),
+    // Snapmaker Orca, speed selector: selected entry + 1 (switch entry k is tool head k; 0 without the selector) and its head,
     // a head's flow (project_config), the preset column a selection edits, and the entries' labels and tooltips.
     int                    head_selection() const;
     int                    selected_head() const { return head_selection() - 1; }
