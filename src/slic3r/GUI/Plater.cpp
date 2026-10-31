@@ -1458,61 +1458,37 @@ private:
 #endif
 };
 
-// The windows of one nozzle tab; the sizers are rebuilt from them (layout_nozzle_page).
+// Snapmaker Orca Max: the windows of one tool head's cell in the nozzle grid; the sizers are rebuilt
+// from them (layout_nozzle_cell).
 struct NozzlePage
 {
     wxPanel      *panel { nullptr };
-    wxStaticText *diameter_label { nullptr };
-    ogStaticText *process_hint { nullptr };         // the process preset the tool head prints with (PerHeadProcess), wrapped to the page; may be nullptr
-    ComboBox     *diameter { nullptr };      // Snapmaker Orca Max: size and flow type ("0.4mm High Flow"), fill_nozzle_combo
+    wxStaticText *badge { nullptr };         // the tool head's number, as the filament list numbers its slots
+    ComboBox     *diameter { nullptr };      // size and flow type ("0.4mm High Flow"), fill_nozzle_combo
+    wxStaticText *info { nullptr };          // what the head prints: layer height and max flow (update_nozzle_process_hints)
 };
 
-// Lays out the rows of one nozzle tab at the current DPI: when the page is built and from
+// Lays out one cell of the nozzle grid at the current DPI: when the cell is built and from
 // Sidebar::msw_rescale(). SetSizer() deletes the previous sizers and keeps the windows.
-static void layout_nozzle_page(const NozzlePage &page)
+static void layout_nozzle_cell(const NozzlePage &page)
 {
     wxWindow *panel = page.panel;
-    // The page sits FromDIP(4) + 2 px inside the printer panel; its labels start where the
-    // "Bed type" label starts, FromDIP(4) + FromDIP(10).
-    const int margin   = panel->FromDIP(10) - 2;
-    const int col_gap  = panel->FromDIP(SidebarProps::IconSpacing());
-    const int row_gap  = panel->FromDIP(6);
-    const int hint_gap = panel->FromDIP(2);
+    const int gap   = panel->FromDIP(6);
+    page.badge->SetMinSize({ panel->FromDIP(14), -1 });
+    // An explicit minimum width: ComboBox reports its last width as best width, which would keep a
+    // cell from shrinking. The height is passed: TextInput::SetMinSize keeps it for -1.
+    page.diameter->SetMinSize({ panel->FromDIP(60), panel->FromDIP(30) });
+    page.info->SetMinSize({ panel->FromDIP(40), -1 });
 
-    // One label column: the widest label, at most 170 DIP. A minimum size is what a sizer reads
-    // (wxSizerItem::CalcMin ignores the maximum size).
-    int label_w = 0;
-    for (wxStaticText *label : { page.diameter_label })
-        label_w = std::max(label_w, label->GetTextExtent(label->GetLabel()).x + panel->FromDIP(4));
-    label_w = std::min(label_w, panel->FromDIP(170));
-    for (wxStaticText *label : { page.diameter_label })
-        label->SetMinSize({ label_w, -1 });
-
-    // An explicit minimum width: ComboBox and TextInput report their last width as best width, which
-    // would keep a row from shrinking. The height is passed: TextInput::SetMinSize keeps it for -1.
-    const wxSize control_min(panel->FromDIP(80), panel->FromDIP(30));
-    page.diameter->SetMinSize(control_min);
-
-    auto *rows = new wxBoxSizer(wxVERTICAL);
-    // No spacers inside a row: a row whose windows are hidden then counts as hidden, border included.
-    auto add_row = [rows, col_gap, row_gap](wxWindow *label, wxWindow *control) {
-        auto *row = new wxBoxSizer(wxHORIZONTAL);
-        row->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, col_gap);
-        row->Add(control, 1, wxALIGN_CENTER_VERTICAL);
-        rows->Add(row, 0, wxEXPAND | wxTOP, row_gap);
-    };
-    add_row(page.diameter_label, page.diameter);
-    if (page.process_hint != nullptr) {
-        page.process_hint->SetMinSize({ panel->FromDIP(40), -1 });   // never widen the page: the hint wraps to it
-        auto *hint_row = new wxBoxSizer(wxHORIZONTAL);
-        hint_row->Add(page.process_hint, 1, wxLEFT, label_w + col_gap);
-        rows->Add(hint_row, 0, wxEXPAND | wxTOP, hint_gap);
-    }
-    rows->AddSpacer(row_gap);
-
-    auto *page_sizer = new wxBoxSizer(wxHORIZONTAL);
-    page_sizer->Add(rows, 1, wxEXPAND | wxLEFT | wxRIGHT, margin);
-    panel->SetSizer(page_sizer);
+    auto *row = new wxBoxSizer(wxHORIZONTAL);
+    row->Add(page.badge, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+    row->Add(page.diameter, 1, wxALIGN_CENTER_VERTICAL);
+    auto *info_row = new wxBoxSizer(wxHORIZONTAL);
+    info_row->Add(page.info, 1, wxLEFT, panel->FromDIP(14) + gap);
+    auto *cell = new wxBoxSizer(wxVERTICAL);
+    cell->Add(row, 0, wxEXPAND);
+    cell->Add(info_row, 0, wxEXPAND | wxTOP, panel->FromDIP(2));
+    panel->SetSizer(cell);
 }
 
 // Background for the extruder-group title chip and its edit buttons
@@ -1900,20 +1876,20 @@ struct Sidebar::priv
     // shown only when the switch is installed (green when ready, red when not calibrated).
     wxStaticBitmap* extruder_separator_icon = nullptr;
 
-    // nozzle notebook  and related controls
-    CustomNotebook*                  m_nozzle_notebook{nullptr};
-    // Snapmaker Orca: set while Sidebar::show_nozzle_tab moves the notebook for the speed selector
-    // of the Process tab; the page change handler then leaves the selector alone (the two follow
-    // each other, one direction at a time).
-    bool                             linking_nozzle_tab{false};
+    // Snapmaker Orca Max: the nozzle grid, one cell per tool head in two columns, as the filament
+    // list shows its slots.
+    wxPanel*                     m_nozzle_grid{nullptr};
+    StaticBox*                   m_panel_nozzle_title{nullptr};   // "Nozzles", folds the grid like the filament sections
+    ScalableButton*              m_nozzle_icon{nullptr};
+    StaticBox*                   m_nozzle_box{nullptr};
     std::vector<ComboBox*>       m_nozzle_diameter_lists;
-    // Flow row: one combo per nozzle tab (always created, shown only on tool heads that declare
-    // more than one nozzle volume type).
-    // Every window of the nozzle tabs, one entry per tab. Window pointers only: they die with
-    // DeleteAllPages().
+    // Every window of the grid, one entry per tool head. Window pointers only: they die with
+    // DestroyChildren().
     std::vector<NozzlePage>      m_nozzle_pages;
     bool                         m_nozzle_rebuild_scheduled{false};
-    // Sizes the nozzle block for its strip and its tallest page.
+    // The tool head last picked in the grid or in the Process tab's speed selector.
+    size_t                       m_nozzle_selected{0};
+    // Lays the nozzle grid out again for the lines its cells take.
     void                         fit_nozzle_block();
 
     ObjectList          *m_object_list{ nullptr };
@@ -1979,20 +1955,26 @@ void Sidebar::priv::flush_printer_sync(bool restart)
         timer_sync_printer->Stop();
 }
 
-// The block is as tall as its strip plus its tallest page, each page measured with the rows it
-// shows. The tallest page decides, so a click on a tab never moves the sections below.
 void Sidebar::priv::fit_nozzle_block()
 {
-    if (m_nozzle_notebook == nullptr)
+    if (m_nozzle_grid == nullptr)
         return;
-    wxWindow *container = m_nozzle_notebook->GetParent();
-    if (container == nullptr)
-        return;
-    for (const NozzlePage &page : m_nozzle_pages)
+    for (const NozzlePage &page : m_nozzle_pages) {
+        page.info->InvalidateBestSize();
+        page.panel->InvalidateBestSize();
         page.panel->Layout();
-    const wxSize min_size(-1, m_nozzle_notebook->FittingHeight());
+    }
+    m_nozzle_grid->InvalidateBestSize();
+    m_nozzle_grid->Layout();
+    wxWindow *container = m_nozzle_grid->GetParent();
+    if (container == nullptr || container->GetSizer() == nullptr)
+        return;
+    // The box holds the grid with its margins: the sizer's minimum, not the grid's.
+    container->InvalidateBestSize();
+    const wxSize min_size(-1, container->GetSizer()->CalcMin().y);
     const bool   resized = container->GetMinSize() != min_size;
     container->SetMinSize(min_size);
+    container->Layout();
     if (resized && scrolled != nullptr)
         scrolled->Layout();
 }
@@ -4338,8 +4320,8 @@ Sidebar::Sidebar(Plater *parent)
         h_sizer_title->AddSpacer(FromDIP(SidebarProps::ElementSpacing()));
         h_sizer_title->Add(p->m_text_printer_settings, 0, wxALIGN_CENTER);
         h_sizer_title->AddStretchSpacer();
-        h_sizer_title->Add(p->m_printerinfo_syncbtn, 0, wxALIGN_CENTER);
-        h_sizer_title->wxSizer::AddSpacer(FromDIP(10));
+        // Snapmaker Orca Max: the nozzle sync button sits on the Nozzles title (below), as the
+        // filament sync button sits on the Filaments title.
         h_sizer_title->Add(p->m_printer_setting, 0, wxALIGN_CENTER);
         h_sizer_title->AddSpacer(FromDIP(SidebarProps::TitlebarMargin()));
         h_sizer_title->SetMinSize(-1, 3 * em);
@@ -4520,39 +4502,55 @@ Sidebar::Sidebar(Plater *parent)
         p->m_panel_printer_content->Layout();
         scrolled_sizer->Add(p->m_panel_printer_content, 0, wxEXPAND, 0);
 
-        // 创建Nozzle notebook的容器
+        // Snapmaker Orca Max: the "Nozzles" title, like the "Filaments" one: a click folds the grid, the
+        // sync button reads the nozzles of the connected printer.
+        p->m_panel_nozzle_title = new StaticBox(p->m_panel_printer_content, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                                wxTAB_TRAVERSAL | wxBORDER_NONE);
+        p->m_panel_nozzle_title->SetBackgroundColor(title_bg);
+        p->m_panel_nozzle_title->SetBackgroundColor2(0xF1F1F1);
+        p->m_panel_nozzle_title->SetMinSize(wxSize(-1, FromDIP(30)));
+        p->m_panel_nozzle_title->SetMaxSize(wxSize(-1, FromDIP(30)));
+        p->m_nozzle_icon = new ScalableButton(p->m_panel_nozzle_title, wxID_ANY, "nozzle_title");
+        auto *nozzle_label = new Label(p->m_panel_nozzle_title, _L("Nozzles"), LB_PROPAGATE_MOUSE_EVENT);
+        p->m_printerinfo_syncbtn->Reparent(p->m_panel_nozzle_title);
+        auto *h_nozzle_title = new wxBoxSizer(wxHORIZONTAL);
+        h_nozzle_title->Add(p->m_nozzle_icon, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(SidebarProps::TitlebarMargin()));
+        h_nozzle_title->AddSpacer(FromDIP(SidebarProps::ElementSpacing()));
+        h_nozzle_title->Add(nozzle_label, 0, wxALIGN_CENTER_VERTICAL);
+        h_nozzle_title->AddStretchSpacer();
+        h_nozzle_title->Add(p->m_printerinfo_syncbtn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(SidebarProps::TitlebarMargin()));
+        p->m_panel_nozzle_title->SetSizer(h_nozzle_title);
+        p->m_panel_nozzle_title->Layout();
+        p->m_panel_nozzle_title->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent &e) {
+            // Not on the sync button.
+            if (p->m_printerinfo_syncbtn->IsShown() && e.GetPosition().x > p->m_printerinfo_syncbtn->GetPosition().x - FromDIP(12))
+                return;
+            const bool expanded = p->m_nozzle_box->IsShown();
+            p->m_nozzle_box->Show(!expanded);
+            p->m_nozzle_box->SetMaxSize(expanded ? wxSize(-1, 0) : wxSize(-1, -1));
+            p->m_panel_printer_content->Layout();
+            m_scrolled_sizer->Layout();
+        });
+        vsizer_printer->Add(p->m_panel_nozzle_title, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(4));
+
         StaticBox* nozzle_container = new StaticBox(p->m_panel_printer_content, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                                                     wxTAB_TRAVERSAL | wxBORDER_NONE);
+        p->m_nozzle_box = nozzle_container;
         nozzle_container->SetCornerRadius(8);
-        // nozzle_container->SetBorderColor(panel_bd_col);
+        p->m_nozzle_grid = new wxPanel(nozzle_container, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
+        // Before any child: StaticBox::Create copies the parent's background for the corners of the
+        // ComboBoxes. White maps to the dark background (#2D2D31).
+        p->m_nozzle_grid->SetBackgroundColour(*wxWHITE);
+        wxGetApp().UpdateDarkUI(p->m_nozzle_grid);
 
-        // 创建notebook
-        p->m_nozzle_notebook = new CustomNotebook(nozzle_container, wxID_ANY);
-        // Snapmaker Orca: a nozzle tab click moves the process tab's Standard / High Flow selector
-        // to that tool head's nozzle volume type (Tab::update_extruder_variants sets a new one).
-        p->m_nozzle_notebook->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent &evt) {
-            evt.Skip();
-            const int head = evt.GetSelection();
-            if (head < 0 || p->linking_nozzle_tab)
-                return;
-            const auto *volume_types = wxGetApp().preset_bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
-            if (volume_types == nullptr || size_t(head) >= volume_types->values.size())
-                return;
-            // With the speed selector the entry of the clicked tool head is selected, with the flow
-            // selector the column of the head's flow type.
-            if (Tab *tab = wxGetApp().get_tab(Preset::TYPE_PRINT); tab != nullptr)
-                tab->select_tool_head(size_t(head), NozzleVolumeType(volume_types->values[head]));
-        });
-
-        // 创建nozzle_sizer并添加notebook
         wxBoxSizer* nozzle_sizer = new wxBoxSizer(wxVERTICAL);
-        nozzle_sizer->Add(p->m_nozzle_notebook, 1, wxEXPAND | wxALL, FromDIP(0));
+        nozzle_sizer->Add(p->m_nozzle_grid, 1, wxEXPAND | wxALL, FromDIP(8));
         nozzle_container->SetSizer(nozzle_sizer);
 
-        // 添加到主布局
         vsizer_printer->Add(nozzle_container, 0, wxEXPAND | wxALL, FromDIP(4));
 
         // Initialize nozzle settings
+        update_nozzle_settings();        // Initialize nozzle settings
         update_nozzle_settings();
     }
 
@@ -6044,6 +6042,8 @@ void Sidebar::msw_rescale()
     p->m_printerinfo_syncbtn->msw_rescale();
     p->m_printer_setting->msw_rescale();
     p->m_filament_icon->msw_rescale();
+    if (p->m_nozzle_icon != nullptr)
+        p->m_nozzle_icon->msw_rescale();
     p->m_color_mix_icon->msw_rescale();
     p->m_bpButton_add_filament->msw_rescale();
     p->m_bpButton_del_filament->msw_rescale();
@@ -6099,13 +6099,12 @@ void Sidebar::msw_rescale()
     p->btn_export_gcode->SetMinSize(wxSize(-1, scaled_height));
     p->btn_reslice     ->SetMinSize(wxSize(-1, scaled_height));
 #endif
-    // The nozzle tabs: strip metrics, control heights and row gaps are FromDIP values. Re-laid in
-    // place: a rebuild would reach the Printer tab and move the focus out of a field being edited.
-    if (p->m_nozzle_notebook != nullptr) {
-        p->m_nozzle_notebook->Rescale();
+    // The nozzle grid: control heights and gaps are FromDIP values. Re-laid in place: a rebuild
+    // would reach the Printer tab and move the focus out of a field being edited.
+    if (p->m_nozzle_grid != nullptr) {
         for (const NozzlePage &page : p->m_nozzle_pages) {
             page.diameter->Rescale();
-            layout_nozzle_page(page);      // after Rescale(): TextInput::messureSize pins the old height
+            layout_nozzle_cell(page);      // after Rescale(): TextInput::messureSize pins the old height
         }
         p->fit_nozzle_block();
     }
@@ -6133,6 +6132,8 @@ void Sidebar::sys_color_changed()
     p->m_printerinfo_syncbtn->msw_rescale();
     p->m_printer_setting->msw_rescale();
     p->m_filament_icon->msw_rescale();
+    if (p->m_nozzle_icon != nullptr)
+        p->m_nozzle_icon->msw_rescale();
     p->m_color_mix_icon->msw_rescale();
     p->m_bpButton_add_filament->msw_rescale();
     p->m_bpButton_del_filament->msw_rescale();
@@ -6173,10 +6174,8 @@ void Sidebar::sys_color_changed()
 //    p->btn_eject_device->msw_rescale();
     //p->btn_export_gcode_removable->msw_rescale();
 
-    // The strip reads its colours when it paints; the walker of a theme switch does not invalidate it.
-    // This is the path of macOS and Linux, where the theme follows the system.
-    if (p->m_nozzle_notebook != nullptr)
-        p->m_nozzle_notebook->Refresh();
+    if (p->m_nozzle_grid != nullptr)
+        p->m_nozzle_grid->Refresh();
 
     p->scrolled->Layout();
 
@@ -11549,8 +11548,8 @@ static void fill_nozzle_combo(const NozzlePage &page, size_t head)
                                                  "a High Flow nozzle prints with the High Flow values of the filament and process presets.") :
                                               _L("Diameter of this nozzle. Its layer height limits and the filament presets it prints follow the diameter.");
     combo->SetToolTip(tip);
-    if (page.diameter_label != nullptr)
-        page.diameter_label->SetToolTip(tip);
+    if (page.badge != nullptr)
+        page.badge->SetToolTip(tip);
 }
 
 // Snapmaker Orca: sets one tool head's nozzle volume type like the Flow row and the sanitizer:
@@ -11821,74 +11820,63 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
 
 void Sidebar::update_nozzle_settings(bool switch_machine)
 {
-    if (!p->m_nozzle_notebook)
+    if (!p->m_nozzle_grid)
         return;
 
     const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-
-    // Get new nozzle count
     auto* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(printer_config.option("nozzle_diameter"));
     size_t new_nozzle_count = nozzle_diameter ? nozzle_diameter->values.size() : 1;
 
-    // Avoid flicker while the notebook is torn down and rebuilt (2.3.6).
-    wxWindowUpdateLocker noUpdates(p->m_nozzle_notebook);
+    // Avoid flicker while the grid is torn down and rebuilt (2.3.6).
+    wxWindowUpdateLocker noUpdates(p->m_nozzle_grid);
 
-    // Record focus before DeleteAllPages destroys the focused control (2.3.6).
-    bool focus_was_in_notebook = false;
+    // Record focus before the rebuild destroys the focused control (2.3.6).
+    bool focus_was_in_grid = false;
     if (wxWindow* focus = wxWindow::FindFocus())
-        focus_was_in_notebook = p->m_nozzle_notebook->IsDescendant(focus);
+        focus_was_in_grid = p->m_nozzle_grid->IsDescendant(focus);
 
-    // Clear existing pages and controls, keeping the selected tab across the rebuild.
-    const int prev_page = p->m_nozzle_notebook->GetSelection();
-    p->m_nozzle_notebook->DeleteAllPages();
+    p->m_nozzle_grid->SetSizer(nullptr);
+    p->m_nozzle_grid->DestroyChildren();
     p->m_nozzle_diameter_lists.clear();
     p->m_nozzle_pages.clear();
+    if (p->m_nozzle_selected >= new_nozzle_count)
+        p->m_nozzle_selected = 0;
 
-    // Recreate pages for new nozzle count
-    // Create tabs for each nozzle
+    // Snapmaker Orca Max: one cell per tool head, two columns, filled row by row (1 2 / 3 4).
+    auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(12));
+    grid->AddGrowableCol(0, 1);
+    grid->AddGrowableCol(1, 1);
     for (size_t i = 0; i < new_nozzle_count; i++) {
-        // layout_nozzle_page() puts the windows into sizers.
         NozzlePage page;
-        page.panel = new wxPanel(p->m_nozzle_notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
-        wxPanel* nozzle_panel = page.panel;
+        page.panel = new wxPanel(p->m_nozzle_grid, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
+        wxPanel *cell = page.panel;
         // Before any child: StaticBox::Create copies the parent's background for the corners of the
-        // ComboBox and TextInput. White maps to the notebook's dark background (#2D2D31).
-        nozzle_panel->SetBackgroundColour(*wxWHITE);
-        wxGetApp().UpdateDarkUI(nozzle_panel);
+        // ComboBox. White maps to the dark background (#2D2D31).
+        cell->SetBackgroundColour(*wxWHITE);
+        wxGetApp().UpdateDarkUI(cell);
 
-        auto make_text = [nozzle_panel](const wxString &text, const wxFont &font, const wxColour &colour) {
-            auto *label = new wxStaticText(nozzle_panel, wxID_ANY, text, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+        // Mapped colours (#000000 <-> #FFFFFE, #6B6B6B <-> #818183, #FFFFFF <-> #2D2D31): the walker of a
+        // live theme switch maps them in both directions.
+        auto make_text = [cell](const wxString &text, const wxFont &font, const wxColour &colour) {
+            auto *label = new wxStaticText(cell, wxID_ANY, text, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
             label->SetFont(font);
-            // Mapped colours (#000000 <-> #FFFFFE, #6B6B6B <-> #818183, #FFFFFF <-> #2D2D31): the walker of a
-            // live theme switch maps them in both directions. The pages are built after the start-up walk.
             label->SetBackgroundColour(*wxWHITE);
             label->SetForegroundColour(colour);
             wxGetApp().UpdateDarkUI(label);
             return label;
         };
-        // A hint under a row: the style of make_text, wrapped to the width of the page instead of
-        // cut, and the nozzle block laid out again for the lines it takes.
-        auto make_hint = [this, nozzle_panel]() {
-            auto *hint = new ogStaticText(nozzle_panel, wxEmptyString, wxST_NO_AUTORESIZE);
-            hint->SetFont(Label::Body_12);
-            hint->SetBackgroundColour(*wxWHITE);
-            hint->SetForegroundColour(wxColour("#6B6B6B"));
-            wxGetApp().UpdateDarkUI(hint);
-            hint->WrapToWidth([this]() { p->fit_nozzle_block(); });
-            hint->Hide();
-            return hint;
-        };
+        page.badge = make_text(wxString::Format("%d", int(i) + 1), Label::Head_14, *wxBLACK);
 
-        // Snapmaker Orca Max: one Nozzle row for the size and the flow type ("0.4mm High Flow"). Items,
-        // selection and state come from fill_nozzle_combo().
-        page.diameter_label = make_text(_L("Nozzle"), Label::Body_14, *wxBLACK);
-        ComboBox* diameter_combo = new ComboBox(nozzle_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, {-1, FromDIP(30)}, 0,
+        // One combo for the size and the flow type ("0.4mm High Flow"). Items, selection and state
+        // come from fill_nozzle_combo().
+        ComboBox* diameter_combo = new ComboBox(cell, wxID_ANY, wxEmptyString, wxDefaultPosition, {-1, FromDIP(30)}, 0,
                                                 nullptr, wxCB_READONLY);
         page.diameter = diameter_combo;
         diameter_combo->Bind(wxEVT_COMBOBOX, [this, diameter_combo, i](wxCommandEvent& event) {
             const int selection = event.GetInt();
             if (selection < 0 || selection >= int(diameter_combo->GetCount()))
                 return;
+            p->m_nozzle_selected = i;
             const wxString size = nozzle_choice_size(diameter_combo->GetString(unsigned(selection)));
             const int      type = int(intptr_t(diameter_combo->GetClientData(unsigned(selection))));
             // ORCA multi-nozzle-size: set ONLY this nozzle's diameter (see apply_nozzle_diameter). A size
@@ -11907,75 +11895,47 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
             // Do not event.Skip(): this is a plain ComboBox; skipping would let the sidebar treat
             // it as the bed-type combo (Plater::priv::on_combobox_select) and mishandle it.
         });
+
+        // What the head prints, like the temperatures under a filament. Text and tooltip come from
+        // update_nozzle_process_hints(); a click leads to the speed picker of the Process tab.
+        page.info = make_text(wxEmptyString, Label::Body_12, wxColour("#6B6B6B"));
+        page.info->SetCursor(wxCursor(wxCURSOR_HAND));
+        page.info->Bind(wxEVT_LEFT_DOWN, [i](wxMouseEvent &) { open_speed_source_picker(i); });
+
         fill_nozzle_combo(page, i);
+        layout_nozzle_cell(page);
+        grid->Add(page.panel, 1, wxEXPAND);
         p->m_nozzle_diameter_lists.push_back(diameter_combo);
-
-        // The process preset a tool head of another nozzle size prints with (PerHeadProcess), under
-        // the rows. Text and visibility come from
-        // update_nozzle_process_hints(). A click leads to the speed picker of the Process tab.
-        page.process_hint = make_hint();
-        page.process_hint->SetCursor(wxCursor(wxCURSOR_HAND));
-        page.process_hint->Bind(wxEVT_LEFT_DOWN, [i](wxMouseEvent &) { open_speed_source_picker(i); });
-
-        layout_nozzle_page(page);
         p->m_nozzle_pages.push_back(page);
-
-        // Add tab
-        wxString tab_name = "";
-        switch (new_nozzle_count)
-        {
-        case 1:
-        {
-            tab_name = _L("Nozzle");
-            break;
-        }
-        case 2:
-        {
-            if (i == 0)
-                tab_name = _L("Left Nozzle");
-            else
-                tab_name = _L("Right Nozzle");
-
-            break;
-        }
-        default:
-        {
-            tab_name = wxString(_L("Nozzle")) + wxString::Format(" %d", i + 1);
-        }
-            
-        }
-        p->m_nozzle_notebook->AddPage(nozzle_panel, tab_name);
     }
+    p->m_nozzle_grid->SetSizer(grid);
 
-    if (prev_page > 0 && prev_page < (int) p->m_nozzle_notebook->GetPageCount())
-        p->m_nozzle_notebook->SetSelection(size_t(prev_page));
-
-    // Fills the Nozzle combos and sizes the notebook (it lays the notebook out).
+    // Fills the Nozzle combos and the lines under them, and sizes the grid.
     update_nozzle_flow_values();
 
     if (switch_machine) {
         p->combo_printer->SetFocus();
-    } else if (focus_was_in_notebook) {
+    } else if (focus_was_in_grid) {
         // The focused control was destroyed by the rebuild.
         p->combo_printer->GetParent()->SetFocus();
     }
 }
 
-// ORCA multi-nozzle-size: refresh the values shown by the nozzle tabs in place, without
-// rebuilding them (no focus or tab-selection changes). Called whenever the printer's nozzle
+// ORCA multi-nozzle-size: refresh the values shown by the nozzle grid in place, without
+// rebuilding it (no focus changes). Called whenever the printer's nozzle
 // sizes or layer height limits change. A change of the extruder count escalates to a deferred
 // full rebuild of the tabs.
 void Sidebar::update_nozzle_values()
 {
-    if (p->m_nozzle_notebook == nullptr)
+    if (p->m_nozzle_grid == nullptr)
         return;
 
     const auto *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(
         wxGetApp().preset_bundle->printers.get_edited_preset().config.option("nozzle_diameter"));
     const size_t nozzle_count = nozzle_diameter != nullptr ? nozzle_diameter->values.size() : 1;
-    if (nozzle_count != p->m_nozzle_notebook->GetPageCount()) {
+    if (nozzle_count != p->m_nozzle_pages.size()) {
         // Defer the rebuild: this can be reached from an event handler of a control that lives
-        // on one of the pages about to be destroyed.
+        // in one of the cells about to be destroyed.
         if (!p->m_nozzle_rebuild_scheduled) {
             p->m_nozzle_rebuild_scheduled = true;
             wxGetApp().CallAfter([this]() {
@@ -11991,9 +11951,7 @@ void Sidebar::update_nozzle_values()
     update_nozzle_flow_values();
 }
 
-// Snapmaker Orca: the nozzle tab hint names the process preset an extruder of another nozzle size
-// prints with (PerHeadProcess.hpp) and its headline values; hidden when it uses the selected preset.
-// Snapmaker Orca: the nozzle tab hint and the notices lead to the speed picker of the Process tab,
+// Snapmaker Orca: the line under a nozzle and the notices lead to the speed picker of the Process tab,
 // on the global Speed page with tool head `head` selected and the picker focused.
 static void open_speed_source_picker(size_t head)
 {
@@ -12005,7 +11963,7 @@ static void open_speed_source_picker(size_t head)
 
 void Sidebar::update_nozzle_process_hints()
 {
-    if (p->m_nozzle_notebook == nullptr)
+    if (p->m_nozzle_grid == nullptr)
         return;
     PresetBundle *bundle = wxGetApp().preset_bundle;
     std::vector<PerHeadProcess::Source> sources;
@@ -12072,11 +12030,68 @@ void Sidebar::update_nozzle_process_hints()
         return HighFlowNotices::width_value_label(option->values[column >= 0 && size_t(column) < option->values.size() ? size_t(column) : 0], nozzle);
     };
 
+    // Snapmaker Orca Max: the layer height each head prints (the multi-nozzle strategy's, else the
+    // plate's) and the max volumetric speed of the filaments it prints, in the column of its flow.
+    std::vector<double> head_heights;
+    if (bundle != nullptr && process != nullptr && printer != nullptr) {
+        DynamicPrintConfig inputs;
+        for (const char *key : { "nozzle_diameter", "min_layer_height", "max_layer_height" })
+            if (const ConfigOption *option = printer->option(key); option != nullptr)
+                inputs.set_key_value(key, option->clone());
+        for (const char *key : { "layer_height", "multi_nozzle_layer_heights" })
+            if (const ConfigOption *option = process->option(key); option != nullptr)
+                inputs.set_key_value(key, option->clone());
+        const ExtruderLayerHeightPlan plan = effective_extruder_layer_heights(inputs);
+        for (double height : plan.heights)
+            head_heights.push_back(height > EPSILON ? height : plan.grid);
+    }
+    auto head_max_flow = [&](size_t head) {
+        double lowest = 0.;
+        if (bundle == nullptr)
+            return lowest;
+        // A filament prints on the tool head of its number, a filament beyond the heads on the first
+        // (Print::extruder_index_of, Print::width_slot).
+        const size_t heads = p->m_nozzle_pages.size();
+        for (size_t filament = 0; filament < bundle->filament_presets.size(); ++filament) {
+            if ((filament < heads ? filament : 0) != head)
+                continue;
+            const Preset *preset = bundle->filaments.find_preset(bundle->filament_presets[filament], false);
+            if (preset == nullptr)
+                continue;
+            const Preset             &edited = bundle->filaments.get_edited_preset();
+            const DynamicPrintConfig &config = preset->name == edited.name ? edited.config : preset->config;
+            const auto               *speeds = dynamic_cast<const ConfigOptionVectorBase *>(config.option("filament_max_volumetric_speed"));
+            if (speeds == nullptr || speeds->empty())
+                continue;
+            int column = 0;
+            if (const auto *variants = config.option<ConfigOptionStrings>("filament_extruder_variant"); variants != nullptr)
+                column = std::max(0, HighFlowNotices::variant_column_for_type(variants->values, int(flow_of(head))));
+            const std::vector<std::string> values = speeds->vserialize();
+            const double value = std::atof(values[size_t(column) < values.size() ? size_t(column) : 0].c_str());
+            if (value > 0. && (lowest <= 0. || value < lowest))
+                lowest = value;
+        }
+        return lowest;
+    };
+
     bool changed = false;
     for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i) {
-        ogStaticText *hint = p->m_nozzle_pages[i].process_hint;
-        if (hint == nullptr)
+        wxStaticText *info = p->m_nozzle_pages[i].info;
+        if (info == nullptr)
             continue;
+        // The line: "0.20 mm · 22 mm³/s" (wide literals: the AppImage runs in the C locale).
+        wxString line;
+        if (i < head_heights.size() && head_heights[i] > EPSILON)
+            line = from_u8(float_to_string_decimal_point(head_heights[i], 2)) + L" mm";
+        if (const double flow = head_max_flow(i); flow > 0.) {
+            const double rounded = std::round(flow);
+            line += (line.IsEmpty() ? wxString() : wxString(L" \u00b7 ")) +
+                    from_u8(std::abs(flow - rounded) < 0.05 ? std::to_string(long(rounded)) : float_to_string_decimal_point(flow, 1)) + L" mm\u00b3/s";
+        }
+        if (info->GetLabel() != line) {
+            info->SetLabel(line);
+            changed = true;
+        }
         const PerHeadProcess::Source *source = i < sources.size() && sources[i].derived && sources[i].preset != nullptr ? &sources[i] : nullptr;
         const std::string              chosen = i < sources.size() ? sources[i].chosen : std::string();
         const bool                     same_as_selected = i < sources.size() && sources[i].chosen_state == PerHeadProcess::ChosenState::SameAsSelected;
@@ -12085,18 +12100,16 @@ void Sidebar::update_nozzle_process_hints()
         // Shown for a tool head that prints with another preset's speeds, has values set for it,
         // carries a chosen preset (applied or not) or prints the Standard speeds of its High Flow
         // nozzle by choice.
-        if (source == nullptr && set_keys.empty() && chosen.empty() && !flow_chosen) {
-            if (hint->IsShown()) {
-                hint->Hide();
-                changed = true;
-            }
-            continue;
-        }
         const std::string outer_wall = effective(i, source, "outer_wall_speed");
         const std::string sparse     = effective(i, source, "sparse_infill_speed");
         const std::string accel      = effective(i, source, "default_acceleration");
         wxString label, tip;
-        if (source != nullptr || same_as_selected || flow_chosen) {
+        if (source == nullptr && set_keys.empty() && chosen.empty() && !flow_chosen && bundle != nullptr) {
+            // The head prints with the selected preset.
+            const Preset &selected = bundle->prints.get_selected_preset();
+            label = HighFlowNotices::speeds_hint_label(from_u8(selected.alias.empty() ? selected.name : selected.alias), wxString(),
+                                                       HighFlowNotices::SpeedsNote::Plain, outer_wall, sparse, accel);
+        } else if (source != nullptr || same_as_selected || flow_chosen) {
             const Preset &preset    = source != nullptr ? *source->preset : bundle->prints.get_selected_preset();
             const bool    is_chosen = i < sources.size() && sources[i].step == PerHeadProcess::Step::Chosen;
             const bool    high_flow = source != nullptr && printer != nullptr && PerHeadProcess::reads_high_flow(*source, flow_of(i), *printer);
@@ -12168,15 +12181,9 @@ void Sidebar::update_nozzle_process_hints()
             tip += (tip.IsEmpty() ? "" : " ") + format_wxstr(_L("Values set for this extruder: %1%."), from_u8(names));
         }
         tip += (tip.IsEmpty() ? "" : " ") + _L("Click to choose the preset of this extruder.");
-        if (hint->GetUnwrappedText() != label) {
-            hint->SetText(label, false);
-            changed = true;
-        }
-        hint->SetToolTip(tip);
-        if (!hint->IsShown()) {
-            hint->Show();
-            changed = true;
-        }
+        // TRN Tooltip of the line under a nozzle in the sidebar: what the line shows
+        const wxString what = _L("Layer height this extruder prints and the max volumetric speed of its filament for this nozzle.");
+        info->SetToolTip(what + "\n" + label + "\n" + tip);
     }
     if (changed)
         p->fit_nozzle_block();
@@ -12188,17 +12195,16 @@ void Sidebar::update_nozzle_process_hints()
 
 void Sidebar::update_nozzle_flow_values()
 {
-    if (p->m_nozzle_notebook == nullptr)
+    if (p->m_nozzle_grid == nullptr)
         return;
 
-    // The process hint of every page follows the same events as the Flow row.
+    // The line under every nozzle follows the same events as the combos.
     update_nozzle_process_hints();
 
     // The Nozzle combo shows the size with the flow type.
     for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i)
         fill_nozzle_combo(p->m_nozzle_pages[i], i);
 
-    // The rows a page shows decide its height.
     p->fit_nozzle_block();
 
     // The extruder pages of the Printer tab show the same choice.
@@ -12208,7 +12214,7 @@ void Sidebar::update_nozzle_flow_values()
 
 void Sidebar::select_nozzle_tab(size_t head)
 {
-    if (p->m_nozzle_notebook == nullptr)
+    if (p->m_nozzle_grid == nullptr)
         return;
     // The printer section folds to a height of 0 (click on its title bar).
     if (p->m_panel_printer_content != nullptr && (p->m_panel_printer_content->GetMaxHeight() == 0 || !p->m_panel_printer_content->IsShown())) {
@@ -12216,29 +12222,23 @@ void Sidebar::select_nozzle_tab(size_t head)
         p->m_panel_printer_content->SetMaxSize({-1, -1});
         m_scrolled_sizer->Layout();
     }
-    if (head < p->m_nozzle_notebook->GetPageCount())
-        p->m_nozzle_notebook->SetSelection(head);
-    if (head < p->m_nozzle_pages.size() && p->m_nozzle_pages[head].diameter != nullptr && p->m_nozzle_pages[head].diameter->IsShownOnScreen())
-        p->m_nozzle_pages[head].diameter->SetFocus();
+    if (head < p->m_nozzle_pages.size()) {
+        p->m_nozzle_selected = head;
+        if (p->m_nozzle_pages[head].diameter != nullptr && p->m_nozzle_pages[head].diameter->IsShownOnScreen())
+            p->m_nozzle_pages[head].diameter->SetFocus();
+    }
 }
 
 void Sidebar::show_nozzle_tab(size_t head)
 {
-    if (p->m_nozzle_notebook == nullptr || head >= p->m_nozzle_notebook->GetPageCount() || int(head) == p->m_nozzle_notebook->GetSelection())
-        return;
-    // CustomNotebook::SetSelection tells no page change (the click handler does), so the process
-    // tab is not called back; the flag guards the handler all the same.
-    p->linking_nozzle_tab = true;
-    p->m_nozzle_notebook->SetSelection(head);
-    p->linking_nozzle_tab = false;
+    // The grid shows every tool head: only the head the Process tab's speed selector picked is noted.
+    if (head < p->m_nozzle_pages.size())
+        p->m_nozzle_selected = head;
 }
 
 size_t Sidebar::selected_nozzle_tab() const
 {
-    if (p->m_nozzle_notebook == nullptr)
-        return 0;
-    const int selection = p->m_nozzle_notebook->GetSelection();
-    return selection < 0 ? 0 : size_t(selection);
+    return p->m_nozzle_selected < p->m_nozzle_pages.size() ? p->m_nozzle_selected : 0;
 }
 
 ObjectList* Sidebar::obj_list()
@@ -12557,10 +12557,8 @@ void Sidebar::on_change_color_mode(bool is_dark) {
         wxGetApp().obj_list()->update_info_items(i,nullptr,false,true);
     }
 
-    // The strip reads its colours when it paints; the walker of a theme switch does not invalidate it.
-    // This is the path of the dark mode check box of Preferences (Windows).
-    if (p->m_nozzle_notebook != nullptr)
-        p->m_nozzle_notebook->Refresh();
+    if (p->m_nozzle_grid != nullptr)
+        p->m_nozzle_grid->Refresh();
 }
 
 BedType Sidebar::get_cur_select_bed_type() {
