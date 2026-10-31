@@ -68,6 +68,20 @@ HIGH_FLOW_SPEEDS = {"outer_wall_speed": "500", "inner_wall_speed": "600", "spars
 HIGH_FLOW_PRESETS = {"Ultra fine": False, "Fine": True, "Coarse": True, "Super coarse": True}
 
 
+# High Quality: Snapmaker's changes of 0.20mm High Quality against 0.20mm Standard (0.4 mm). The speeds
+# and accelerations are ceilings (a value already lower stays); the rest is set as it is.
+HQ_CEILINGS = {"outer_wall_speed": 60, "inner_wall_speed": 150, "sparse_infill_speed": 200,
+               "internal_solid_infill_speed": 200, "top_surface_speed": 150, "default_acceleration": 4000,
+               "outer_wall_acceleration": 2000}
+HQ_VALUES = {"inner_wall_acceleration": "4000", "overhang_1_4_speed": "60", "overhang_2_4_speed": "30",
+             "overhang_3_4_speed": "10", "overhang_4_4_speed": "10", "bridge_density": "80%", "bridge_flow": "0.8"}
+# Variant keys of the set above (one value per column); bridge_density and bridge_flow are plain.
+HQ_PLAIN = {"bridge_density", "bridge_flow"}
+# Strategy -> the Snapmaker High Quality preset a 0.2 mm nozzle takes under it.
+HQ_STRATEGIES = {"Fine": "0.08mm High Quality @Snapmaker U1 (0.2 nozzle)",
+                 "Normal": "0.10mm High Quality @Snapmaker U1 (0.2 nozzle)"}
+
+
 def load(name):
     with open(PROCESS_DIR / f"{name}.json", encoding="utf-8-sig") as f:
         return json.load(f)
@@ -236,6 +250,62 @@ def height_preset(size, height):
     return name
 
 
+def keep_id(name, preset):
+    """Keeps the id orca_profile_tool.py generate-id gave the preset."""
+    if (PROCESS_DIR / f"{name}.json").exists():
+        setting_id = load(name).get("setting_id")
+        if setting_id:
+            preset["setting_id"] = setting_id
+
+
+def high_quality(parent, columns):
+    """The High Quality values over `parent` (a resolved preset), `columns` values per variant key."""
+    out = {}
+    for key, ceiling in HQ_CEILINGS.items():
+        values = parent.get(key)
+        values = values if isinstance(values, list) else [values]
+        capped = [f"{min(float(v), ceiling):g}" if v not in (None, "nil") else f"{ceiling:g}" for v in values]
+        out[key] = (capped + [capped[-1]] * columns)[:columns]
+    for key, value in HQ_VALUES.items():
+        out[key] = value if key in HQ_PLAIN else [value] * columns
+    return out
+
+
+def high_quality_presets(strategy):
+    """Multi-nozzle <strategy> High Quality @Snapmaker U1 and its 0.2 / 0.6 / 0.8 mm presets."""
+    name = f"Multi-nozzle {strategy} High Quality @Snapmaker U1"
+    standard = f"Multi-nozzle {strategy} @Snapmaker U1"
+    parent = resolved(standard)
+    columns = len(parent["print_extruder_variant"]) if isinstance(parent.get("print_extruder_variant"), list) else 1
+    plate = load(standard)
+    preset = {"type": "process", "name": name, "inherits": standard, "from": "system", "instantiation": "true"}
+    keep_id(name, preset)
+    heights = STRATEGIES[strategy]
+    preset["description"] = (f"{strategy} with High Quality speeds: slower walls and accelerations "
+                             f"(0.2: {heights['0.2']}, 0.4: {float(heights['0.2']) * 2:.2f}, 0.6: {heights['0.6']}, "
+                             f"0.8: {heights['0.8']} mm).")
+    preset.update(high_quality(parent, columns))
+    preset["compatible_printers"] = plate["compatible_printers"]
+    write(name, preset)
+    written = [name]
+    for size in ("0.2", "0.6", "0.8"):
+        size_name = f"Multi-nozzle {strategy} High Quality @Snapmaker U1 ({size} nozzle)"
+        sibling = {"type": "process", "name": size_name, "from": "system", "instantiation": "true"}
+        keep_id(size_name, sibling)
+        if size == "0.2":
+            sibling["inherits"] = HQ_STRATEGIES[strategy]
+            sibling["description"] = f"0.2 mm nozzle, Multi-nozzle {strategy} High Quality: {short(HQ_STRATEGIES[strategy])}."
+        else:
+            standard_size = f"Multi-nozzle {strategy} @Snapmaker U1 ({size} nozzle)"
+            sibling["inherits"] = standard_size
+            sibling["description"] = f"{size} mm nozzle, Multi-nozzle {strategy} with High Quality speeds."
+            sibling.update(high_quality(resolved(standard_size), 1))
+        sibling["compatible_printers"] = [f"Snapmaker U1 ({size} nozzle)"]
+        write(size_name, sibling)
+        written.append(size_name)
+    return written
+
+
 def main():
     for strategy, heights in STRATEGIES.items():
         for size, height in heights.items():
@@ -243,6 +313,8 @@ def main():
     for strategy, faster in HIGH_FLOW_PRESETS.items():
         add_high_flow_column(strategy, faster)
     written = []
+    for strategy in HQ_STRATEGIES:
+        written += high_quality_presets(strategy)
     for size in SIZES:
         heights = step_heights(size)
         for height in heights:

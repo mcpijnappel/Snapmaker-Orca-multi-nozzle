@@ -1,0 +1,50 @@
+{
+	"type": "process",
+	"name": "Multi-nozzle Fine High Quality @Snapmaker U1 (0.8 nozzle)",
+	"inherits": "Multi-nozzle Fine @Snapmaker U1 (0.8 nozzle)",
+	"from": "system",
+	"setting_id": "9yXz6tSu1LHX9ml3",
+	"instantiation": "true",
+	"description": "0.8 mm nozzle, Multi-nozzle Fine with High Quality speeds.",
+	"outer_wall_speed": [
+		"60"
+	],
+	"inner_wall_speed": [
+		"150"
+	],
+	"sparse_infill_speed": [
+		"100"
+	],
+	"internal_solid_infill_speed": [
+		"150"
+	],
+	"top_surface_speed": [
+		"150"
+	],
+	"default_acceleration": [
+		"4000"
+	],
+	"outer_wall_acceleration": [
+		"2000"
+	],
+	"inner_wall_acceleration": [
+		"4000"
+	],
+	"overhang_1_4_speed": [
+		"60"
+	],
+	"overhang_2_4_speed": [
+		"30"
+	],
+	"overhang_3_4_speed": [
+		"10"
+	],
+	"overhang_4_4_speed": [
+		"10"
+	],
+	"bridge_density": "80%",
+	"bridge_flow": "0.8",
+	"compatible_printers": [
+		"Snapmaker U1 (0.8 nozzle)"
+	]
+}

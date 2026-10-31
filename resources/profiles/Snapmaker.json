@@ -1,6 +1,6 @@
 {
   "name": "Snapmaker",
-  "version": "02.03.03.16",
+  "version": "02.03.03.17",
   "force_update": "0",
   "description": "Snapmaker configurations",
   "machine_model_list": [
@@ -693,6 +693,38 @@
     {
       "name": "0.50mm Multi-nozzle @Snapmaker U1 (0.8 nozzle)",
       "sub_path": "process/0.50mm Multi-nozzle @Snapmaker U1 (0.8 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Fine High Quality @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Fine High Quality @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Fine High Quality @Snapmaker U1 (0.2 nozzle)",
+      "sub_path": "process/Multi-nozzle Fine High Quality @Snapmaker U1 (0.2 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Fine High Quality @Snapmaker U1 (0.6 nozzle)",
+      "sub_path": "process/Multi-nozzle Fine High Quality @Snapmaker U1 (0.6 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Fine High Quality @Snapmaker U1 (0.8 nozzle)",
+      "sub_path": "process/Multi-nozzle Fine High Quality @Snapmaker U1 (0.8 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Normal High Quality @Snapmaker U1",
+      "sub_path": "process/Multi-nozzle Normal High Quality @Snapmaker U1.json"
+    },
+    {
+      "name": "Multi-nozzle Normal High Quality @Snapmaker U1 (0.2 nozzle)",
+      "sub_path": "process/Multi-nozzle Normal High Quality @Snapmaker U1 (0.2 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Normal High Quality @Snapmaker U1 (0.6 nozzle)",
+      "sub_path": "process/Multi-nozzle Normal High Quality @Snapmaker U1 (0.6 nozzle).json"
+    },
+    {
+      "name": "Multi-nozzle Normal High Quality @Snapmaker U1 (0.8 nozzle)",
+      "sub_path": "process/Multi-nozzle Normal High Quality @Snapmaker U1 (0.8 nozzle).json"
     }
   ],
   "filament_list": [

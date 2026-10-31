@@ -89,7 +89,8 @@ TEST_CASE("Mixed nozzle sizes list only the multi-nozzle process presets and the
             else
                 CHECK(preset->name == U1_STANDARD);
         }
-        CHECK(multi_nozzle == 5);
+        // Ultra fine, Fine, Normal, Coarse, Super coarse, Fine High Quality, Normal High Quality.
+        CHECK(multi_nozzle == 7);
         // The selected single-size preset is kept, so a project that uses it keeps it.
         CHECK(bundle->prints.get_selected_preset().name == U1_STANDARD);
         const Preset *multi = bundle->prints.find_preset(U1_MULTI, false, true);
@@ -102,7 +103,8 @@ TEST_CASE("Every multi-nozzle preset ships a hidden preset per other nozzle size
 {
     // The strategy's share of the nozzle diameter (Slicing.hpp multi_nozzle_strategy_height).
     const std::vector<std::pair<std::string, double>> strategies = {
-        {"Ultra fine", 0.25}, {"Fine", 0.4}, {"Normal", 0.5}, {"Coarse", 0.6}, {"Super coarse", 0.7}};
+        {"Ultra fine", 0.25}, {"Fine", 0.4}, {"Normal", 0.5}, {"Coarse", 0.6}, {"Super coarse", 0.7},
+        {"Fine High Quality", 0.4}, {"Normal High Quality", 0.5}};
     auto bundle = load_snapmaker_bundle();
     for (const auto &[strategy, share] : strategies)
         for (const char *size : {"0.2", "0.6", "0.8"}) {
@@ -127,7 +129,7 @@ TEST_CASE("Every multi-nozzle preset ships a hidden preset per other nozzle size
 TEST_CASE("Every 0.4 mm multi-nozzle preset carries a High Flow column", "[Profiles][MultiNozzle][HighFlow]")
 {
     auto bundle = load_snapmaker_bundle();
-    for (const char *strategy : {"Ultra fine", "Fine", "Normal", "Coarse", "Super coarse"}) {
+    for (const char *strategy : {"Ultra fine", "Fine", "Normal", "Coarse", "Super coarse", "Fine High Quality", "Normal High Quality"}) {
         const std::string name = std::string("Multi-nozzle ") + strategy + " @Snapmaker U1";
         INFO(name);
         const Preset *preset = bundle->prints.find_preset(name, false);
@@ -165,5 +167,31 @@ TEST_CASE("Every nozzle size has a hidden height preset one grid step from each 
             CHECK(preset->is_system);
             CHECK_FALSE(preset->is_visible);
             CHECK_THAT(preset->config.opt_float("layer_height"), Catch::Matchers::WithinAbs(std::stod(height), 1e-6));
+        }
+}
+
+TEST_CASE("The High Quality strategy presets slow the walls and accelerations of every nozzle size", "[Profiles][MultiNozzle]")
+{
+    auto bundle = load_snapmaker_bundle();
+    auto first = [](const Preset &preset, const char *key) {
+        const auto *option = dynamic_cast<const ConfigOptionVectorBase *>(preset.config.option(key));
+        REQUIRE(option != nullptr);
+        return std::stod(option->vserialize().front());
+    };
+    for (const char *strategy : {"Fine", "Normal"})
+        for (const char *suffix : {"", " (0.2 nozzle)", " (0.6 nozzle)", " (0.8 nozzle)"}) {
+            const std::string standard = std::string("Multi-nozzle ") + strategy + " @Snapmaker U1" + suffix;
+            const std::string quality  = std::string("Multi-nozzle ") + strategy + " High Quality @Snapmaker U1" + suffix;
+            INFO(quality);
+            const Preset *s = bundle->prints.find_preset(standard, false);
+            const Preset *q = bundle->prints.find_preset(quality, false);
+            REQUIRE(s != nullptr);
+            REQUIRE(q != nullptr);
+            CHECK(first(*q, "outer_wall_speed") <= 60.);
+            CHECK(first(*q, "default_acceleration") <= 4000.);
+            CHECK(first(*q, "outer_wall_acceleration") <= 2000.);
+            CHECK(first(*q, "inner_wall_speed") <= first(*s, "inner_wall_speed"));
+            CHECK(first(*q, "sparse_infill_speed") <= first(*s, "sparse_infill_speed"));
+            CHECK_THAT(q->config.opt_float("layer_height"), Catch::Matchers::WithinAbs(s->config.opt_float("layer_height"), 1e-6));
         }
 }
