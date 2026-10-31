@@ -196,6 +196,7 @@ public:
     // EViewType::FanSpeed
     // EViewType::Temperature
     // EViewType::BedTemperature
+    // EViewType::ChamberTemperature
     // ORCA: Add Pressure Advance visualization support
     // EViewType::PressureAdvance
     // ORCA: Add Acceleration visualization support

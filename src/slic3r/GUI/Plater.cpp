@@ -11267,6 +11267,8 @@ void Sidebar::update_filament_temperatures()
                     if (! bed.empty())
                         text += (text.empty() ? wxString() : wxString(L" \u00b7 ")) + wxString::Format(_L("bed %s"), bed);
                 }
+                if (const int chamber = int_at(config, "chamber_temperature"); chamber > 0)
+                    text += (text.empty() ? wxString() : wxString(L" \u00b7 ")) + wxString::Format(_L("chamber %d \u00b0C"), chamber);
             }
         if (combo->temp_label->GetLabel() != text) {
             combo->temp_label->SetLabel(text);

@@ -638,3 +638,24 @@ TEST_CASE("Moves carry the current bed temperature target", "[GCodeProcessor][Be
     const std::map<unsigned int, std::set<float>> expected = { { 2, { 60.f } }, { 4, { 80.f } }, { 6, { 55.f } } };
     CHECK(temps_by_line == expected);
 }
+
+// Snapmaker Orca Max: every move carries the chamber temperature target set before it (M141, M191),
+// for the preview's Chamber temperature colour scheme.
+TEST_CASE("Moves carry the current chamber temperature target", "[GCodeProcessor][ChamberTemperature]")
+{
+    FullPrintConfig config = make_config(0., 0., 0.);
+    GCodeProcessor  proc;
+    run_processor(proc, config,
+                  "M141 S40\n"
+                  "G1 X10 Y10 E1 F1200\n"
+                  "M191 S55\n"
+                  "G1 X20 Y10 E2\n"
+                  "M141 S0\n"
+                  "G1 X30 Y10 E3\n");
+    std::map<unsigned int, std::set<float>> temps_by_line;
+    for (const auto &move : proc.get_result().moves)
+        if (move.type == EMoveType::Extrude)
+            temps_by_line[move.gcode_id].insert(move.chamber_temperature);
+    const std::map<unsigned int, std::set<float>> expected = { { 2, { 40.f } }, { 4, { 55.f } }, { 6, { 0.f } } };
+    CHECK(temps_by_line == expected);
+}

@@ -245,6 +245,8 @@ class Print;
             float print_z{0.0f};
             // Snapmaker Orca Max: the bed temperature last set by M140/M190 (Celsius degrees).
             float bed_temperature{ 0.0f };
+            // Snapmaker Orca Max: the chamber temperature last set by M141/M191 (Celsius degrees).
+            float chamber_temperature{ 0.0f };
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
             float actual_volumetric_rate() const { return actual_feedrate * mm3_per_mm; }
@@ -1169,6 +1171,8 @@ class Print;
         int m_highest_bed_temp;
         // Snapmaker Orca Max: the current bed temperature target (M140/M190 S), stored on every move.
         float m_bed_temperature{ 0.0f };
+        // Snapmaker Orca Max: the current chamber temperature target (M141/M191 S), stored on every move.
+        float m_chamber_temperature{ 0.0f };
         float m_extruded_last_z;
         float m_first_layer_height; // mm
         float m_zero_layer_height; // mm
@@ -1401,6 +1405,7 @@ class Print;
 
         //BBS: Set bed temperature
         void process_M140(const GCodeReader::GCodeLine& line);
+        void process_M141(const GCodeReader::GCodeLine& line);
 
         //BBS: wait bed temperature
         void process_M190(const GCodeReader::GCodeLine& line);

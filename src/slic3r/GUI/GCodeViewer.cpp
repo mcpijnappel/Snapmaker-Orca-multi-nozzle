@@ -92,6 +92,8 @@ static std::string get_view_type_string(libvgcode::EViewType view_type)
         return _u8L("Temperature");
     else if (view_type == libvgcode::EViewType::BedTemperature)
         return _u8L("Bed temperature");
+    else if (view_type == libvgcode::EViewType::ChamberTemperature)
+        return _u8L("Chamber temperature");
     else if (view_type == libvgcode::EViewType::VolumetricFlowRate)
         return _u8L("Flow");
     else if (view_type == libvgcode::EViewType::ActualVolumetricFlowRate)
@@ -131,6 +133,7 @@ static const std::vector<std::pair<std::string, libvgcode::EViewType>>& view_typ
         { "fan_speed",                    libvgcode::EViewType::FanSpeed },
         { "temperature",                  libvgcode::EViewType::Temperature },
         { "bed_temperature",              libvgcode::EViewType::BedTemperature },
+        { "chamber_temperature",          libvgcode::EViewType::ChamberTemperature },
         { "pressure_advance",             libvgcode::EViewType::PressureAdvance },
     };
     return map;
@@ -426,6 +429,9 @@ void GCodeViewer::SequentialView::Marker::render_position_window(const libvgcode
                 break;
             case libvgcode::EViewType::BedTemperature:
                 sprintf(detail_buf, "%s%.0f", _u8L("Bed temperature: ").c_str(), vertex.bed_temperature);
+                break;
+            case libvgcode::EViewType::ChamberTemperature:
+                sprintf(detail_buf, "%s%.0f", _u8L("Chamber temperature: ").c_str(), vertex.chamber_temperature);
                 break;
             case libvgcode::EViewType::LayerTimeLinear:
             case libvgcode::EViewType::LayerTimeLogarithmic:
@@ -1237,6 +1243,7 @@ void GCodeViewer::update_by_mode(ConfigOptionMode mode)
     view_type_items.push_back(libvgcode::EViewType::FanSpeed);
     view_type_items.push_back(libvgcode::EViewType::Temperature);
     view_type_items.push_back(libvgcode::EViewType::BedTemperature);
+    view_type_items.push_back(libvgcode::EViewType::ChamberTemperature);
 // ORCA: Add Pressure Advance visualization support
     view_type_items.push_back(libvgcode::EViewType::PressureAdvance);
     //if (mode == ConfigOptionMode::comDevelop) {
@@ -4013,6 +4020,7 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     case libvgcode::EViewType::FanSpeed:       { imgui.title(_u8L("Fan speed (%)")); break; }
     case libvgcode::EViewType::Temperature:    { imgui.title(_u8L("Temperature (℃)")); break; }
     case libvgcode::EViewType::BedTemperature: { imgui.title(_u8L("Bed temperature (℃)")); break; }
+    case libvgcode::EViewType::ChamberTemperature: { imgui.title(_u8L("Chamber temperature (℃)")); break; }
 // ORCA: Add Pressure Advance visualization support
     case libvgcode::EViewType::PressureAdvance:{ imgui.title(_u8L("Pressure Advance")); break; }
     case libvgcode::EViewType::VolumetricFlowRate:
@@ -4292,6 +4300,7 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
         render_bed_temperature_sources(range);
         break;
     }
+    case libvgcode::EViewType::ChamberTemperature:       { append_range(m_viewer.get_color_range(libvgcode::EViewType::ChamberTemperature), 0); break; }
 // ORCA: Add Pressure Advance visualization support
     case libvgcode::EViewType::PressureAdvance:          { append_range(m_viewer.get_color_range(libvgcode::EViewType::PressureAdvance), 3); break; }
     case libvgcode::EViewType::LayerTimeLinear:          { append_range(m_viewer.get_color_range(libvgcode::EViewType::LayerTimeLinear), true); break; }

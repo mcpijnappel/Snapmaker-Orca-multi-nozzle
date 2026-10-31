@@ -2753,6 +2753,7 @@ void GCodeProcessor::register_commands()
         {"M132", [this](const GCodeReader::GCodeLine& line) { process_M132(line); }}, // Recall stored home offsets
         {"M135", [this](const GCodeReader::GCodeLine& line) { process_M135(line); }}, // Set tool (MakerWare)
 
+        {"M141", [this](const GCodeReader::GCodeLine& line) { process_M141(line); }}, // Set chamber temperature
         {"M140", [this](const GCodeReader::GCodeLine& line) { process_M140(line); }}, // Set bed temperature
         {"M190", [this](const GCodeReader::GCodeLine& line) { process_M190(line); }}, // Wait bed temperature
         {"M191", [this](const GCodeReader::GCodeLine& line) { process_M191(line); }}, // Wait chamber temperature
@@ -3615,6 +3616,7 @@ void GCodeProcessor::reset()
 
     m_highest_bed_temp = 0;
     m_bed_temperature  = 0.0f;
+    m_chamber_temperature = 0.0f;
 
     m_extruded_last_z = 0.0f;
     m_zero_layer_height = 0.0f;
@@ -6308,9 +6310,18 @@ void GCodeProcessor::process_M190(const GCodeReader::GCodeLine& line)
     }
 }
 
+void GCodeProcessor::process_M141(const GCodeReader::GCodeLine& line)
+{
+    float new_temp;
+    if (line.has_value('S', new_temp))
+        m_chamber_temperature = new_temp;
+}
+
 void GCodeProcessor::process_M191(const GCodeReader::GCodeLine& line)
 {
     float chamber_temp = 0;
+    if (line.has_value('S', chamber_temp))
+        m_chamber_temperature = chamber_temp;
     const float wait_chamber_temp_time = 720.0;
     // BBS: when chamber_temp>40,caculate time required for heating
     if (line.has_value('S', chamber_temp) && chamber_temp > 40)
@@ -7134,7 +7145,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type, EMovePathType path_type, 
         internal_only,
         m_object_label_id,
         m_print_z,
-        m_bed_temperature
+        m_bed_temperature,
+        m_chamber_temperature
     });
 
     if (type == EMoveType::Seam) {

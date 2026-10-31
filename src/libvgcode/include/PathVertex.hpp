@@ -105,6 +105,10 @@ struct PathVertex
     // Snapmaker Orca Max: bed temperature target (Celsius degrees)
     //
     float bed_temperature{ 0.0f };
+    //
+    // Snapmaker Orca Max: chamber temperature target (Celsius degrees)
+    //
+    float chamber_temperature{ 0.0f };
 
     //
     // Return true if the segment is an extrusion move

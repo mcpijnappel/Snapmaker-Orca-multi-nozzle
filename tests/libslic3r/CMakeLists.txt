@@ -50,6 +50,7 @@ add_executable(${_TEST_NAME}_tests
     test_snapmaker_flow_compat.cpp # Snapmaker Orca: older project layouts of the per flow type filament keys
     test_sswcp_protocol.cpp # Snapmaker Orca: device protocol conversion (upstream #807)
     test_snapmaker_hf_profiles.cpp # Snapmaker Orca: High Flow columns of the shipped U1 profiles
+    test_snapmaker_multi_nozzle_profiles.cpp # Snapmaker Orca Max: U1 process presets for mixed nozzle sizes
     test_obj.cpp
     test_step.cpp
     test_stl.cpp

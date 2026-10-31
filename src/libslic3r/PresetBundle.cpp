@@ -8970,6 +8970,27 @@ void PresetBundle::update_compatible(PresetSelectCompatibleType select_other_pri
         const std::vector<std::string> &prefered_filament_profiles = printer_preset.config.option<ConfigOptionStrings>("default_filament_profile")->values;
         this->prints.update_compatible(printer_preset_with_vendor_profile, nullptr, select_other_print_if_incompatible,
             PreferedPrintProfileMatch(this->prints.get_selected_idx() == size_t(-1) ? nullptr : &this->prints.get_edited_preset(), printer_preset.config.opt_string("default_print_profile"), snapmaker_printer));
+        // Snapmaker Orca Max: with mixed nozzle sizes the multi-nozzle process presets plan the whole
+        // print, so the list drops the system presets of one nozzle size (when a multi-nozzle preset is
+        // there to take their place). The selected preset stays listed.
+        const auto *nozzles      = printer_preset.config.option<ConfigOptionFloats>("nozzle_diameter");
+        const bool  mixed_sizes  = nozzles != nullptr && std::any_of(nozzles->values.begin(), nozzles->values.end(),
+                                                                  [nozzles](double size) { return std::abs(size - nozzles->values.front()) > EPSILON; });
+        if (snapmaker_printer && mixed_sizes) {
+            auto is_multi_nozzle = [](const Preset &preset) {
+                const auto *strategy = preset.config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+                return strategy != nullptr && strategy->value != mnlhOff && strategy->value != mnlhCustom;
+            };
+            bool has_multi_nozzle = false;
+            for (const Preset &preset : this->prints)
+                has_multi_nozzle = has_multi_nozzle || (preset.is_system && preset.is_compatible && is_multi_nozzle(preset));
+            if (has_multi_nozzle)
+                for (size_t idx = 0; idx < this->prints.size(); ++ idx) {
+                    Preset &preset = this->prints.preset(idx);
+                    if (preset.is_system && ! preset.is_default && idx != this->prints.get_selected_idx() && ! is_multi_nozzle(preset))
+                        preset.is_compatible = false;
+                }
+        }
         const PresetWithVendorProfile   print_preset_with_vendor_profile = this->prints.get_edited_preset_with_vendor_profile();
         // Remember whether the filament profiles were compatible before updating the filament compatibility.
         std::vector<char> 				filament_preset_was_compatible(this->filament_presets.size(), false);

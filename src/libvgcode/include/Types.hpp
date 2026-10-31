@@ -101,6 +101,8 @@ enum class EViewType : uint8_t
     Tool,
     // Snapmaker Orca Max: the bed temperature target at each move (M140/M190)
     BedTemperature,
+    // Snapmaker Orca Max: the chamber temperature target at each move (M141/M191)
+    ChamberTemperature,
     COUNT
 };
 
