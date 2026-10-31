@@ -5640,7 +5640,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Quality");
     def->tooltip  = L("For printers whose extruders have different nozzle sizes. Off: one layer height for the whole "
                       "print, as usual. The strategies give every nozzle the same share of its diameter - Ultra fine "
-                      "30%, Fine 40%, Normal 50%, Coarse 60%, Super coarse 70% - on one common grid (the 0.2 mm "
+                      "25%, Fine 40%, Normal 50%, Coarse 60%, Super coarse 70% - on one common grid (the 0.2 mm "
                       "nozzle's height), so all nozzle sizes always meet on shared layers: Normal prints a 0.2 mm "
                       "nozzle at 0.10, 0.4 at 0.20, 0.6 at 0.30 and 0.8 at 0.40 mm. Each part prints in layers of its "
                       "own nozzle's height where its shape allows, the finer nozzles finishing each cycle. A height "
@@ -5656,7 +5656,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.emplace_back("coarse");
     def->enum_values.emplace_back("super_coarse");
     def->enum_labels.emplace_back(L("Off"));
-    def->enum_labels.emplace_back(L("Ultra fine (30%)"));
+    def->enum_labels.emplace_back(L("Ultra fine (25%)"));
     def->enum_labels.emplace_back(L("Fine (40%)"));
     def->enum_labels.emplace_back(L("Normal (50%)"));
     def->enum_labels.emplace_back(L("Coarse (60%)"));
@@ -10259,7 +10259,7 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
             if (count > 0) {
                 share /= count;
                 const std::pair<double, MultiNozzleLayerHeights> strategies[] = {
-                    { 0.3, mnlhUltraFine }, { 0.4, mnlhFine }, { 0.5, mnlhNormal }, { 0.6, mnlhCoarse }, { 0.7, mnlhSuperCoarse } };
+                    { 0.25, mnlhUltraFine }, { 0.4, mnlhFine }, { 0.5, mnlhNormal }, { 0.6, mnlhCoarse }, { 0.7, mnlhSuperCoarse } };
                 double best = std::numeric_limits<double>::max();
                 for (const auto &[fraction, value] : strategies)
                     if (std::abs(fraction - share) < best - 1e-9) {

@@ -101,7 +101,7 @@ TEST_CASE("Every multi-nozzle preset ships a hidden preset per other nozzle size
 {
     // The strategy's share of the nozzle diameter (Slicing.hpp multi_nozzle_strategy_height).
     const std::vector<std::pair<std::string, double>> strategies = {
-        {"Ultra fine", 0.3}, {"Fine", 0.4}, {"Normal", 0.5}, {"Coarse", 0.6}, {"Super coarse", 0.7}};
+        {"Ultra fine", 0.25}, {"Fine", 0.4}, {"Normal", 0.5}, {"Coarse", 0.6}, {"Super coarse", 0.7}};
     auto bundle = load_snapmaker_bundle();
     for (const auto &[strategy, share] : strategies)
         for (const char *size : {"0.2", "0.6", "0.8"}) {

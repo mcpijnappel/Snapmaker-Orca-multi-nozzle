@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "HrO53etFKUxccOQy",
 	"instantiation": "true",
-	"description": "Speeds, accelerations and line widths of a 0.2 mm nozzle under Multi-nozzle Ultra fine: Snapmaker's 0.06 mm values for the 0.2 mm nozzle, with the settings of 0.12mm Standard @Snapmaker U1 (0.2 nozzle).",
+	"description": "Speeds, accelerations and line widths of a 0.2 mm nozzle under Multi-nozzle Ultra fine: Snapmaker's 0.06 mm values (the nearest it has to 0.05 mm) for the 0.2 mm nozzle, with the settings of 0.12mm Standard @Snapmaker U1 (0.2 nozzle).",
 	"bottom_color_penetration_layers": "3",
 	"top_color_penetration_layers": "5",
 	"elefant_foot_compensation": "0.15",
@@ -23,6 +23,7 @@
 	"wipe_tower_wall_type": "rib",
 	"initial_layer_print_height": "0.14",
 	"sparse_infill_pattern": "gyroid",
+	"layer_height": "0.05",
 	"compatible_printers": [
 		"Snapmaker U1 (0.2 nozzle)"
 	]

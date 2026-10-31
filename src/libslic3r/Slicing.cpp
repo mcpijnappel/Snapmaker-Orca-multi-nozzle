@@ -1075,7 +1075,7 @@ int generate_layer_height_texture(
 double multi_nozzle_strategy_fraction(int strategy)
 {
     switch (strategy) {
-    case mnlhUltraFine:   return 0.3;
+    case mnlhUltraFine:   return 0.25;
     case mnlhFine:        return 0.4;
     case mnlhNormal:      return 0.5;
     case mnlhCoarse:      return 0.6;

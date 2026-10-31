@@ -2671,7 +2671,7 @@ TEST_CASE("No region layer prints below its nozzle's minimum layer height", "[Mu
     // leaves a piece shorter than its nozzle's minimum, which must merge with its neighbour.
     //   0.4 / 0.4 / 0.6 / 0.2 mm at 0.2 / 0.2 / 0.28 / 0.12 on a 0.04 grid (mins 0.08 / 0.08 / 0.12 / 0.04)
     //   0.4 / 0.4 / 0.4 / 0.2 mm at 0.195 / 0.195 / 0.195 / 0.13 on a 0.065 grid
-    //   Ultra fine: 0.4 / 0.4 / 0.6 / 0.2 mm at 0.12 / 0.12 / 0.18 / 0.06 on a 0.06 grid
+    //   0.4 / 0.4 / 0.6 / 0.2 mm at 0.12 / 0.12 / 0.18 / 0.06 on a 0.06 grid (30 % of each nozzle)
     const int setup = GENERATE(0, 1, 2);
     const bool mixed_sizes = setup == 0;
     DynamicPrintConfig config = four_nozzle_config();
@@ -3404,7 +3404,7 @@ TEST_CASE("Multi-nozzle strategies give every nozzle size its share on one grid"
     struct Nozzle { double d, min_lh, max_lh; };
     const Nozzle nozzles[] = { { 0.2, 0.04, 0.14 }, { 0.4, 0.08, 0.28 }, { 0.6, 0.12, 0.42 }, { 0.8, 0.16, 0.56 } };
     const struct { MultiNozzleLayerHeights strategy; double grid; double heights[4]; } table[] = {
-        { mnlhUltraFine,   0.06, { 0.06, 0.12, 0.18, 0.24 } },
+        { mnlhUltraFine,   0.05, { 0.05, 0.10, 0.15, 0.20 } },
         { mnlhFine,        0.08, { 0.08, 0.16, 0.24, 0.32 } },
         { mnlhNormal,      0.10, { 0.10, 0.20, 0.30, 0.40 } },
         { mnlhCoarse,      0.12, { 0.12, 0.24, 0.36, 0.48 } },
@@ -3469,10 +3469,10 @@ TEST_CASE("Custom and preferred heights of older versions load as the nearest st
         CHECK(strategy_of(config) == mnlhNormal);
         CHECK(heights_of(config) == std::vector<double>{0., 0.});
     }
-    SECTION("the average share decides: 0.16 / 0.4 and 0.06 / 0.2 average 35 %, a tie that goes to the finer Ultra fine") {
+    SECTION("the average share decides: 0.12 / 0.4 and 0.05 / 0.2 average 27.5 %, nearest to Ultra fine's 25 %") {
         DynamicPrintConfig config;
         config.set_key_value("nozzle_diameter", new ConfigOptionFloats({0.4, 0.2}));
-        config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.16, 0.06}));
+        config.set_key_value("extruder_layer_height", new ConfigOptionFloats({0.12, 0.05}));
         config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
         PrintConfigDef::handle_legacy_composite(config);
         CHECK(strategy_of(config) == mnlhUltraFine);
@@ -3675,7 +3675,7 @@ TEST_CASE("A coarse tool purges on the prime tower at its own step", "[MultiNozz
 
 TEST_CASE("Support layers keep the support nozzle's minimum on a fine grid", "[MultiNozzleLayerHeight][Support][MinHeight]")
 {
-    // Ultra fine: a 0.06 mm grid, support on a 0.4 mm nozzle (minimum 0.08) printing 0.12 mm layers,
+    // Ultra fine: a 0.05 mm grid, support on a 0.4 mm nozzle (minimum 0.08) printing 0.10 mm layers,
     // zero top gap. The contact layer and the last layer under it span at least two rows.
     DynamicPrintConfig config = four_nozzle_config();
     config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
@@ -3697,7 +3697,7 @@ TEST_CASE("Support layers keep the support nozzle's minimum on a fine grid", "[M
     config.set_key_value("wipe_tower_x",               new ConfigOptionFloats({10.}));
     config.set_key_value("wipe_tower_y",               new ConfigOptionFloats({10.}));
     apply_extruder_layer_height_plan(config);
-    REQUIRE(config.opt_float("layer_height") == Catch::Approx(0.06).margin(1e-9));
+    REQUIRE(config.opt_float("layer_height") == Catch::Approx(0.05).margin(1e-9));
     const float lift = GENERATE(0.1f, 0.15f, 0.2f);
     Print print;
     Model model;

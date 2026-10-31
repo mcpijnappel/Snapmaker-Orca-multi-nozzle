@@ -27,9 +27,9 @@ from orca_profile_tool import NORMALIZE_FIELD_ORDER, OBSOLETE_KEYS  # noqa: E402
 PROCESS_DIR = pathlib.Path(__file__).resolve().parent.parent / "resources" / "profiles" / "Snapmaker" / "process"
 
 # Strategy -> layer height per nozzle size (the strategy's share of the diameter, Slicing.cpp
-# multi_nozzle_strategy_height): 30 / 40 / 50 / 60 / 70 %.
+# multi_nozzle_strategy_height): 25 / 40 / 50 / 60 / 70 %.
 STRATEGIES = {
-    "Ultra fine":   {"0.2": "0.06", "0.6": "0.18", "0.8": "0.24"},
+    "Ultra fine":   {"0.2": "0.05", "0.6": "0.15", "0.8": "0.20"},
     "Fine":         {"0.2": "0.08", "0.6": "0.24", "0.8": "0.32"},
     "Normal":       {"0.2": "0.10", "0.6": "0.30", "0.8": "0.40"},
     "Coarse":       {"0.2": "0.12", "0.6": "0.36", "0.8": "0.48"},
@@ -76,6 +76,13 @@ def scalar(value):
     return value[0] if isinstance(value, list) else value
 
 
+def nearest_base(size, height):
+    """The base fdm_process_U1_<h>_nozzle_<size> nearest to `height` (a tie goes to the finer one)."""
+    heights = sorted(path.stem.split("_")[3] for path in PROCESS_DIR.glob(f"fdm_process_U1_*_nozzle_{size}.json"))
+    best = min(heights, key=lambda h: (abs(float(h) - float(height)), float(h)))
+    return f"fdm_process_U1_{best}_nozzle_{size}", best
+
+
 def write(name, preset):
     # The shape orca_profile_tool.py normalize gives a file: identifying keys first, no obsolete keys.
     preset = {key: value for key, value in preset.items() if key not in OBSOLETE_KEYS}
@@ -100,15 +107,19 @@ def size_preset(strategy, size, height):
         preset["description"] = (f"Speeds, accelerations and line widths of a {size} mm nozzle under Multi-nozzle "
                                  f"{strategy}: {exact}.")
     else:
-        base = f"fdm_process_U1_{height}_nozzle_{size}"
+        base, base_height = nearest_base(size, height)
         nearest = NEAREST_STANDARD[size]
         preset["inherits"] = base
+        values = (f"Snapmaker's {base_height} mm values" if base_height == height else
+                  f"Snapmaker's {base_height} mm values (the nearest it has to {height} mm)")
         preset["description"] = (f"Speeds, accelerations and line widths of a {size} mm nozzle under Multi-nozzle "
-                                 f"{strategy}: Snapmaker's {height} mm values for the {size} mm nozzle, with the "
-                                 f"settings of {nearest}.")
+                                 f"{strategy}: {values} for the {size} mm nozzle, with the settings of {nearest}.")
         for key, value in load(nearest).items():
             if key not in META_KEYS:
                 preset[key] = value
+        # A base of another height: the layer height the strategy prints this size at.
+        if base_height != height:
+            preset["layer_height"] = height
     preset["compatible_printers"] = [machine]
     write(name, preset)
 

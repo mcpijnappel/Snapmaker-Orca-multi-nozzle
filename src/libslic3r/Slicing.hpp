@@ -219,7 +219,7 @@ struct ExtruderLayerHeightPlan
 };
 
 // Snapmaker Orca Max: multi-nozzle layer height strategies (MultiNozzleLayerHeights, as int).
-// Share of the nozzle diameter a strategy prints at (0.3 .. 0.7), 0 for Off.
+// Share of the nozzle diameter a strategy prints at (0.25 .. 0.7), 0 for Off.
 double multi_nozzle_strategy_fraction(int strategy);
 // The strategy's common grid: the 0.2 mm nozzle's height (0 for Off).
 double multi_nozzle_strategy_grid(int strategy);
