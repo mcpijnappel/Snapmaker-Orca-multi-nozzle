@@ -4,6 +4,7 @@
 #include "WipeTower2.hpp"
 #include "../Config.hpp"
 #include "../PrintConfig.hpp"
+#include "../Slicing.hpp"
 #include "../libslic3r.h"
 
 #include <algorithm>
@@ -119,11 +120,25 @@ WipeTowerFootprint estimate_wipe_tower_footprint(const ConfigBase &config, WipeT
     // is one change more than the filaments_cnt - 1 the planners assume per layer.
     bool closing_change = false;
     if (filaments_cnt > 1 && opt_bool("fine_nozzle_finishes_cycle")) {
-        const auto  *heights = floats_of("extruder_layer_height");
-        const size_t nozzles = nozzle_opt != nullptr ? nozzle_opt->values.size() : 0;
-        if (heights != nullptr && !heights->values.empty()) {
+        // The per-nozzle heights: those a planned config holds, else the ones its multi-nozzle
+        // strategy gives the nozzles (Slicing.hpp; the GUI's config holds the strategy only).
+        std::vector<double> heights;
+        if (const auto *planned = floats_of("extruder_layer_height");
+            planned != nullptr && std::any_of(planned->values.begin(), planned->values.end(), [](double h) { return h > EPSILON; }))
+            heights = planned->values;
+        else if (const auto *strategy = dynamic_cast<const ConfigOptionEnum<MultiNozzleLayerHeights> *>(option_of(config, "multi_nozzle_layer_heights"));
+                 strategy != nullptr && nozzle_opt != nullptr) {
+            const auto *min_lh = floats_of("min_layer_height");
+            const auto *max_lh = floats_of("max_layer_height");
+            for (size_t j = 0; j < nozzle_opt->values.size(); ++j)
+                heights.push_back(multi_nozzle_strategy_height(int(strategy->value), nozzle_opt->values[j],
+                                                               min_lh != nullptr && !min_lh->values.empty() ? min_lh->get_at(j) : 0.,
+                                                               max_lh != nullptr && !max_lh->values.empty() ? max_lh->get_at(j) : 0.));
+        }
+        const size_t nozzles = heights.size();
+        if (!heights.empty()) {
             // The column of a 0-based filament, as Print::width_slot() picks it.
-            auto height_of = [&](unsigned int id) { return heights->get_at(id < nozzles ? id : 0); };
+            auto height_of = [&](unsigned int id) { return heights[id < nozzles ? id : 0]; };
             double lowest = height_of(filament_ids.front()), highest = lowest;
             for (unsigned int id : filament_ids) {
                 lowest  = std::min(lowest, height_of(id));

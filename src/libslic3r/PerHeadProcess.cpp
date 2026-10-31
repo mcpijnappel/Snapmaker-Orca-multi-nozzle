@@ -270,18 +270,12 @@ void hide_multi_nozzle_size_presets(PresetCollection &prints)
     }
 }
 
-double target_layer_height(const PresetBundle &bundle, size_t head, bool *preferred)
+double target_layer_height(const PresetBundle &bundle)
 {
-    const auto  *heights = bundle.printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height");
-    const double height  = heights != nullptr && head < heights->values.size() ? heights->values[head] : 0.;
-    if (preferred != nullptr)
-        *preferred = height > 0.;
-    if (height > 0.)
-        return height;
     return bundle.prints.get_selected_idx() == size_t(-1) ? 0. : layer_height_of(bundle.prints.get_selected_preset());
 }
 
-const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double preferred_layer_height,
+const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double target_height_mm,
                               const Preset &selected, const std::string &explicit_name, Reason &reason,
                               const std::function<bool(const Preset &)> &accept, RuleTrace *trace)
 {
@@ -313,9 +307,9 @@ const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine,
     }
 
     // The quality rule: the plate's class, then its ladder; within a class the layer height nearest
-    // the head's preferred height, else the saved selected preset's height (an unsaved edit does
+    // `target_height_mm` when > 0, else the saved selected preset's height (an unsaved edit does
     // not move the source).
-    const double      target_height = preferred_layer_height > 0. ? preferred_layer_height : layer_height_of(selected);
+    const double      target_height = target_height_mm > 0. ? target_height_mm : layer_height_of(selected);
     const std::string quality       = quality_class_of(bundle, selected);
     const std::string default_name  = default_print_profile_of(machine);
 
@@ -369,7 +363,6 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
     const Preset &selected = bundle.prints.get_selected_preset();
     const Preset *parent   = system_parent(bundle);
     const double  home     = NozzleFilament::home_nozzle_size(printer.config);
-    const auto   *heights  = printer.config.option<ConfigOptionFloats>("extruder_layer_height");
     const bool    multi_nozzle = parent != nullptr && has_multi_nozzle_sizes(bundle, *parent);
     const std::set<std::string> edited = all_edited_keys(bundle);
     auto split_keys = [&edited](Source &source) {
@@ -460,10 +453,9 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             source.reason = Reason::Explicit;
             continue;
         }
-        const double preferred = heights != nullptr && head < heights->values.size() ? heights->values[head] : 0.;
         Reason        reason   = Reason::Derived;
         RuleTrace     trace;
-        const Preset *by_rule  = source_for_head(bundle, *machine, preferred, selected, std::string(), reason, {}, &trace);
+        const Preset *by_rule  = source_for_head(bundle, *machine, 0., selected, std::string(), reason, {}, &trace);
         if (by_rule == nullptr) {
             source.reason = Reason::NoProcessPreset;
             continue;
@@ -498,10 +490,9 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             if (has)
                 continue;
             const Preset *machine   = head < state.head_machine.size() && state.head_machine[head] != nullptr ? state.head_machine[head] : &printer;
-            const double  preferred = heights != nullptr && head < heights->values.size() ? heights->values[head] : 0.;
             Reason        reason    = Reason::Derived;
             RuleTrace     trace;
-            const Preset *by_rule   = source_for_head(bundle, *machine, preferred, selected, std::string(), reason,
+            const Preset *by_rule   = source_for_head(bundle, *machine, 0., selected, std::string(), reason,
                                                       [&printer, head](const Preset &candidate) { return column_for_head(candidate.config, head, nvtHighFlow, printer.config) >= 0; },
                                                       &trace);
             if (by_rule == nullptr)

@@ -14,12 +14,16 @@ The process preset selected in the sidebar is the plate's **quality choice**. Fo
 nozzle size differs from the printer preset, the rule takes the system presets made for the extruder's
 size and picks, within the plate's quality class (the text of the preset name between the layer
 height and the printer: `Standard`, `High Quality`, `Strength`, `Draft`, ...; a user preset takes its
-system parent's class), the one whose layer height is nearest to the extruder's preferred layer height
-(sidebar, nozzle tab) or, without one, to the layer height of the selected preset as saved; a tie
-goes to the thinner preset. When the extruder's size has no preset of that class, the rule walks a
+system parent's class), the one whose layer height is nearest to the layer height of the selected
+preset as saved; a tie goes to the thinner preset. When the extruder's size has no preset of that class, the rule walks a
 ladder: `High Quality` and `Color Mixing` ask for `High Quality`, then `Standard`; every other class
 asks for itself, then `Standard`. Without any class match the machine preset's default process
-preset is taken, then the first compatible preset by name. The 32 speed, acceleration and jerk keys
+preset is taken, then the first compatible preset by name.
+
+A Multi-nozzle preset (`Multi-nozzle Normal @Snapmaker U1`, ...) carries its values per nozzle size
+instead: an extruder prints with its hidden preset of the extruder's size (`Multi-nozzle Normal
+@Snapmaker U1 (0.2 nozzle)`), and an extruder of the size the preset itself is made for (0.4) with the
+preset itself, whatever size the printer preset is based on. The 32 speed, acceleration and jerk keys
 come from that preset; a value changed in the selected preset under "All extruders" is kept on
 every extruder, and a value set for one extruder on the Speed or Quality page beats everything.
 
@@ -48,9 +52,6 @@ extruder of that size prints with. `-`: the home size, the selected preset itsel
 | 0.32mm Standard (0.8) | 0.12 Std | 0.28 Std | 0.30 Std | - |
 | 0.40mm Standard (0.8) | 0.12 Std | 0.28 Std | 0.30 Std | - |
 | 0.40mm Strength (0.8) | 0.12 Std | 0.28 Std | 0.30 Std | - |
-
-A preferred layer height on an extruder replaces the plate's layer height for that extruder inside the
-class; it never changes the class.
 
 ## The J1 matrix (a 0.4 plate, one extruder changed to another size)
 
@@ -221,7 +222,7 @@ with Y."). Both keys are in the G-code header.
 | New Project | cleared |
 | Open project | the file's value, `[]` when the file has none; a published project brings none |
 | Import Configs (from a G-code or a project's config) | the file's value, `[]` when the file has none |
-| a nozzle size change, a flow change, a preferred layer height, a printer or process preset switch, the preference | unchanged; the choice is applied or inactive |
+| a nozzle size change, a flow change, a printer or process preset switch, the preference | unchanged; the choice is applied or inactive |
 | deleting a chosen user preset | unchanged, shown as "(not installed)" |
 | the undo button or the automatic item | that extruder's entry cleared |
 

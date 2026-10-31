@@ -1010,8 +1010,7 @@ void PrintConfigDef::init_common_params()
     def->label = L("Layer height");
     def->category = L("Quality");
     def->tooltip = L("This is the height for each layer. Smaller layer heights give greater accuracy but longer printing time.\n"
-                     "While a preferred layer height is set for any extruder (printer settings), the object layer height is "
-                     "derived from the preferred layer heights - the finest one - and the global value is locked here.");
+                     "With Multi-nozzle layer heights on, the strategy sets the layer height and the value is locked here.");
     def->sidetext = L("mm");	// millimeters, CIS languages need translation
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(INITIAL_LAYER_HEIGHT));
@@ -5623,27 +5622,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 0.07 });
 
+    // Snapmaker Orca Max: the per-extruder layer heights the multi-nozzle strategy sets for slicing
+    // (apply_extruder_layer_height_plan in Slicing.hpp); 0 prints the object layer height. Internal:
+    // no setting page shows it, and loading clears a stored value (handle_legacy_composite).
     def = this->add("extruder_layer_height", coFloats);
-    def->label = L("Preferred layer height");
-    def->tooltip = L("Used when Multi-nozzle layer heights (Quality settings) is set to Custom; the other choices "
-                     "set every nozzle's height themselves. "
-                     "Layer height this extruder should print with, used for printers whose extruders have "
-                     "different nozzle sizes. Any value can be entered and is kept as entered. For slicing, the object "
-                     "layer height becomes the coarsest height on which every preferred layer height lands within 0.01 mm "
-                     "of a whole multiple (from the finest preferred height down to a quarter of it), and the preferred "
-                     "heights print rounded to those multiples; with \"Exact preferred layer heights\" enabled every "
-                     "entered value prints exactly instead. "
-                     "A part whose features all follow this extruder prints only on every Nth layer with "
-                     "correspondingly thicker extrusions, wherever its geometry allows it; elsewhere it "
-                     "falls back to the object layer height. When the rest of the part cannot follow, "
-                     "walls assigned to this extruder still combine to this height on their own, "
-                     "full-density top surfaces absorb the solid layers below them, and sparse or 100% "
-                     "dense infill combines to this height where the part prints every layer; inside a "
-                     "part printing on every Nth layer the infill follows that part's layers. 0 means to "
-                     "use the object layer height.");
+    def->label = L("Extruder layer height");
+    def->tooltip = L("The layer height this extruder prints with, set by Multi-nozzle layer heights. 0 means to use "
+                     "the object layer height.");
     def->sidetext = "mm";	// milimeters, don't need translation
     def->min = 0;
-    def->mode = comAdvanced;
+    def->mode = comDevelop;
     def->set_default_value(new ConfigOptionFloats { 0. });
 
     // Snapmaker Orca Max: layer height strategies for mixed nozzle sizes.
@@ -5657,24 +5645,22 @@ void PrintConfigDef::init_fff_params()
                       "nozzle at 0.10, 0.4 at 0.20, 0.6 at 0.30 and 0.8 at 0.40 mm. Each part prints in layers of its "
                       "own nozzle's height where its shape allows, the finer nozzles finishing each cycle. A height "
                       "is kept within the nozzle's minimum and maximum layer height. The layer height setting then "
-                      "shows the grid and is not used. Custom: the printer's per-extruder preferred layer heights "
-                      "(projects made before these strategies).");
+                      "shows the grid and is not used.");
     def->enum_keys_map = &ConfigOptionEnum<MultiNozzleLayerHeights>::get_enum_values();
-    // Entry order must follow the enum's numeric order: the choice field maps by position.
+    // Entry order must follow the enum's numeric order: the choice field maps by position. Custom
+    // (mnlhCustom, last) is left out: it is only read from older configs.
     def->enum_values.emplace_back("off");
     def->enum_values.emplace_back("ultra_fine");
     def->enum_values.emplace_back("fine");
     def->enum_values.emplace_back("normal");
     def->enum_values.emplace_back("coarse");
     def->enum_values.emplace_back("super_coarse");
-    def->enum_values.emplace_back("custom");
     def->enum_labels.emplace_back(L("Off"));
     def->enum_labels.emplace_back(L("Ultra fine (30%)"));
     def->enum_labels.emplace_back(L("Fine (40%)"));
     def->enum_labels.emplace_back(L("Normal (50%)"));
     def->enum_labels.emplace_back(L("Coarse (60%)"));
     def->enum_labels.emplace_back(L("Super coarse (70%)"));
-    def->enum_labels.emplace_back(L("Custom (printer's preferred heights)"));
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
 
@@ -5690,21 +5676,6 @@ void PrintConfigDef::init_fff_params()
     def->max      = 3;
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionInt(0));
-
-    // ORCA multi-nozzle-size: experimental exact preferred layer heights.
-    def = this->add("extruder_layer_height_exact", coBool);
-    def->label = L("Exact preferred layer heights");
-    def->category = L("Extruders");
-    def->tooltip = L("Experimental. Keep every preferred layer height exactly as entered: the object layer height "
-                     "becomes the coarsest height all of them are whole multiples of, which can be very fine "
-                     "(0.13 and 0.37 mm share only 0.01 mm). Extruders left at Default, supports, the first layers "
-                     "and the areas that cannot follow an extruder's height print at that grid, so slicing and "
-                     "printing can take much longer. The prime tower prints one slab per tool change on that grid in "
-                     "either mode; a coarse extruder purging on a slab of a fine grid extrudes below its minimum "
-                     "layer height there, which slicing reports. Off: the preferred heights print rounded to the "
-                     "coarsest grid on which they land within 0.01 mm.");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("slow_down_min_speed", coFloats);
     def->label = L("Min print speed");
@@ -10244,6 +10215,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         "internal_bridge_support_thickness", "top_area_threshold", "reduce_wall_solid_infill","filament_load_time","filament_unload_time",
         "smooth_coefficient", "overhang_totally_speed", "silent_mode",
         "overhang_speed_classic",
+        "extruder_layer_height_exact", // Snapmaker Orca Max: with the Custom multi-nozzle strategy
         "anisotropic_surfaces", // superseded by top_surface_fill_order / bottom_surface_fill_order
     };
 
@@ -10263,19 +10235,50 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
 {
-    // Snapmaker Orca Max: projects and configs made before the multi-nozzle strategies keep the
-    // printer's per-extruder preferred layer heights.
-    if (config.has("extruder_layer_height") && ! config.has("multi_nozzle_layer_heights")) {
-        if (const auto *heights = config.option<ConfigOptionFloats>("extruder_layer_height");
-            heights != nullptr && std::any_of(heights->values.begin(), heights->values.end(), [](double h) { return h > 0.; })) {
-            config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
+    // Snapmaker Orca Max: the Custom strategy (the printer's per-extruder preferred layer heights)
+    // is gone. A process or project config with Custom, or with preferred heights and no strategy
+    // (made before the strategies), takes the strategy whose share of the nozzle diameter is nearest
+    // to the heights' average share; without heights it takes Off. Stored heights are cleared in any
+    // config: the strategy sets them for slicing.
+    {
+        auto       *heights  = config.option<ConfigOptionFloats>("extruder_layer_height");
+        const auto *strategy = config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+        const bool  explicit_heights = heights != nullptr &&
+                                      std::any_of(heights->values.begin(), heights->values.end(), [](double h) { return h > 0.; });
+        const bool  custom = strategy != nullptr ? strategy->value == mnlhCustom : explicit_heights && config.has("layer_height");
+        if (custom) {
+            MultiNozzleLayerHeights nearest = mnlhOff;
+            const auto *nozzles = config.option<ConfigOptionFloats>("nozzle_diameter");
+            double      share   = 0.;
+            int         count   = 0;
+            for (size_t j = 0; explicit_heights && nozzles != nullptr && j < heights->values.size() && j < nozzles->values.size(); ++ j)
+                if (heights->values[j] > 0. && nozzles->values[j] > 0.) {
+                    share += heights->values[j] / nozzles->values[j];
+                    ++ count;
+                }
+            if (count > 0) {
+                share /= count;
+                const std::pair<double, MultiNozzleLayerHeights> strategies[] = {
+                    { 0.3, mnlhUltraFine }, { 0.4, mnlhFine }, { 0.5, mnlhNormal }, { 0.6, mnlhCoarse }, { 0.7, mnlhSuperCoarse } };
+                double best = std::numeric_limits<double>::max();
+                for (const auto &[fraction, value] : strategies)
+                    if (std::abs(fraction - share) < best - 1e-9) {
+                        best    = std::abs(fraction - share);
+                        nearest = value;
+                    }
+            }
+            const bool listed = strategy == nullptr;
+            config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(nearest));
             // A project lists the keys that differ from its process preset (first column); loaders that
             // rebuild the config from the system presets keep only those, so list this one too.
-            if (auto *different = config.option<ConfigOptionStrings>("different_settings_to_system"); different != nullptr && ! different->values.empty()) {
+            if (auto *different = config.option<ConfigOptionStrings>("different_settings_to_system");
+                listed && different != nullptr && ! different->values.empty()) {
                 std::string &column = different->values.front();
                 column += column.empty() ? "multi_nozzle_layer_heights" : ";multi_nozzle_layer_heights";
             }
         }
+        if (explicit_heights)
+            std::fill(heights->values.begin(), heights->values.end(), 0.);
     }
     if (config.has("thumbnails")) {
         std::string extention;

@@ -214,9 +214,9 @@ void fill_flow_combo(::ComboBox *combo, const DynamicPrintConfig &printer_config
 wxString flow_tooltip(FlowRowState state, const std::string &head_size);
 
 // Why the quality rule gave a tool head its preset (PerHeadProcess::source_for_head), from the matched
-// `height` and whether it is the head's preferred one. Empty for SelectedPreset and Chosen sources.
+// `height` (the plate's). Empty for SelectedPreset and Chosen sources.
 wxString automatic_reason(PerHeadProcess::Step step, const std::string &plate_class, const std::string &class_used, const std::string &head_size,
-                          double height, bool preferred);
+                          double height);
 
 // Speed-page intro and speed-selector tooltip for a tool head: head, nozzle size and flow type;
 // `standard_chosen`: a High Flow nozzle set to print the Standard speeds (PerHeadProcess::flow_key).
@@ -242,9 +242,6 @@ wxString standard_chosen_tooltip();
 wxString widths_description(const std::string &derived_heads, const std::string &presets, const std::string &other_heads, bool several);
 // The line under the picker: what the picked preset supplies on this page and on the other one.
 wxString picker_note(bool quality_page);
-// Under a selected tool head on the Quality page, when its preferred layer height differs from the
-// plate's: the head prints that height (the Layer height field above is greyed). `head` 0-based.
-wxString preferred_height_sentence(double height, size_t head);
 // Under a selected tool head: a line width changed under All tool heads applies to it in place of
 // its width source's value. `label` the setting, `value` the All value, `source_alias` and
 // `source_value` the preset the head takes its widths from and what it has.

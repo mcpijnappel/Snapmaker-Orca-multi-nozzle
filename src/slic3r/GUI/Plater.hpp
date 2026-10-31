@@ -252,9 +252,6 @@ public:
     // Sets only nozzle `nozzle_idx`'s diameter (`variant` as the profiles name it, "0.4"),
     // keeping the printer preset; see Plater.cpp.
     void apply_nozzle_diameter(size_t nozzle_idx, const wxString &diameter_label);
-    // The line under each preferred layer height: the height the extruder prints for slicing when
-    // it differs, a warning for an entered height off the layer grid (see Plater.cpp).
-    void update_nozzle_layer_height_hints();
     // Refresh the nozzle tabs' combo values in place; rebuilds (deferred) on extruder count change.
     void update_nozzle_values();
     // Refresh the Flow row of the nozzle tabs: which types a tool head offers, whether it may be

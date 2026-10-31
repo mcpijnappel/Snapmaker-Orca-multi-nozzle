@@ -1463,12 +1463,8 @@ struct NozzlePage
 {
     wxPanel      *panel { nullptr };
     wxStaticText *diameter_label { nullptr };
-    wxStaticText *layer_height_label { nullptr };
     ogStaticText *process_hint { nullptr };         // the process preset the tool head prints with (PerHeadProcess), wrapped to the page; may be nullptr
     ComboBox     *diameter { nullptr };      // Snapmaker Orca Max: size and flow type ("0.4mm High Flow"), fill_nozzle_combo
-    ComboBox     *layer_height { nullptr };            // editable: a listed height or any typed one
-    ogStaticText *layer_height_hint { nullptr };       // the height the extruder prints when it differs; a warning for a typed height off the grid
-    ogStaticText *layer_height_link { nullptr };       // "Print exact heights" under the warning
 };
 
 // Lays out the rows of one nozzle tab at the current DPI: when the page is built and from
@@ -1486,17 +1482,16 @@ static void layout_nozzle_page(const NozzlePage &page)
     // One label column: the widest label, at most 170 DIP. A minimum size is what a sizer reads
     // (wxSizerItem::CalcMin ignores the maximum size).
     int label_w = 0;
-    for (wxStaticText *label : { page.diameter_label, page.layer_height_label })
+    for (wxStaticText *label : { page.diameter_label })
         label_w = std::max(label_w, label->GetTextExtent(label->GetLabel()).x + panel->FromDIP(4));
     label_w = std::min(label_w, panel->FromDIP(170));
-    for (wxStaticText *label : { page.diameter_label, page.layer_height_label })
+    for (wxStaticText *label : { page.diameter_label })
         label->SetMinSize({ label_w, -1 });
 
     // An explicit minimum width: ComboBox and TextInput report their last width as best width, which
     // would keep a row from shrinking. The height is passed: TextInput::SetMinSize keeps it for -1.
     const wxSize control_min(panel->FromDIP(80), panel->FromDIP(30));
     page.diameter->SetMinSize(control_min);
-    page.layer_height->SetMinSize(control_min);
 
     auto *rows = new wxBoxSizer(wxVERTICAL);
     // No spacers inside a row: a row whose windows are hidden then counts as hidden, border included.
@@ -1507,15 +1502,6 @@ static void layout_nozzle_page(const NozzlePage &page)
         rows->Add(row, 0, wxEXPAND | wxTOP, row_gap);
     };
     add_row(page.diameter_label, page.diameter);
-    add_row(page.layer_height_label, page.layer_height);
-    for (ogStaticText *hint : { page.layer_height_hint, page.layer_height_link }) {
-        if (hint == nullptr)
-            continue;
-        hint->SetMinSize({ panel->FromDIP(40), -1 });   // never widen the page: the hint wraps to it
-        auto *hint_row = new wxBoxSizer(wxHORIZONTAL);
-        hint_row->Add(hint, 1, wxLEFT, label_w + col_gap);
-        rows->Add(hint_row, 0, wxEXPAND | wxTOP, hint_gap);
-    }
     if (page.process_hint != nullptr) {
         page.process_hint->SetMinSize({ panel->FromDIP(40), -1 });   // never widen the page: the hint wraps to it
         auto *hint_row = new wxBoxSizer(wxHORIZONTAL);
@@ -1926,7 +1912,6 @@ struct Sidebar::priv
     // Every window of the nozzle tabs, one entry per tab. Window pointers only: they die with
     // DeleteAllPages().
     std::vector<NozzlePage>      m_nozzle_pages;
-    std::vector<ComboBox*>       m_nozzle_layer_height_lists;
     bool                         m_nozzle_rebuild_scheduled{false};
     // Sizes the nozzle block for its strip and its tallest page.
     void                         fit_nozzle_block();
@@ -6120,7 +6105,6 @@ void Sidebar::msw_rescale()
         p->m_nozzle_notebook->Rescale();
         for (const NozzlePage &page : p->m_nozzle_pages) {
             page.diameter->Rescale();
-            page.layer_height->Rescale();
             layout_nozzle_page(page);      // after Rescale(): TextInput::messureSize pins the old height
         }
         p->fit_nozzle_block();
@@ -11569,156 +11553,6 @@ static void fill_nozzle_combo(const NozzlePage &page, size_t head)
         page.diameter_label->SetToolTip(tip);
 }
 
-// Snapmaker Orca: the inputs of the layer height plan from the edited printer and print presets.
-static DynamicPrintConfig edited_layer_height_inputs()
-{
-    const PresetBundle &bundle = *wxGetApp().preset_bundle;
-    return extruder_layer_height_inputs(bundle.printers.get_edited_preset().config, bundle.prints.get_edited_preset().config);
-}
-
-// Snapmaker Orca: the preferred layer height entered for extruder `extruder_idx` (0 = Default).
-static double entered_layer_height(size_t extruder_idx)
-{
-    const auto *preferred = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height");
-    return preferred != nullptr && !preferred->values.empty() ? std::max(0., preferred->get_at(extruder_idx)) : 0.;
-}
-
-// Snapmaker Orca: shows the entered preferred layer height of extruder `extruder_idx` in its field
-// ("Default" = 0, the object layer height).
-static void show_nozzle_layer_height(ComboBox *field, size_t extruder_idx)
-{
-    const double current = entered_layer_height(extruder_idx);
-    field->SetValue(current > 0. ? nozzle_combo_label(current) : _L("Default"));
-}
-
-// Snapmaker Orca: the list of the "Preferred layer height" field of extruder `extruder_idx`: Default,
-// the heights that print as listed (available_extruder_layer_heights; none while no other extruder has
-// a height) and the entered height when it is not among them; the field then shows the entered height.
-static void fill_nozzle_layer_height_field(ComboBox *field, size_t extruder_idx)
-{
-    const DynamicPrintConfig inputs  = edited_layer_height_inputs();
-    std::vector<double>      heights = other_extruder_has_layer_height(inputs, extruder_idx) ?
-                                           available_extruder_layer_heights(inputs, extruder_idx) : std::vector<double>();
-    const double        current = entered_layer_height(extruder_idx);
-    if (current > 0. && std::none_of(heights.begin(), heights.end(), [current](double h) { return std::abs(h - current) < 1e-6; })) {
-        heights.push_back(current);
-        std::sort(heights.begin(), heights.end());
-    }
-    field->Clear();
-    field->AppendString(_L("Default"));
-    for (double h : heights)
-        field->AppendString(nozzle_combo_label(h));
-    show_nozzle_layer_height(field, extruder_idx);
-}
-
-// Snapmaker Orca: stores the preferred layer height of extruder `extruder_idx` in the edited printer
-// preset as entered; the object layer height is planned for slicing only (Slicing.hpp). Returns
-// false when the value is unchanged.
-static bool store_preferred_layer_height(size_t extruder_idx, double height)
-{
-    Tab *printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
-    if (printer_tab == nullptr)
-        return false;
-    DynamicPrintConfig new_conf   = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-    const auto        *height_opt = new_conf.option<ConfigOptionFloats>("extruder_layer_height");
-    const auto        *nd_opt     = new_conf.option<ConfigOptionFloats>("nozzle_diameter");
-    if (height_opt == nullptr || nd_opt == nullptr || extruder_idx >= nd_opt->values.size())
-        return false;
-    std::vector<double> heights = height_opt->values;
-    heights.resize(nd_opt->values.size(), 0.);
-    if (std::abs(heights[extruder_idx] - height) < 1e-6)
-        return false;
-    // Snapmaker Orca Max: nozzles of one size share the preferred height unless one has its own.
-    const std::vector<size_t> linked = link_same_size_layer_heights(heights, nd_opt->values, extruder_idx, height);
-    new_conf.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
-    if (! linked.empty()) {
-        std::string names;
-        for (size_t j : linked)
-            names += (names.empty() ? "" : ", ") + std::to_string(j + 1);
-        if (NotificationManager *notifications = wxGetApp().plater()->get_notification_manager(); notifications != nullptr)
-            notifications->push_notification(NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel,
-                GUI::format(_u8L("Also set for extruder(s) %1%, which have the same %2% mm nozzle."), names, nd_opt->values[extruder_idx]));
-    }
-    // As with the diameter combo: marks the printer preset modified and propagates the change
-    // without switching presets; the sidebar fields and hints are refilled from there.
-    printer_tab->load_config(new_conf);
-    // Validation errors shown for the previous heights are stale until the re-validation.
-    if (NotificationManager *notifications = wxGetApp().plater()->get_notification_manager(); notifications != nullptr)
-        notifications->close_notification_of_type(NotificationType::ValidateError);
-    return true;
-}
-
-// Snapmaker Orca: turns on "Exact preferred layer heights" in the edited printer preset (it shows
-// as modified; saving or reverting it is up to the user).
-static void print_exact_layer_heights()
-{
-    Tab *printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
-    if (printer_tab == nullptr)
-        return;
-    DynamicPrintConfig new_conf = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-    new_conf.set_key_value("extruder_layer_height_exact", new ConfigOptionBool(true));
-    printer_tab->load_config(new_conf);
-}
-
-void Sidebar::update_nozzle_layer_height_hints()
-{
-    if (p->m_nozzle_notebook == nullptr || wxGetApp().preset_bundle == nullptr)
-        return;
-    const DynamicPrintConfig                   inputs = edited_layer_height_inputs();
-    const std::vector<ExtruderLayerHeightNote> notes  = extruder_layer_height_notes(inputs);
-    const auto  *exact_opt = inputs.option<ConfigOptionBool>("extruder_layer_height_exact");
-    const bool   exact     = exact_opt != nullptr && exact_opt->value;
-    const auto  *base_opt  = inputs.option<ConfigOptionFloat>("layer_height");
-    const double base      = base_opt != nullptr ? base_opt->value : 0.;
-    auto number = [](double h) { return nozzle_combo_number(nozzle_combo_label(h)); };
-
-    bool changed = false;
-    auto show = [&changed](wxWindow *window, bool shown) {
-        if (window->IsShown() != shown) {
-            window->Show(shown);
-            changed = true;
-        }
-    };
-    for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i) {
-        const NozzlePage &page = p->m_nozzle_pages[i];
-        if (page.layer_height_hint == nullptr || page.layer_height_link == nullptr)
-            continue;
-        wxString text;
-        bool     warning = false;
-        if (i < notes.size()) {
-            const ExtruderLayerHeightNote &note = notes[i];
-            if (note.off_grid) {
-                warning = true;
-                // TRN Warning under the preferred layer height of a nozzle tab. %1% the entered height, %2% the height it prints at, %3% the object layer height, all in mm
-                text = format_wxstr(_L("%1% mm is not on this plate's layer grid and prints at %2% mm (object layer height %3% mm)."),
-                                    number(note.preferred), number(note.printed), number(note.grid));
-            } else if (note.preferred <= 0. && (std::abs(note.printed - base) > 1e-6 || std::abs(note.grid - base) > 1e-6)) {
-                // TRN Under the preferred layer height Default of a nozzle tab. %1% the height it prints at, %2% the object layer height, in mm
-                text = format_wxstr(_L("Default: prints %1% mm layers (object layer height %2% mm)."), number(note.printed), number(note.grid));
-            } else if (note.preferred > 0. && std::abs(note.grid - base) > 1e-6) {
-                // TRN Under the preferred layer height of a nozzle tab. %1% the height it prints at, %2% the object layer height, in mm
-                text = format_wxstr(_L("Prints %1% mm layers (object layer height %2% mm)."), number(note.printed), number(note.grid));
-            }
-        }
-        ogStaticText *hint = page.layer_height_hint;
-        // Mapped colours: the walker of a live theme switch maps the grey in both directions.
-        const wxColour colour = warning ? wxColour("#FF6F00") : StateColor::darkModeColorFor(wxColour("#6B6B6B"));
-        if (hint->GetForegroundColour() != colour) {
-            hint->SetForegroundColour(colour);
-            hint->Refresh();
-        }
-        if (!text.IsEmpty() && hint->GetUnwrappedText() != text) {
-            hint->SetText(text, false);
-            changed = true;
-        }
-        show(hint, !text.IsEmpty());
-        // With exact heights on, an entered height prints as entered: the way out is offered only when off.
-        show(page.layer_height_link, warning && !exact);
-    }
-    if (changed)
-        p->fit_nozzle_block();
-}
-
 // Snapmaker Orca: sets one tool head's nozzle volume type like the Flow row and the sanitizer:
 // via TabPrinter::set_extruder_volume_type() (project config, remembered choice, settings tabs),
 // then the plates' per-filament volume choices. The printer preset is not modified.
@@ -11739,9 +11573,8 @@ static void apply_nozzle_flow_type(size_t head, NozzleVolumeType type)
 // ORCA multi-nozzle-size: set ONLY nozzle `i`'s diameter - the sidebar nozzle combo and the
 // printer sync go through here - mirroring the Printer Settings -> Extruder tab: the printer
 // preset is kept (switching it to a single-diameter variant would force all nozzles to that
-// size, which defeats per-nozzle sizes), the nozzle's layer height limits follow its profile
-// variant, and a preferred layer height that no longer fits through it is reset. `variant` is
-// the diameter as the profiles name it ("0.4").
+// size, which defeats per-nozzle sizes) and the nozzle's layer height limits follow its profile
+// variant. `variant` is the diameter as the profiles name it ("0.4").
 void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
 {
     double new_nd = 0.;
@@ -11842,18 +11675,6 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
                                  variant, i + 1);
         }
     }
-    // A preferred layer height that no longer fits through the new nozzle cannot print;
-    // reset it to Default rather than leave a dead setting behind.
-    if (const auto *height_opt = static_cast<const ConfigOptionFloats*>(new_conf.option("extruder_layer_height"));
-        height_opt != nullptr && !height_opt->values.empty() && height_opt->get_at(i) > new_nd + EPSILON) {
-        std::vector<double> heights = height_opt->values;
-        heights.resize(nozzle_diameters.size(), 0.);
-        heights[i] = 0.;
-        new_conf.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
-        notice += "\n";
-        notice += GUI::format(_u8L("The preferred layer height of nozzle %1% no longer fits through it and was reset to Default."), i + 1);
-    }
-
     // Snapmaker Orca: the state of a process preset chosen for this tool head before the size
     // changes (speed picker): a choice made for another size stays in the project, inactive, and
     // applies again when the size comes back; both changes get a notice below.
@@ -11996,9 +11817,6 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
                 open_speed_source_picker(i);
                 return false;
             });
-    // The valid preferred layer heights of this nozzle follow its bore and limits.
-    if (i < p->m_nozzle_layer_height_lists.size() && p->m_nozzle_layer_height_lists[i] != nullptr)
-        fill_nozzle_layer_height_field(p->m_nozzle_layer_height_lists[i], i);
 }
 
 void Sidebar::update_nozzle_settings(bool switch_machine)
@@ -12025,13 +11843,11 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
     p->m_nozzle_notebook->DeleteAllPages();
     p->m_nozzle_diameter_lists.clear();
     p->m_nozzle_pages.clear();
-    p->m_nozzle_layer_height_lists.clear();
 
     // Recreate pages for new nozzle count
     // Create tabs for each nozzle
     for (size_t i = 0; i < new_nozzle_count; i++) {
-        // The windows are created in the order Diameter, Flow, Preferred layer height: it is the
-        // order of the rows and of the keyboard. layout_nozzle_page() puts them into sizers.
+        // layout_nozzle_page() puts the windows into sizers.
         NozzlePage page;
         page.panel = new wxPanel(p->m_nozzle_notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
         wxPanel* nozzle_panel = page.panel;
@@ -12094,163 +11910,6 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
         fill_nozzle_combo(page, i);
         p->m_nozzle_diameter_lists.push_back(diameter_combo);
 
-        // Preferred layer height row: the layer height this extruder should print with (the
-        // "extruder_layer_height" printer option), stored as entered.
-        page.layer_height_label = make_text(_L("Preferred layer height"), Label::Body_14, *wxBLACK);
-
-        // Editable combo: a listed height prints as listed, any other height can be typed. Style 0:
-        // wxCB_READONLY would hide the text control (Widgets/ComboBox.cpp).
-        ComboBox* lh_field = new ComboBox(nozzle_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, {-1, FromDIP(30)}, 0, nullptr, 0);
-        page.layer_height = lh_field;
-        // The full rule is the tooltip of "extruder_layer_height" in the printer settings.
-        const wxString layer_height_tip = _L("Layer height this nozzle should print with. Pick a listed height, which prints as listed, or "
-                                             "enter any height in mm; Default prints the object layer height. For slicing, the object layer "
-                                             "height is chosen so that every preferred layer height is a whole multiple of it; the line "
-                                             "below names the height the extruder prints when it differs.");
-        lh_field->SetToolTip(layer_height_tip);
-        page.layer_height_label->SetToolTip(layer_height_tip);
-        fill_nozzle_layer_height_field(lh_field, i);
-
-        // Applies the entered or picked height for extruder `i` (Enter, leaving the field, a pick).
-        auto apply_preferred_height = [lh_field, i]() {
-            wxString text = lh_field->GetTextCtrl()->GetValue();
-            text.Trim(true).Trim(false);
-            if (text.EndsWith("mm"))
-                text.RemoveLast(2);
-            text.Trim(true);
-            double new_height = 0.;
-            // Empty, "0" or Default (translated or not) clears the preference; anything else must
-            // be a layer height of at least 5 um.
-            if (!text.empty() && text.CmpNoCase(_L("Default")) != 0 && text.CmpNoCase("Default") != 0) {
-                const bool numeric = text.ToCDouble(&new_height) || text.ToDouble(&new_height);
-                if (!numeric || new_height < 0. || (new_height > 0. && new_height < 0.0025)) {
-                    wxGetApp().plater()->get_notification_manager()->push_notification(
-                        NotificationType::CustomNotification, NotificationManager::NotificationLevel::WarningNotificationLevel,
-                        GUI::format(_u8L("\"%1%\" is not a valid layer height for extruder %2%. Enter a height in mm, or Default."), into_u8(text), i + 1));
-                    show_nozzle_layer_height(lh_field, i); // show the stored value again
-                    return;
-                }
-            }
-            // Layers are planned in 5 um steps: a finer value could not print as entered.
-            constexpr double quantum = 0.005;
-            if (new_height > 0.)
-                new_height = std::round(std::round(new_height / quantum) * quantum * 1e6) / 1e6;
-
-            const auto *nd_opt = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter");
-            if (nd_opt == nullptr || i >= nd_opt->values.size())
-                return;
-            if (new_height > nd_opt->values[i] + EPSILON) {
-                wxGetApp().plater()->get_notification_manager()->push_notification(
-                    NotificationType::CustomNotification, NotificationManager::NotificationLevel::WarningNotificationLevel,
-                    GUI::format(_u8L("The layer height of extruder %1% cannot exceed its nozzle diameter (%2% mm)."), i + 1, nd_opt->values[i]));
-                show_nozzle_layer_height(lh_field, i);
-                return;
-            }
-            // A change refills every field through the printer preset update; otherwise
-            // normalise this one's text.
-            if (!store_preferred_layer_height(i, new_height))
-                show_nozzle_layer_height(lh_field, i);
-        };
-        // "Default" is a placeholder, not text to delete first: it clears when the field is entered
-        // and comes back (from the stored value) when the field is left empty.
-        auto clear_default_placeholder = [lh_field]() {
-            wxTextCtrl *ctrl = lh_field->GetTextCtrl();
-            const wxString text = ctrl->GetValue();
-            if (text.CmpNoCase(_L("Default")) == 0 || text.CmpNoCase("Default") == 0)
-                ctrl->ChangeValue(wxEmptyString);
-        };
-        // Entering the field opens the list while another extruder has a height to fit; the focus stays
-        // in the text, so typing goes on. Not right after the list closed: the click that closes it must
-        // not open it again.
-        auto open_list = [lh_field, i]() {
-            lh_field->CallAfter([lh_field, i]() {
-                if (lh_field->IsEnabled() && lh_field->GetTextCtrl()->HasFocus() && !lh_field->is_drop_down() &&
-                    lh_field->GetDropDown().HasDismissLongTime() && other_extruder_has_layer_height(edited_layer_height_inputs(), i))
-                    lh_field->ForceDropdownOpen(lh_field->GetTextCtrl());
-            });
-        };
-        lh_field->Bind(wxEVT_TEXT_ENTER, [apply_preferred_height, clear_default_placeholder, lh_field](wxCommandEvent&) {
-            if (lh_field->is_drop_down())
-                lh_field->GetDropDown().Cancel();
-            apply_preferred_height();
-            // The field keeps the focus after Enter: keep the placeholder hidden while editing.
-            if (lh_field->GetTextCtrl()->HasFocus())
-                clear_default_placeholder();
-        });
-        lh_field->Bind(wxEVT_COMBOBOX, [apply_preferred_height](wxCommandEvent&) {
-            apply_preferred_height();
-            // Do not event.Skip(): see the diameter combo.
-        });
-        lh_field->GetTextCtrl()->Bind(wxEVT_SET_FOCUS, [clear_default_placeholder, open_list](wxFocusEvent& e) {
-            clear_default_placeholder();
-            open_list();
-            e.Skip();
-        });
-        // Also on a click into a field that already has the focus (e.g. right after Enter
-        // normalised its text to Default, or after a pick).
-        lh_field->GetTextCtrl()->Bind(wxEVT_LEFT_DOWN, [clear_default_placeholder, open_list](wxMouseEvent& e) {
-            clear_default_placeholder();
-            open_list();
-            e.Skip();
-        });
-        lh_field->Bind(wxEVT_KILL_FOCUS, [apply_preferred_height, lh_field, i](wxFocusEvent& e) {
-            apply_preferred_height();
-            if (lh_field->GetTextCtrl()->GetValue().empty())
-                show_nozzle_layer_height(lh_field, i); // the placeholder comes back
-            e.Skip();
-        });
-        // With the list open: the arrows move its highlight, Enter picks the highlighted height (else
-        // applies the typed one), Escape closes it. Any other key closes it first, so the key reaches
-        // the text: while the list is open, the popup would take the typed characters.
-        lh_field->GetTextCtrl()->Bind(wxEVT_KEY_DOWN, [lh_field](wxKeyEvent& e) {
-            const int key = e.GetKeyCode();
-            if (!lh_field->is_drop_down() || key == WXK_SHIFT || key == WXK_CONTROL || key == WXK_ALT) {
-                e.Skip();
-                return;
-            }
-            DropDown &drop = lh_field->GetDropDown();
-            if (key == WXK_UP || key == WXK_DOWN) {
-                drop.MoveHighlight(key == WXK_UP ? -1 : 1);
-                return;
-            }
-            if ((key == WXK_RETURN || key == WXK_NUMPAD_ENTER) && drop.HighlightedItem() >= 0) {
-                drop.CommitHighlighted();
-                return;
-            }
-            drop.Cancel();
-            if (key != WXK_ESCAPE)
-                e.Skip();
-        });
-        // A list closed by a click elsewhere keeps the focus event from the field: it is left the
-        // way leaving the field leaves it (checked once the focus has moved).
-        lh_field->Bind(wxEVT_COMBOBOX_CLOSEUP, [apply_preferred_height, lh_field, i](wxCommandEvent&) {
-            lh_field->CallAfter([apply_preferred_height, lh_field, i]() {
-                if (lh_field->GetTextCtrl()->HasFocus())
-                    return;
-                apply_preferred_height();
-                if (lh_field->GetTextCtrl()->GetValue().empty())
-                    show_nozzle_layer_height(lh_field, i);
-            });
-        });
-        p->m_nozzle_layer_height_lists.push_back(lh_field);
-
-        // Under the row: the height the extruder prints when it differs from the entered one or the
-        // object layer height changes for slicing; a warning in orange for an entered height off the
-        // grid, with the way to print every entered height exactly. Filled by update_nozzle_layer_height_hints().
-        page.layer_height_hint = make_hint();
-        page.layer_height_link = make_hint();
-        page.layer_height_link->SetForegroundColour(wxColour("#009688"));
-        wxFont link_font = page.layer_height_link->GetFont();
-        link_font.SetUnderlined(true);
-        page.layer_height_link->SetFont(link_font);
-        page.layer_height_link->SetCursor(wxCursor(wxCURSOR_HAND));
-        // TRN Link under the warning of a preferred layer height off the layer grid; turns on "Exact preferred layer heights"
-        page.layer_height_link->SetText(_L("Print exact heights"), false);
-        page.layer_height_link->SetToolTip(_L("Turns on \"Exact preferred layer heights\" in the printer settings: every preferred layer "
-                                              "height prints as entered, and the object layer height becomes the coarsest height they are "
-                                              "all whole multiples of, which can mean many more layers."));
-        page.layer_height_link->Bind(wxEVT_LEFT_DOWN, [](wxMouseEvent &) { wxGetApp().CallAfter([]() { print_exact_layer_heights(); }); });
-
         // The process preset a tool head of another nozzle size prints with (PerHeadProcess), under
         // the rows. Text and visibility come from
         // update_nozzle_process_hints(). A click leads to the speed picker of the Process tab.
@@ -12258,7 +11917,6 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
         page.process_hint->SetCursor(wxCursor(wxCURSOR_HAND));
         page.process_hint->Bind(wxEVT_LEFT_DOWN, [i](wxMouseEvent &) { open_speed_source_picker(i); });
 
-        page.layer_height->MoveAfterInTabOrder(page.diameter);
         layout_nozzle_page(page);
         p->m_nozzle_pages.push_back(page);
 
@@ -12292,8 +11950,7 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
     if (prev_page > 0 && prev_page < (int) p->m_nozzle_notebook->GetPageCount())
         p->m_nozzle_notebook->SetSelection(size_t(prev_page));
 
-    update_nozzle_layer_height_hints();
-    // Fills the Flow rows and sizes the notebook for them (it lays the notebook out).
+    // Fills the Nozzle combos and sizes the notebook (it lays the notebook out).
     update_nozzle_flow_values();
 
     if (switch_machine) {
@@ -12306,9 +11963,8 @@ void Sidebar::update_nozzle_settings(bool switch_machine)
 
 // ORCA multi-nozzle-size: refresh the values shown by the nozzle tabs in place, without
 // rebuilding them (no focus or tab-selection changes). Called whenever the printer's nozzle
-// sizes, layer height limits or preferred layer heights change, or the object layer height
-// changes (it defines which preferred layer heights are valid). A change of the extruder
-// count escalates to a deferred full rebuild of the tabs.
+// sizes or layer height limits change. A change of the extruder count escalates to a deferred
+// full rebuild of the tabs.
 void Sidebar::update_nozzle_values()
 {
     if (p->m_nozzle_notebook == nullptr)
@@ -12331,10 +11987,6 @@ void Sidebar::update_nozzle_values()
     }
     for (size_t i = 0; i < p->m_nozzle_pages.size(); ++i)
         fill_nozzle_combo(p->m_nozzle_pages[i], i);
-    for (size_t i = 0; i < p->m_nozzle_layer_height_lists.size(); ++i)
-        if (p->m_nozzle_layer_height_lists[i] != nullptr)
-            fill_nozzle_layer_height_field(p->m_nozzle_layer_height_lists[i], i);
-    update_nozzle_layer_height_hints();
     // A tool head may run High Flow only with a nozzle size the vendor data has values for.
     update_nozzle_flow_values();
 }
@@ -12479,10 +12131,9 @@ void Sidebar::update_nozzle_process_hints()
                                    kept.empty() ? _L("none") : from_u8(kept));
             } else if (source != nullptr) {
                 // The sentence of the quality rule: which step of PerHeadProcess::source_for_head chose the preset.
-                bool           preferred = false;
-                const double   height    = PerHeadProcess::target_layer_height(*bundle, i, &preferred);
+                const double   height    = PerHeadProcess::target_layer_height(*bundle);
                 const wxString why       = HighFlowNotices::automatic_reason(source->step, PerHeadProcess::plate_quality_class(*bundle), source->class_used,
-                                                                             HighFlowNotices::head_nozzle_size_label(*printer, i), height, preferred);
+                                                                             HighFlowNotices::head_nozzle_size_label(*printer, i), height);
                 // TRN Tooltip of the line under a nozzle tab. %1% is a process preset, %2% a sentence that says why the rule chose it, %3% the default line width the tool head prints ("110 % (0.22 mm)"), %4% a list of settings or "none"
                 tip = format_wxstr(_L("This extruder has another nozzle size than the selected process preset is made for. Its speeds, accelerations, jerk and line widths come from %1%. %2% "
                                       "Line width %3%. Every other setting comes from the selected process preset. Values you changed in the selected preset are kept: %4%."),
@@ -18467,7 +18118,7 @@ static constexpr size_t long_slice_layer_threshold = 4000;
 static LongSliceEstimate estimate_plate_layers(const Model &model, PartPlate &plate)
 {
     LongSliceEstimate  est;
-    // The grid planned from the preferred layer heights, as slicing uses it (Slicing.hpp).
+    // The grid planned from the multi-nozzle strategy, as slicing uses it (Slicing.hpp).
     DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
     apply_extruder_layer_height_plan(full_config);
     const double       global_layer_height = full_config.opt_float("layer_height");
@@ -18526,32 +18177,14 @@ static LongSliceEstimate estimate_plate_layers(const Model &model, PartPlate &pl
 // ORCA: body of the "would take very long" question for the given (plate index, estimate) pairs.
 static wxString long_slice_question(const std::vector<std::pair<int, LongSliceEstimate>> &plates, bool name_plates)
 {
-    std::string body        = _u8L("Slicing would take very long:") + "\n";
-    double      finest_grid = 0.;
-    bool        any_preset  = false;
+    std::string body = _u8L("Slicing would take very long:") + "\n";
     for (const auto &[plate_idx, est] : plates) {
         body += "\n";
         if (name_plates)
             body += GUI::format(_u8L("Plate %1%: "), plate_idx + 1);
         body += GUI::format(_u8L("\"%1%\" would be sliced into about %2% layers at a layer height of %3% mm."),
                             est.object_name, est.layers, est.layer_height);
-        if (!est.from_override) {
-            any_preset = true;
-            if (finest_grid <= 0. || est.layer_height < finest_grid)
-                finest_grid = est.layer_height;
-        }
     }
-    // The usual cause: the object layer height follows the finest preferred layer height. Hint
-    // only when a preferred height does set the grid (not when the fine height is the user's
-    // own object layer height).
-    const auto *preferred = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height");
-    if (any_preset && preferred != nullptr)
-        for (size_t j = 0; j < preferred->values.size(); ++j)
-            if (preferred->values[j] > EPSILON && std::abs(preferred->values[j] - finest_grid) <= 1e-4) {
-                body += "\n\n" + GUI::format(_u8L("The object layer height follows the finest preferred layer height (extruder %1%). "
-                                                  "A coarser preferred layer height there gives a much faster slice."), j + 1);
-                break;
-            }
     body += "\n\n" + _u8L("Do you want to proceed?");
     return wxString::FromUTF8(body.c_str());
 }
@@ -30104,18 +29737,16 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
             update_scheduled = true;
         }
         // ORCA multi-nozzle-size: the sidebar nozzle tabs mirror the printer's extruder count,
-        // nozzle sizes, layer height limits and preferred layer heights; their lists and hints
-        // follow the object layer height. update_nozzle_values() refreshes them in place (and
+        // nozzle sizes and layer height limits. update_nozzle_values() refreshes them in place (and
         // defers a full tab rebuild when the extruder count changed).
-        else if (opt_key == "nozzle_diameter" || opt_key == "extruder_layer_height" || opt_key == "extruder_layer_height_exact" ||
-                 opt_key == "layer_height" || opt_key == "min_layer_height" || opt_key == "max_layer_height") {
+        else if (opt_key == "nozzle_diameter" || opt_key == "layer_height" || opt_key == "min_layer_height" || opt_key == "max_layer_height") {
             nozzle_tabs_changed = true;
             if (opt_key == "nozzle_diameter")
                 nozzle_sizes_changed = true;
             // Snapmaker Orca: the speed selector of the Process tab names the nozzle size of every
             // tool head and shows, under a tool head, the values of the process preset of its size,
-            // which the source rule picks by size and preferred layer height (PerHeadProcess::head_sources).
-            if (opt_key == "nozzle_diameter" || opt_key == "extruder_layer_height")
+            // which the source rule picks by size (PerHeadProcess::head_sources).
+            if (opt_key == "nozzle_diameter")
                 head_selector_changed = true;
         }
     }

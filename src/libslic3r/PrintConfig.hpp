@@ -404,8 +404,9 @@ enum SupportLayerHeightStep : int {
 
 // Snapmaker Orca Max: layer heights for printers whose extruders have different nozzle sizes.
 // Off slices with one layer height; the strategies give every nozzle the same share of its
-// diameter on one common grid (see multi_nozzle_strategy_fraction()); Custom uses the printer's
-// per-extruder "Preferred layer height" values (projects made before the strategies existed).
+// diameter on one common grid (see multi_nozzle_strategy_fraction()). Custom (the printer's
+// per-extruder preferred heights of older versions) is read only while a config loads:
+// PrintConfigDef::handle_legacy_composite turns it into the nearest strategy.
 enum MultiNozzleLayerHeights : int {
     mnlhOff = 0,
     mnlhUltraFine,
@@ -1982,7 +1983,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloats,               fan_min_speed))
     ((ConfigOptionFloats,             min_layer_height))
     ((ConfigOptionFloats,             extruder_layer_height))
-    ((ConfigOptionBool,               extruder_layer_height_exact))
     ((ConfigOptionFloat,              printable_height))
     ((ConfigOptionFloatsNullable,     extruder_printable_height))
     ((ConfigOptionPoint,              best_object_pos))

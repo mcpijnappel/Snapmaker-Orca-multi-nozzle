@@ -1114,7 +1114,6 @@ double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, 
     return stepped_nozzle_layer_height(multi_nozzle_strategy_fraction(strategy) * nozzle, 0, grid, nozzle, min_lh, max_lh);
 }
 
-// ORCA multi-nozzle-size: see Slicing.hpp.
 double conforming_object_layer_height(const std::vector<double> &heights, double base, bool include_base, double max_height)
 {
     auto quanta = [](double height) { return std::lround(height / 0.005); };
@@ -1128,89 +1127,6 @@ double conforming_object_layer_height(const std::vector<double> &heights, double
         if (common % k == 0 && (max_height <= EPSILON || (common / k) * 0.005 <= max_height + EPSILON))
             return std::round((common / k) * 0.005 * 1e6) / 1e6;
     return 0.;
-}
-
-ExtruderLayerHeightPlan plan_extruder_layer_heights(std::vector<double> heights, double base, const std::vector<double> &nozzles,
-                                                    double min_nozzle, bool exact, double min_grid, double tolerance)
-{
-    ExtruderLayerHeightPlan plan;
-    auto snap = [](double v) { return std::round(v * 1e6) / 1e6; };
-    double finest      = 0.;
-    bool   has_default = false;
-    for (double h : heights) {
-        if (h > EPSILON) {
-            if (finest <= 0. || h < finest)
-                finest = h;
-        } else
-            has_default = true;
-    }
-    if (finest <= 0.) {
-        plan.heights = std::move(heights);
-        return plan;
-    }
-    // Whether `h` lands within `tol` of a whole multiple of the grid `g` that fits the bore.
-    auto lands = [&snap](double h, double g, double bore, double tol) {
-        const long   n       = std::max(1L, std::lround(h / g));
-        const double snapped = snap(n * g);
-        return std::abs(snapped - h) <= tol + EPSILON && snapped <= bore + EPSILON;
-    };
-    double grid = 0.;
-    if (exact) {
-        // Every entered value prints exactly: the grid is what they all are whole multiples of.
-        grid = conforming_object_layer_height(heights, base, false, min_nozzle);
-    } else {
-        // The coarsest grid on which every entered value lands within the tolerance of a whole
-        // multiple; candidates run from the finest value (or the smallest nozzle, if that is
-        // finer) down to the floor in 5 um steps. With Default extruders, `base` must land too,
-        // within max(tol, 0.1 * base). If nothing fits, the tolerance grows step by step until a
-        // candidate does; the grid never drops below the floor.
-        const double top       = min_nozzle > EPSILON ? std::min(finest, min_nozzle) : finest;
-        const double floor     = std::min(top, std::max(0.02, min_grid));
-        const bool   with_base = has_default && base > EPSILON;
-        const double step      = std::max(tolerance, 0.005);
-        const long   q_top     = std::lround(top / 0.005), q_floor = std::max(1L, std::lround(floor / 0.005));
-        for (double tol = step; grid <= 0. && tol <= top + EPSILON; tol += step) {
-            const double base_tol = std::max(tol, 0.1 * base);
-            for (long q = q_top; q >= q_floor && grid <= 0.; -- q) {
-                const double g  = snap(q * 0.005);
-                bool         ok = ! with_base || lands(base, g, std::numeric_limits<double>::max(), base_tol);
-                for (size_t j = 0; j < heights.size() && ok; ++ j)
-                    if (heights[j] > EPSILON)
-                        ok = lands(heights[j], g, j < nozzles.size() ? nozzles[j] : std::numeric_limits<double>::max(), tol);
-                if (ok)
-                    grid = g;
-            }
-        }
-        if (grid <= EPSILON)
-            // Only a value above its own nozzle never lands (Print::validate refuses it); the
-            // coarsest candidate, the snapping below caps every value to its bore.
-            grid = top;
-    }
-    if (grid <= EPSILON) {
-        plan.heights = std::move(heights);
-        return plan;
-    }
-    auto multiple_of_grid = [&](double h, double bore) {
-        long n = std::max(1L, std::lround(h / grid));
-        while (n > 1 && n * grid > bore + EPSILON)
-            -- n;
-        return snap(n * grid);
-    };
-    for (size_t j = 0; j < heights.size(); ++ j) {
-        const double bore = j < nozzles.size() ? nozzles[j] : std::numeric_limits<double>::max();
-        if (heights[j] > EPSILON) {
-            const double snapped = multiple_of_grid(heights[j], bore);
-            if (std::abs(snapped - heights[j]) > 1e-6)
-                plan.rounded.push_back(j);
-            heights[j] = snapped;
-        } else if (base > EPSILON && grid < base - EPSILON && bore >= grid - EPSILON) {
-            heights[j] = multiple_of_grid(base, bore);
-            plan.pinned.push_back(j);
-        }
-    }
-    plan.grid    = grid;
-    plan.heights = std::move(heights);
-    return plan;
 }
 
 const char *const extruder_layer_height_planned_key = "extruder_layer_height_planned";
@@ -1250,89 +1166,43 @@ bool whole_multiple_of(double height, double base)
     return n >= 1. && std::abs(height - n * base) <= EPSILON;
 }
 
-bool on_quantum_grid(double height)
-{
-    return std::abs(height / 0.005 - std::round(height / 0.005)) <= 1e-6;
-}
-
 } // namespace
 
-DynamicPrintConfig extruder_layer_height_inputs(const DynamicPrintConfig &printer, const DynamicPrintConfig &print)
-{
-    DynamicPrintConfig inputs;
-    for (const char *key : { "extruder_layer_height", "extruder_layer_height_exact", "nozzle_diameter", "min_layer_height", "max_layer_height" })
-        if (const ConfigOption *option = printer.option(key); option != nullptr)
-            inputs.set_key_value(key, option->clone());
-    for (const char *key : { "layer_height", "multi_nozzle_layer_heights" })
-        if (const ConfigOption *option = print.option(key); option != nullptr)
-            inputs.set_key_value(key, option->clone());
-    return inputs;
-}
-
-bool extruder_layer_heights_conform(const std::vector<double> &heights, double base, const std::vector<double> &nozzles)
-{
-    if (base <= EPSILON || ! on_quantum_grid(base))
-        return false;
-    for (size_t j = 0; j < heights.size(); ++ j) {
-        const double bore = j < nozzles.size() && nozzles[j] > EPSILON ? nozzles[j] : std::numeric_limits<double>::max();
-        if (heights[j] > EPSILON) {
-            if (! whole_multiple_of(heights[j], base) || heights[j] > bore + EPSILON)
-                return false;
-        } else if (bore < base - EPSILON)
-            // A Default extruder would print the object layer height through a smaller nozzle.
-            return false;
-    }
-    return true;
-}
-
-// The configured multi-nozzle strategy; configs without the key keep the printer's heights.
+// The configured multi-nozzle strategy; -1 for a config without the key, which keeps its heights.
 static int multi_nozzle_strategy_of(const DynamicPrintConfig &config)
 {
     const auto *option = config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
-    return option == nullptr ? int(mnlhCustom) : int(option->value);
+    return option == nullptr ? -1 : int(option->value);
 }
 
 ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfig &config)
 {
     ExtruderLayerHeightPlan   effective;
-    const std::vector<double> nozzles = floats_of(config, "nozzle_diameter");
-    const int                 strategy = multi_nozzle_strategy_of(config);
-    if (strategy != mnlhCustom) {
-        // Off: one layer height for everything (every extruder at Default). A strategy: each
-        // nozzle's share of its diameter on the strategy's grid, which becomes the layer height.
-        const auto  *base_option = config.option<ConfigOptionFloat>("layer_height");
-        effective.heights.assign(std::max<size_t>(1, nozzles.size()), 0.);
-        effective.grid = base_option != nullptr ? base_option->value : 0.;
-        if (strategy == mnlhOff || nozzles.empty())
-            return effective;
-        const std::vector<double> min_lh = floats_of(config, "min_layer_height");
-        const std::vector<double> max_lh = floats_of(config, "max_layer_height");
-        effective.grid = multi_nozzle_strategy_grid(strategy);
-        for (size_t j = 0; j < nozzles.size(); ++ j)
-            effective.heights[j] = multi_nozzle_strategy_height(strategy, nozzles[j], value_at(min_lh, j), value_at(max_lh, j));
+    const std::vector<double> nozzles     = floats_of(config, "nozzle_diameter");
+    const int                 strategy    = multi_nozzle_strategy_of(config);
+    const auto               *base_option = config.option<ConfigOptionFloat>("layer_height");
+    effective.grid                        = base_option != nullptr ? base_option->value : 0.;
+    if (strategy < 0) {
+        // No strategy key: the heights the config holds, as they are.
+        effective.heights = floats_of(config, "extruder_layer_height");
+        if (! nozzles.empty())
+            effective.heights.resize(nozzles.size(), 0.);
+        for (double &height : effective.heights)
+            height = std::max(0., height);
         return effective;
     }
-    effective.heights                 = floats_of(config, "extruder_layer_height");
-    if (! nozzles.empty())
-        effective.heights.resize(nozzles.size(), 0.);
-    // A height above its nozzle cannot print: planned as the nozzle diameter (on the 5 um grid).
-    for (size_t j = 0; j < effective.heights.size(); ++ j) {
-        double &height = effective.heights[j];
-        if (height <= EPSILON)
-            height = 0.;
-        else if (j < nozzles.size() && nozzles[j] > EPSILON && height > nozzles[j] + EPSILON)
-            height = std::round(std::floor(nozzles[j] / 0.005 + EPSILON) * 0.005 * 1e6) / 1e6;
-    }
-    const auto  *base_option = config.option<ConfigOptionFloat>("layer_height");
-    const double base        = base_option != nullptr ? base_option->value : 0.;
-    effective.grid           = base;
-    if (base <= EPSILON || ! has_explicit_height(effective.heights) || extruder_layer_heights_conform(effective.heights, base, nozzles))
+    // Off: one layer height for everything. A strategy: each nozzle's share of its diameter on the
+    // strategy's grid, which becomes the layer height. Custom only exists while a project of an
+    // older version loads (PrintConfigDef::handle_legacy_composite) and prints as Off.
+    effective.heights.assign(std::max<size_t>(1, nozzles.size()), 0.);
+    if (multi_nozzle_strategy_fraction(strategy) <= 0. || nozzles.empty())
         return effective;
-    const auto *exact = config.option<ConfigOptionBool>("extruder_layer_height_exact");
-    ExtruderLayerHeightPlan plan = plan_extruder_layer_heights(effective.heights, base, nozzles, smallest_positive(nozzles),
-                                                               exact != nullptr && exact->value,
-                                                               smallest_positive(floats_of(config, "min_layer_height")) / 2.);
-    return plan.grid > EPSILON ? plan : effective;
+    const std::vector<double> min_lh = floats_of(config, "min_layer_height");
+    const std::vector<double> max_lh = floats_of(config, "max_layer_height");
+    effective.grid = multi_nozzle_strategy_grid(strategy);
+    for (size_t j = 0; j < nozzles.size(); ++ j)
+        effective.heights[j] = multi_nozzle_strategy_height(strategy, nozzles[j], value_at(min_lh, j), value_at(max_lh, j));
+    return effective;
 }
 
 double nozzle_layer_height_for(const DynamicPrintConfig &full_config, size_t extruder_idx, int steps)
@@ -1350,7 +1220,7 @@ bool apply_extruder_layer_height_plan(DynamicPrintConfig &config)
 {
     const std::vector<double> stored   = floats_of(config, "extruder_layer_height");
     const int                 strategy = multi_nozzle_strategy_of(config);
-    if (strategy == mnlhCustom ? ! has_explicit_height(stored) : (strategy == mnlhOff && ! has_explicit_height(stored)))
+    if (strategy < 0 || (multi_nozzle_strategy_fraction(strategy) <= 0. && ! has_explicit_height(stored)))
         return false;
     config.set_key_value(extruder_layer_height_planned_key, new ConfigOptionBool(true));
     const ExtruderLayerHeightPlan effective = effective_extruder_layer_heights(config);
@@ -1378,102 +1248,6 @@ double effective_object_layer_height(const std::vector<double> &heights, const s
         return object_height;
     const double grid = conforming_object_layer_height(heights, object_height, false, smallest_positive(nozzles));
     return grid > EPSILON ? grid : object_height;
-}
-
-std::vector<double> available_extruder_layer_heights(const DynamicPrintConfig &config, size_t extruder)
-{
-    std::vector<double> available;
-    // Candidates: the grid of the other extruders' heights, its half and quarter, and its whole multiples.
-    std::vector<double> heights = floats_of(config, "extruder_layer_height");
-    if (heights.size() <= extruder)
-        heights.resize(extruder + 1, 0.);
-    heights[extruder] = 0.;
-    DynamicPrintConfig others = config;
-    others.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
-    const double grid = effective_extruder_layer_heights(others).grid;
-    if (grid <= EPSILON)
-        return available;
-
-    double       cap        = value_at(floats_of(config, "nozzle_diameter"), extruder);
-    const double max_height = value_at(floats_of(config, "max_layer_height"), extruder);
-    if (max_height > EPSILON)
-        cap = cap > EPSILON ? std::min(cap, max_height) : max_height;
-    const double min_height = value_at(floats_of(config, "min_layer_height"), extruder);
-    auto offer = [&](double height) {
-        height = std::round(height * 1e6) / 1e6;
-        if (height + EPSILON >= min_height && (cap <= EPSILON || height <= cap + EPSILON) && on_quantum_grid(height) &&
-            std::none_of(available.begin(), available.end(), [height](double h) { return std::abs(h - height) < 1e-6; }))
-            available.push_back(height);
-    };
-    offer(grid / 4.);
-    offer(grid / 2.);
-    for (int n = 1; n <= 100 && (n == 1 || (cap > EPSILON && n * grid <= cap + EPSILON)); ++ n)
-        offer(n * grid);
-    std::sort(available.begin(), available.end());
-
-    // A candidate may move the plan to another grid: kept only when it prints as listed and every other
-    // entered height prints as before (or as entered).
-    const std::vector<ExtruderLayerHeightNote> reference = extruder_layer_height_notes(others);
-    auto prints_as_listed = [&](double height) {
-        heights[extruder] = height;
-        others.set_key_value("extruder_layer_height", new ConfigOptionFloats(heights));
-        const std::vector<ExtruderLayerHeightNote> notes = extruder_layer_height_notes(others);
-        if (extruder < notes.size() && notes[extruder].off_grid)
-            return false;
-        for (size_t j = 0; j < std::min(notes.size(), reference.size()); ++ j)
-            if (j != extruder && heights[j] > EPSILON && notes[j].off_grid && std::abs(notes[j].printed - reference[j].printed) > 1e-6)
-                return false;
-        return true;
-    };
-    available.erase(std::remove_if(available.begin(), available.end(), [&](double height) { return ! prints_as_listed(height); }),
-                    available.end());
-    return available;
-}
-
-std::vector<size_t> link_same_size_layer_heights(std::vector<double> &heights, const std::vector<double> &nozzles,
-                                                 size_t extruder, double height)
-{
-    std::vector<size_t> linked;
-    heights.resize(nozzles.size(), 0.);
-    if (extruder >= nozzles.size())
-        return linked;
-    const double old_height = heights[extruder];
-    heights[extruder]       = height;
-    for (size_t j = 0; j < nozzles.size(); ++ j) {
-        if (j == extruder || std::abs(nozzles[j] - nozzles[extruder]) > EPSILON)
-            continue;
-        if (heights[j] < EPSILON || std::abs(heights[j] - old_height) < EPSILON) {
-            if (std::abs(heights[j] - height) > EPSILON)
-                linked.emplace_back(j);
-            heights[j] = height;
-        }
-    }
-    return linked;
-}
-
-bool other_extruder_has_layer_height(const DynamicPrintConfig &config, size_t extruder)
-{
-    const std::vector<double> heights = floats_of(config, "extruder_layer_height");
-    for (size_t j = 0; j < heights.size(); ++ j)
-        if (j != extruder && heights[j] > EPSILON)
-            return true;
-    return false;
-}
-
-std::vector<ExtruderLayerHeightNote> extruder_layer_height_notes(const DynamicPrintConfig &config)
-{
-    const ExtruderLayerHeightPlan effective = effective_extruder_layer_heights(config);
-    std::vector<double>           stored    = floats_of(config, "extruder_layer_height");
-    stored.resize(effective.heights.size(), 0.);
-    std::vector<ExtruderLayerHeightNote> notes(effective.heights.size());
-    for (size_t j = 0; j < notes.size(); ++ j) {
-        ExtruderLayerHeightNote &note = notes[j];
-        note.preferred = std::max(0., stored[j]);
-        note.grid      = effective.grid;
-        note.printed   = effective.heights[j] > EPSILON ? effective.heights[j] : effective.grid;
-        note.off_grid  = note.preferred > EPSILON && std::abs(note.printed - note.preferred) > 1e-6;
-    }
-    return notes;
 }
 
 }; // namespace Slic3r

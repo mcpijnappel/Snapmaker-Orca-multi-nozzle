@@ -864,7 +864,6 @@ public:
 	void		reload_config() override;
 	void		activate_selected_page(std::function<void()> throw_if_canceled) override;
 	void		clear_pages() override;
-	bool		multi_nozzle_custom() const;
 	void		toggle_options() override;
     void		update() override;
     void		update_fff();

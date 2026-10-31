@@ -519,36 +519,23 @@ wxString flow_tooltip(FlowRowState state, const std::string &head_size)
 }
 
 wxString automatic_reason(PerHeadProcess::Step step, const std::string &plate_class, const std::string &class_used, const std::string &head_size,
-                          double height, bool preferred)
+                          double height)
 {
     const wxString height_text = from_u8(float_to_string_decimal_point(height, 2));
     switch (step) {
     case PerHeadProcess::Step::SameQuality:
         if (plate_class.empty())
-            return preferred ?
-                // TRN Why a tool head prints with a process preset. %1% is a layer height in mm
-                format_wxstr(_L("Automatic: the nearest layer height to the preferred %1% mm."), height_text) :
-                // TRN Why a tool head prints with a process preset. %1% is a layer height in mm
-                format_wxstr(_L("Automatic: the nearest layer height to the plate's %1% mm."), height_text);
-        return preferred ?
-            // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
-            format_wxstr(_L("Automatic: the plate's quality (%1%), nearest to the preferred layer height %2% mm."), from_u8(plate_class), height_text) :
-            // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
-            format_wxstr(_L("Automatic: the plate's quality (%1%), nearest to the plate's layer height %2% mm."), from_u8(plate_class), height_text);
+            // TRN Why a tool head prints with a process preset. %1% is a layer height in mm
+            return format_wxstr(_L("Automatic: the nearest layer height to the plate's %1% mm."), height_text);
+        // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
+        return format_wxstr(_L("Automatic: the plate's quality (%1%), nearest to the plate's layer height %2% mm."), from_u8(plate_class), height_text);
     case PerHeadProcess::Step::ClassLadder:
         if (plate_class.empty())
-            return preferred ?
-                // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
-                format_wxstr(_L("Automatic: %1%, nearest to the preferred layer height %2% mm."), from_u8(class_used), height_text) :
-                // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
-                format_wxstr(_L("Automatic: %1%, nearest to the plate's layer height %2% mm."), from_u8(class_used), height_text);
-        return preferred ?
-            // TRN Why a tool head prints with a process preset. %1% is the plate's quality class ("High Quality"), %2% a nozzle size, %3% the class used instead ("Standard"), %4% a layer height in mm
-            format_wxstr(_L("Automatic: no %1% preset exists for a %2% mm nozzle, so %3%, nearest to the preferred layer height %4% mm."),
-                         from_u8(plate_class), from_u8(head_size), from_u8(class_used), height_text) :
-            // TRN Why a tool head prints with a process preset. %1% is the plate's quality class ("High Quality"), %2% a nozzle size, %3% the class used instead ("Standard"), %4% a layer height in mm
-            format_wxstr(_L("Automatic: no %1% preset exists for a %2% mm nozzle, so %3%, nearest to the plate's layer height %4% mm."),
-                         from_u8(plate_class), from_u8(head_size), from_u8(class_used), height_text);
+            // TRN Why a tool head prints with a process preset. %1% is a quality class ("Standard"), %2% a layer height in mm
+            return format_wxstr(_L("Automatic: %1%, nearest to the plate's layer height %2% mm."), from_u8(class_used), height_text);
+        // TRN Why a tool head prints with a process preset. %1% is the plate's quality class ("High Quality"), %2% a nozzle size, %3% the class used instead ("Standard"), %4% a layer height in mm
+        return format_wxstr(_L("Automatic: no %1% preset exists for a %2% mm nozzle, so %3%, nearest to the plate's layer height %4% mm."),
+                            from_u8(plate_class), from_u8(head_size), from_u8(class_used), height_text);
     case PerHeadProcess::Step::SizeDefault:
         // TRN Why a tool head prints with a process preset. %1% is a nozzle size
         return format_wxstr(_L("Automatic: the default preset of a %1% mm nozzle."), from_u8(head_size));
@@ -626,12 +613,6 @@ wxString picker_note(bool quality_page)
     // TRN Line under the picker of the process preset of a tool head, on the Quality / Speed page of the process settings
     return quality_page ? _L("Its line widths print on this extruder; so do its speeds (Speed page).") :
                           _L("Its speeds, accelerations and jerk print on this extruder; so do its line widths (Quality page).");
-}
-
-wxString preferred_height_sentence(double height, size_t head)
-{
-    // TRN Under a selected tool head on the Quality page. %1% a layer height in mm, %2% the nozzle in the sidebar
-    return format_wxstr(_L("This extruder prints %1% mm layers (preferred layer height, nozzle %2% in the sidebar)."), from_u8(float_to_string_decimal_point(height, 2)), head + 1);
 }
 
 wxString all_edited_width_sentence(const wxString &label, const std::string &value, const wxString &source_alias, const std::string &source_value)

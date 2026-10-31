@@ -1070,10 +1070,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     const bool classic_synchronized = have_support_material && !support_is_tree &&
                                       (config->opt_bool("enable_prime_tower") || !config->opt_bool("independent_support_layer_height"));
     // Snapmaker Orca Max: multi-nozzle layer heights. A strategy sets the layer height (its grid);
-    // the grid steps of objects and parts need one (or Custom's printer heights).
+    // the grid steps of objects and parts need one.
     if (config->has("multi_nozzle_layer_heights")) {
         const auto strategy = config->option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value;
-        toggle_field("layer_height", strategy == mnlhOff || strategy == mnlhCustom);
+        toggle_field("layer_height", strategy == mnlhOff);
         toggle_line("nozzle_layer_height_steps", strategy != mnlhOff);
     }
     toggle_line("support_layer_height_step", ((support_is_normal_tree && config->opt_bool("independent_support_layer_height") &&

@@ -872,28 +872,29 @@ TEST_CASE("A 0.4 mm tool head offers High Flow on the 0.2, 0.6 and 0.8 mm U1 pre
 TEST_CASE("The automatic reason names the step of the quality rule and the layer height it matched", "[HighFlow][SpeedPicker][phs_picker]")
 {
     using PerHeadProcess::Step;
-    const wxString same = HighFlowNotices::automatic_reason(Step::SameQuality, "Standard", "Standard", "0.6", 0.2, false);
+    const wxString same = HighFlowNotices::automatic_reason(Step::SameQuality, "Standard", "Standard", "0.6", 0.2);
     CHECK(same.Contains("Standard"));
     CHECK(same.Contains("0.20"));
     CHECK(same.Contains("plate"));
     CHECK_FALSE(same.Contains("preferred"));
-    const wxString preferred = HighFlowNotices::automatic_reason(Step::SameQuality, "Standard", "Standard", "0.6", 0.3, true);
-    CHECK(preferred.Contains("preferred"));
-    CHECK(preferred.Contains("0.30"));
-    const wxString ladder = HighFlowNotices::automatic_reason(Step::ClassLadder, "High Quality", "Standard", "0.8", 0.2, false);
+    // Snapmaker Orca Max: a multi-nozzle preset's preset of the head's size.
+    const wxString multi = HighFlowNotices::automatic_reason(Step::MultiNozzleSize, "Multi-nozzle Normal", "Multi-nozzle Normal", "0.2", 0.1);
+    CHECK(multi.Contains("Multi-nozzle Normal"));
+    CHECK(multi.Contains("0.2 mm nozzle"));
+    const wxString ladder = HighFlowNotices::automatic_reason(Step::ClassLadder, "High Quality", "Standard", "0.8", 0.2);
     CHECK(ladder.Contains("High Quality"));
     CHECK(ladder.Contains("0.8"));
     CHECK(ladder.Contains("Standard"));
     // A classless plate names the class the ladder landed on and no missing class.
-    const wxString classless = HighFlowNotices::automatic_reason(Step::ClassLadder, "", "Standard", "0.8", 0.2, false);
+    const wxString classless = HighFlowNotices::automatic_reason(Step::ClassLadder, "", "Standard", "0.8", 0.2);
     CHECK(classless.Contains("Standard"));
     CHECK_FALSE(classless.Contains("no "));
-    CHECK(HighFlowNotices::automatic_reason(Step::SameQuality, "", "", "0.8", 0.2, false).Contains("nearest layer height"));
-    CHECK(HighFlowNotices::automatic_reason(Step::SizeDefault, "Standard", "", "0.5", 0.2, false).Contains("default"));
-    CHECK(HighFlowNotices::automatic_reason(Step::FirstByName, "Standard", "", "0.5", 0.2, false).Contains("first"));
+    CHECK(HighFlowNotices::automatic_reason(Step::SameQuality, "", "", "0.8", 0.2).Contains("nearest layer height"));
+    CHECK(HighFlowNotices::automatic_reason(Step::SizeDefault, "Standard", "", "0.5", 0.2).Contains("default"));
+    CHECK(HighFlowNotices::automatic_reason(Step::FirstByName, "Standard", "", "0.5", 0.2).Contains("first"));
     // Not derived by the rule: nothing to say.
-    CHECK(HighFlowNotices::automatic_reason(Step::SelectedPreset, "Standard", "", "0.4", 0.2, false).IsEmpty());
-    CHECK(HighFlowNotices::automatic_reason(Step::Chosen, "Standard", "", "0.4", 0.2, false).IsEmpty());
+    CHECK(HighFlowNotices::automatic_reason(Step::SelectedPreset, "Standard", "", "0.4", 0.2).IsEmpty());
+    CHECK(HighFlowNotices::automatic_reason(Step::Chosen, "Standard", "", "0.4", 0.2).IsEmpty());
 }
 
 // The flow toggle of the Speed page (PerHeadProcess::flow_key): the texts of a High Flow tool head
@@ -962,10 +963,7 @@ TEST_CASE("The texts of the Quality page name line widths, the values by kind an
     CHECK(HighFlowNotices::picker_note(false).Contains("speeds, accelerations and jerk print on this extruder"));
     CHECK(HighFlowNotices::picker_note(false).Contains("(Quality page)"));
 
-    // Under a head: the preferred layer height, a width changed under All, the counts.
-    const wxString height = HighFlowNotices::preferred_height_sentence(0.1, 0);
-    CHECK(height.Contains("prints 0.10 mm layers"));
-    CHECK(height.Contains("nozzle 1 in the sidebar"));
+    // Under a head: a width changed under All, the counts.
     const wxString edited = HighFlowNotices::all_edited_width_sentence("Inner wall", "110%", "0.10mm High Quality", "112.5%");
     CHECK(edited == "Inner wall 110% from All extruders (0.10mm High Quality has 112.5%).");
     CHECK(HighFlowNotices::head_values_by_kind(1, 3) == "1 line width, 3 speeds");

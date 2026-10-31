@@ -112,17 +112,16 @@ std::string function_body(const std::string &source, const std::string &signatur
 
 } // namespace
 
-// Plater::on_config_change refreshes the Process tab's speed selector on a nozzle size or preferred
-// layer height change, so its labels and the selected head's source preset match the new sizes. The
+// Plater::on_config_change refreshes the Process tab's speed selector on a nozzle size change, so
+// its labels and the selected head's source preset match the new sizes. The
 // refresh is Tab::update_extruder_variants, called directly or via refresh_process_head_selector.
-TEST_CASE("A nozzle size or preferred layer height change refreshes the speed selector of the Process tab", "[PerHeadProcess][hs_selector_refresh]")
+TEST_CASE("A nozzle size change refreshes the speed selector of the Process tab", "[PerHeadProcess][hs_selector_refresh]")
 {
     const std::string plater = gui_source("Plater.cpp");
     const std::string body   = function_body(plater, "void Plater::on_config_change(");
     REQUIRE_FALSE(body.empty());
     // The branch of the nozzle keys is where the refresh belongs.
     REQUIRE(body.find("\"nozzle_diameter\"") != std::string::npos);
-    REQUIRE(body.find("\"extruder_layer_height\"") != std::string::npos);
 
     bool refreshes = body.find("update_extruder_variants(") != std::string::npos;
     if (!refreshes && body.find("refresh_process_head_selector(") != std::string::npos) {

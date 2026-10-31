@@ -2049,7 +2049,7 @@ WipeTowerFootprint PartPlate::estimate_wipe_tower_footprint(const DynamicPrintCo
     // Tallest object on this plate and the thinnest layer it is sliced at, resolved per object
     // as PrintObject resolves them (override, else preset) and over this plate's objects only -
     // seeding from the global value, or folding in an off-plate override, diverges from Print.
-    // Snapmaker Orca: the heights the print plans from the preferred layer heights (Slicing.hpp), so
+    // Snapmaker Orca: the heights the print plans from the multi-nozzle strategy (Slicing.hpp), so
     // the estimate sizes the tower of the grid the slice prints on.
     const ExtruderLayerHeightPlan planned_heights     = effective_extruder_layer_heights(config);
     const ConfigOptionFloats     *nozzle_diameters    = config.option<ConfigOptionFloats>("nozzle_diameter");

@@ -320,7 +320,7 @@ static t_config_option_keys print_config_diffs(
     return print_diff;
 }
 
-// Snapmaker Orca: an object's own layer height fitted to the planned preferred layer heights of a
+// Snapmaker Orca: an object's own layer height fitted to the planned per-extruder layer heights of a
 // config marked by apply_extruder_layer_height_plan(); unmarked configs are left as they are.
 static void fit_object_layer_height(PrintObjectConfig &object_config, const ModelObject &model_object, const DynamicPrintConfig &full_config)
 {

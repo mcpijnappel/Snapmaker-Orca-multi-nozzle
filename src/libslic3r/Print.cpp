@@ -773,7 +773,6 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "precise_z_height"
             // ORCA: layer combining for thicker extruder layer heights happens at the slicing step.
             || opt_key == "extruder_layer_height"
-            || opt_key == "extruder_layer_height_exact"
             || opt_key == "multi_nozzle_layer_heights"
             || opt_key == "align_bottoms_to_coarse_layers"
             || opt_key == "dithering_z_step_size"
@@ -3019,7 +3018,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                              "integer multiple of the object layer height (%3% mm), not below it, and must not exceed the "
                                                              "extruder's nozzle diameter."),
                                                         extruder_idx + 1, extruder_height, layer_height),
-                                         "extruder_layer_height", object);
+                                         "multi_nozzle_layer_heights", object);
                                 }
                                 continue;
                             }
@@ -3027,31 +3026,25 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                             // The GUI keeps the global configuration conforming; a per-object layer
                             // height override is the usual way here, so name the value that conforms.
                             if (extruder_height < layer_height - EPSILON || std::abs(extruder_height - std::lround(extruder_height / layer_height) * layer_height) > EPSILON) {
-                                // Object layer height as the sidebar derives it (plan_extruder_layer_heights),
-                                // one entry per used head only: a 0 means Default and pulls the object layer
-                                // height into the scan, so unused heads are left out.
-                                std::vector<double> used_heights, used_nozzles;
-                                double              min_used_height = 0.;   // the floor: half the smallest minimum layer height in use
-                                for (unsigned int used_filament : extruders) {
-                                    const size_t head = this->extruder_index_of(used_filament);
-                                    used_heights.push_back(m_config.extruder_layer_height.get_at(head));
-                                    used_nozzles.push_back(m_config.nozzle_diameter.get_at(head));
-                                    const double min_height = m_config.min_layer_height.get_at(head);
-                                    if (min_height > EPSILON && (min_used_height <= 0. || min_height < min_used_height))
-                                        min_used_height = min_height;
-                                }
-                                const ExtruderLayerHeightPlan plan = plan_extruder_layer_heights(used_heights, layer_height, used_nozzles,
-                                                                                                min_nozzle_diameter, m_config.extruder_layer_height_exact.value,
-                                                                                                min_used_height / 2.);
-                                const double conforming = plan.grid > EPSILON ? plan.grid : layer_height;
-                                return { Slic3r::format(_u8L("The preferred layer height of extruder %1% (%2% mm) is not a whole multiple of the object layer "
-                                                             "height (%3% mm). Set the object layer height (for this object: its own layer height in the object "
-                                                             "settings) to %4% mm, the object layer height derived from the preferred layer heights of the "
-                                                             "extruders in use, or change the preferred layer heights."),
-                                                        extruder_idx + 1, extruder_height, layer_height, conforming), object, "extruder_layer_height" };
+                                // The coarsest object layer height (in um, through the smallest nozzle) the heights of the
+                                // extruders in use are whole multiples of.
+                                long common = 0;
+                                for (unsigned int used_filament : extruders)
+                                    if (const double h = m_config.extruder_layer_height.get_at(this->extruder_index_of(used_filament)); h > EPSILON)
+                                        common = std::gcd(common, std::lround(h * 1e6));
+                                double conforming = layer_height;
+                                for (long k = 1; common > 0 && k <= common; ++ k)
+                                    if (common % k == 0 && (min_nozzle_diameter <= EPSILON || (common / k) * 1e-6 <= min_nozzle_diameter + EPSILON)) {
+                                        conforming = (common / k) * 1e-6;
+                                        break;
+                                    }
+                                return { Slic3r::format(_u8L("The layer height of extruder %1% (%2% mm) is not a whole multiple of the object layer "
+                                                             "height (%3% mm). Set the object's own layer height in the object settings to %4% mm, "
+                                                             "or remove it so the multi-nozzle layer heights set it."),
+                                                        extruder_idx + 1, extruder_height, layer_height, conforming), object, "layer_height" };
                             }
                             return { Slic3r::format(_u8L("The layer height of extruder %1% (%2% mm) cannot exceed its nozzle diameter."),
-                                                    extruder_idx + 1, extruder_height), object, "extruder_layer_height" };
+                                                    extruder_idx + 1, extruder_height), object, "multi_nozzle_layer_heights" };
                         }
                         if (pitch_from_features && multiplier <= 1)
                             continue; // a preference equal to the object layer height offers nothing
@@ -3192,13 +3185,13 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                                  "walls print together, so these walls keep the object layer height. "
                                                                  "Assign both wall features to filaments with large enough nozzles."),
                                                             pitch, filament + 1),
-                                             "extruder_layer_height", object);
+                                             "multi_nozzle_layer_heights", object);
                                     else
                                         warn(Slic3r::format(_u8L("Some object parts prefer %1% mm layers, but the nozzle of filament %2% "
                                                                  "printing other features of the part is too small to extrude that height. "
                                                                  "These parts print with the object layer height instead."),
                                                             pitch, filament + 1),
-                                             "extruder_layer_height", object);
+                                             "multi_nozzle_layer_heights", object);
                                 }
                                 region_multiplier = 1;
                                 break;
@@ -3232,13 +3225,13 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                      "Outer and inner walls print together, so these walls print with the lower "
                                                      "height (%1% mm)."),
                                                 wall_multiplier * layer_height),
-                                 "extruder_layer_height", object);
+                                 "multi_nozzle_layer_heights", object);
                         else
                             warn(_u8L("The wall filaments of some object parts prefer different layer heights. "
                                       "Outer and inner walls print together, so these walls keep the object layer "
                                       "height. Assign both wall features to filaments preferring the same height "
                                       "to print thicker walls."),
-                                 "extruder_layer_height", object);
+                                 "multi_nozzle_layer_heights", object);
                     }
                     // A pitch above a filament's max layer height keeps the pitch: max is a soft
                     // profile limit that the explicit preference overrides. Warn once.
@@ -3250,7 +3243,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                                  "height is %3% mm. Assign the part's features to filaments of the coarser "
                                                  "nozzle, raise the filament's maximum layer height, or accept printing above it."),
                                             pitch, filament0 + 1, max_lh),
-                             "extruder_layer_height", object);
+                             "multi_nozzle_layer_heights", object);
                     };
                     const double region_pitch = region_multiplier * layer_height;
                     // Heights the wall classes print at: the region pitch when the whole part
@@ -3315,7 +3308,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                 width = double(Flow::auto_extrusion_width(role, float(infill_nozzle)));
                             if (combined_infill_height > layer_height + EPSILON && width <= combined_infill_height + EPSILON)
                                 return { Slic3r::format(_u8L("The %1% mm infill line width is too small for infill combined to %2% mm high layers. "
-                                                             "Increase the line width or lower the preferred layer height of the infill filament."),
+                                                             "Increase the line width or choose a finer multi-nozzle layer height strategy."),
                                                         width, combined_infill_height), object, width_key };
                         }
                     }
@@ -3383,12 +3376,12 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                 continue;
                             warned_below_min_heights = true;
                             warn(Slic3r::format(_u8L("Some object parts print %1% mm layers with filament %2% whose minimum layer "
-                                                     "height is %3% mm. Raise the object layer height (with preferred layer heights: "
-                                                     "choose heights that share a coarser common divisor), use a filament with a finer "
+                                                     "height is %3% mm. Raise the object layer height (with multi-nozzle layer heights: "
+                                                     "choose a coarser strategy), use a filament with a finer "
                                                      "nozzle for these features, or accept printing below the extruder's minimum."),
                                                 pitch_below_min ? lowest : layer_height,
                                                 filament + 1, min_lh),
-                                 "extruder_layer_height", object);
+                                 "multi_nozzle_layer_heights", object);
                             break;
                         }
                     // Warn once about preferred heights the part cannot honor: one pitch applies to the
@@ -3428,12 +3421,12 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                                 continue;
                             }
                             warned_unhonored_heights = true;
-                            warn(_u8L("Some object parts use filaments whose preferred layer heights cannot all be honored: "
+                            warn(_u8L("Some object parts use filaments whose layer heights cannot all be honored: "
                                       "a part prints its features with one layer pitch (set by its wall filaments, or by the "
                                       "other features' agreement when no wall filament has a preference); the walls, the top "
                                       "surfaces and the infill can each combine to their own height when the rest of the part "
                                       "cannot follow them, but the remaining features print with the part's pitch."),
-                                 "extruder_layer_height", object);
+                                 "multi_nozzle_layer_heights", object);
                             break;
                         }
                     if (region_multiplier > 1 || wall_multiplier > 1 || top_multiplier > 1 || solid_multiplier > 1 || wall_split) {
@@ -3459,22 +3452,22 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                             const double width = resolve_line_width(width_key, filament_id);
                             if (width > 0. && width <= pitch + EPSILON)
                                 return { Slic3r::format(_u8L("The %1% mm line width is too small for the %2% mm layer height of its extruder. "
-                                                             "Increase the line width or lower the extruder layer height."),
+                                                             "Increase the line width or choose a finer multi-nozzle layer height strategy."),
                                                         width, pitch), object, width_key };
                         }
                     }
                 }
                 if (object_has_combined_regions) {
                     if (m_config.spiral_mode)
-                        return { _u8L("Per-extruder layer heights are not supported in spiral vase mode."), object, "extruder_layer_height" };
+                        return { _u8L("Per-extruder layer heights are not supported in spiral vase mode."), object, "multi_nozzle_layer_heights" };
                     if (object->config().interface_shells)
-                        return { _u8L("Per-extruder layer heights are not supported together with interface shells."), object, "extruder_layer_height" };
+                        return { _u8L("Per-extruder layer heights are not supported together with interface shells."), object, "multi_nozzle_layer_heights" };
                     // The beams are carved per object layer before the runs combine; a run keeps
                     // only the shape common to its layers, so a combined region's beam cells vanish
                     // while the holes for them stay in the other region.
                     if (object->config().interlocking_beam && object->all_regions().size() > 1)
                         return { _u8L("Per-extruder layer heights are not supported together with interlocking beams. "
-                                      "Disable the interlocking beams or set the extruders' preferred layer heights to Default."),
+                                      "Disable the interlocking beams or set Multi-nozzle layer heights to Off."),
                                  object, "interlocking_beam" };
                     if (object->model_object()->has_custom_layering()) {
                         std::vector<coordf_t> profile;
@@ -3482,8 +3475,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
                         if (! check_object_layers_fixed(object->slicing_parameters(), profile))
                             return { _u8L("Per-extruder layer heights are not supported together with variable layer height or "
                                           "height range modifiers that change the layer height. Remove them for this object or "
-                                          "set the extruders' preferred layer heights to Default."),
-                                     object, "extruder_layer_height" };
+                                          "set Multi-nozzle layer heights to Off."),
+                                     object, "multi_nozzle_layer_heights" };
                     }
                 }
             }
@@ -6295,8 +6288,8 @@ void Print::_make_wipe_tower()
             if (! per_head.empty())
                 this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
                     Slic3r::format(_u8L("The prime tower prints %1% slabs on the object layer grid, some thinner than the minimum "
-                                        "layer height of an extruder that purges on them (%2%). Preferred layer heights that share "
-                                        "a coarser grid, or fewer tool changes per layer, reduce them."),
+                                        "layer height of an extruder that purges on them (%2%). A coarser multi-nozzle layer height "
+                                        "strategy, or fewer tool changes per layer, reduces them."),
                                    slabs, per_head));
         }
         m_wipe_tower_data.depth             = wipe_tower.get_depth();

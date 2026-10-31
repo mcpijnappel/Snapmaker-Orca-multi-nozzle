@@ -114,10 +114,9 @@ const Preset *multi_nozzle_size_preset(const PresetBundle &bundle, const Preset 
 // name, so it works on a collection that is not sorted yet.
 void hide_multi_nozzle_size_presets(PresetCollection &prints);
 
-// The layer height the rule matches for tool head `head`: extruder_layer_height of the edited printer
-// when set, else the saved selected preset's layer_height, so an unsaved edit does not move the
-// source. `preferred` tells which.
-double target_layer_height(const PresetBundle &bundle, size_t head, bool *preferred = nullptr);
+// The layer height the rule matches: the saved selected preset's layer_height, so an unsaved edit
+// does not move the source.
+double target_layer_height(const PresetBundle &bundle);
 
 // The composed keys the selected process preset changes against its system parent, compared in the
 // shared columns against the parent in the preset's layout (reference_in_layout_of). Empty without a
@@ -245,10 +244,10 @@ struct RuleTrace
 };
 
 // The system preset a head of `machine` (its size's machine preset) prints with: an installed compatible
-// `explicit_name` (Explicit); else, `selected` excluded, the preset nearest the target height (preferred_layer_height
+// `explicit_name` (Explicit); else, `selected` excluded, the preset nearest the target height (target_height_mm
 // when > 0, else `selected`'s) in `selected`'s class, then down the ladder (Color Mixing: High Quality, then Standard),
 // then default_print_profile, then the first by name. `accept` filters; `trace` gets the step.
-const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double preferred_layer_height,
+const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double target_height_mm,
                               const Preset &selected, const std::string &explicit_name, Reason &reason,
                               const std::function<bool(const Preset &)> &accept = {}, RuleTrace *trace = nullptr);
 

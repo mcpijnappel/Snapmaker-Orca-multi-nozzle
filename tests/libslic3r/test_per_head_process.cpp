@@ -383,11 +383,11 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
 {
     auto bundle = load_snapmaker_bundle();
 
-    SECTION("preferred layer heights with an exact preset of the same class") {
-        select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0.12, 0.30, 0.});
+    SECTION("the preset of the same class nearest the plate's layer height") {
+        select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0., 0., 0.});
         const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
-        CHECK(source_names(sources) == std::vector<std::string>{"", STD_012_02, STD_030_06, ""});
+        CHECK(source_names(sources) == std::vector<std::string>{"", STD_012_02, STD_018_06, ""});
         CHECK(sources[0].reason == PerHeadProcess::Reason::HomeSize);
         CHECK(sources[1].reason == PerHeadProcess::Reason::Derived);
         CHECK(sources[2].reason == PerHeadProcess::Reason::Derived);
@@ -411,15 +411,14 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
         CHECK(stored.option(PerHeadProcess::source_column_key) == nullptr);
         CHECK(floats_of(stored, "outer_wall_speed") == std::vector<double>{200., 500.});
 
-        // With the preference off the print config is the plain full config with the preferred
-        // layer heights planned for slicing (0.12 and 0.30 mm do not land on the 0.20 mm process).
+        // With the preference off the print config is the plain full config (Off: no heights to plan).
         bundle->process_follows_nozzle = false;
         CHECK(PerHeadProcess::head_sources(*bundle)[1].reason == PerHeadProcess::Reason::Off);
         const DynamicPrintConfig plain = bundle->full_config_for_print(false);
         CHECK(plain.option<ConfigOptionInts>("print_extruder_id")->values == std::vector<int>{1, 1});
         CHECK(plain.option(PerHeadProcess::source_column_key) == nullptr);
         DynamicPrintConfig plain_planned = bundle->full_config(false);
-        CHECK(apply_extruder_layer_height_plan(plain_planned));
+        CHECK_FALSE(apply_extruder_layer_height_plan(plain_planned));
         CHECK(plain.equals(plain_planned));
     }
 
@@ -443,10 +442,10 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
     }
 
     SECTION("a quality class the size lacks takes the size's Standard preset") {
-        select_u1(*bundle, {0.4, 0.4, 0.6, 0.4}, {0., 0., 0.30, 0.}, HQ_020_04);
+        select_u1(*bundle, {0.4, 0.4, 0.6, 0.4}, {0., 0., 0., 0.}, HQ_020_04);
         const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
-        CHECK(source_names(sources) == std::vector<std::string>{"", "", STD_030_06, ""});
+        CHECK(source_names(sources) == std::vector<std::string>{"", "", STD_018_06, ""});
         const DynamicPrintConfig composed = bundle->full_config_for_print(false);
         CHECK(floats_of(composed, "outer_wall_speed") == std::vector<double>{60., 60., 120., 60.});
         CHECK(floats_of(composed, "default_acceleration") == std::vector<double>{4000., 4000., 10000., 4000.});
@@ -624,22 +623,14 @@ TEST_CASE("On the shipped U1 presets every tool head of another size prints with
         CHECK(sources[2].step == PerHeadProcess::Step::ClassLadder);
     }
 
-    SECTION("the edited layer height does not move the source; a preferred height on one tool head leaves the others") {
+    SECTION("the edited layer height does not move the source") {
         select_u1(*bundle, sizes, {0., 0., 0., 0.});
         // An unsaved edit of the layer height: the rule reads the saved 0.20.
         bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("layer_height", true)->value = 0.28;
         std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
         CHECK(source_names(sources) == std::vector<std::string>{STD_012_02, "", STD_018_06, STD_024_08});
-        bool preferred = true;
-        CHECK_THAT(PerHeadProcess::target_layer_height(*bundle, 2, &preferred), Catch::Matchers::WithinAbs(0.20, 1e-9));
-        CHECK_FALSE(preferred);
-        // A preferred height on the 0.6 mm head moves that head alone, inside the class.
-        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height", true)->values = {0., 0., 0.30, 0.};
-        sources = PerHeadProcess::head_sources(*bundle);
-        CHECK(source_names(sources) == std::vector<std::string>{STD_012_02, "", STD_030_06, STD_024_08});
-        CHECK_THAT(PerHeadProcess::target_layer_height(*bundle, 2, &preferred), Catch::Matchers::WithinAbs(0.30, 1e-9));
-        CHECK(preferred);
+        CHECK_THAT(PerHeadProcess::target_layer_height(*bundle), Catch::Matchers::WithinAbs(0.20, 1e-9));
     }
 
     SECTION("a classless plate matches the classless presets of a size by the nearest height, before Standard") {
@@ -788,10 +779,10 @@ TEST_CASE("A U1 whose tool heads all carry the nozzle size of the printer preset
 TEST_CASE("The project records the process preset of every tool head and a load reports a difference", "[PerHeadProcess][Profiles][phs_project_record]")
 {
     auto bundle = load_snapmaker_bundle();
-    select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0.12, 0.30, 0.});
+    select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0., 0., 0.});
     bundle->project_config.option<ConfigOptionStrings>("filament_colour", true)->values = {"#FF0000", "#00FF00", "#0000FF", "#FFFF00"};
 
-    const std::vector<std::string> record = {"", STD_012_02, STD_030_06, ""};
+    const std::vector<std::string> record = {"", STD_012_02, STD_018_06, ""};
     const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::record_sources(*bundle);
     REQUIRE(sources.size() == 4);
     CHECK(bundle->project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values == record);
@@ -865,14 +856,14 @@ TEST_CASE("The project records the process preset of every tool head and a load 
         delete plate;
     }
 
-    SECTION("a changed preferred layer height is reported with the preset the head prints with now") {
-        // The 0.6 mm head prefers 0.18 now: the Standard preset of that height, no longer the recorded 0.30.
-        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height", true)->values = {0., 0.12, 0.18, 0.};
+    SECTION("another plate preset is reported with the preset the head prints with now") {
+        // 0.28mm Standard: the 0.6 mm head's nearest Standard preset is 0.30, no longer the recorded 0.18.
+        REQUIRE(bundle->prints.select_preset_by_name("0.28mm Standard @Snapmaker U1 (0.4 nozzle)", true));
         const std::vector<PerHeadProcess::LoadReportEntry> report = PerHeadProcess::load_report(*bundle);
         REQUIRE(report.size() == 1);
         CHECK(report[0].head == 2);
-        CHECK(report[0].recorded == STD_030_06);
-        CHECK(report[0].current == STD_018_06);
+        CHECK(report[0].recorded == STD_018_06);
+        CHECK(report[0].current == STD_030_06);
         CHECK(report[0].reason == PerHeadProcess::Reason::Derived);
         CHECK_THAT(report[0].nozzle_size, Catch::Matchers::WithinAbs(0.6, 1e-9));
         // The next record follows the rule.
@@ -888,11 +879,11 @@ TEST_CASE("The project records the process preset of every tool head and a load 
         CHECK(report[0].current.empty());
         CHECK(report[0].reason == PerHeadProcess::Reason::HomeSize);
 
-        bundle->project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values = {"", "", "0.30mm Standard @Snapmaker U1 (0.6 nozzle) renamed", ""};
+        bundle->project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values = {"", "", "0.18mm Standard @Snapmaker U1 (0.6 nozzle) renamed", ""};
         report = PerHeadProcess::load_report(*bundle);
         REQUIRE(report.size() == 1);
         CHECK(report[0].head == 2);
-        CHECK(report[0].current == STD_030_06);
+        CHECK(report[0].current == STD_018_06);
         CHECK_FALSE(report[0].recorded_installed);
     }
 }
@@ -1999,7 +1990,7 @@ TEST_CASE("The High Flow rule applies to a High Flow tool head without High Flow
         const DynamicPrintConfig composed = bundle->full_config_for_print(false, std::nullopt, std::nullopt, &sources);
         REQUIRE(sources.size() == 4);
         CHECK(sources[2].reason == PerHeadProcess::Reason::Derived);
-        CHECK(sources[2].preset->name == STD_030_06);
+        CHECK(sources[2].preset->name == STD_018_06);
         CHECK(sources[2].fallback_variants == std::vector<int>{int(nvtHighFlow)});
         CHECK_FALSE(PerHeadProcess::reads_high_flow(sources[2], nvtHighFlow, printer));
         CHECK(floats_of(composed, "outer_wall_speed") == std::vector<double>{200., 200., 500., 200.});
@@ -2135,7 +2126,7 @@ TEST_CASE("A process preset chosen for a tool head supplies its speeds, below a 
     REQUIRE(sources[1].automatic != nullptr);
     CHECK(sources[1].automatic->name == STD_012_02);
     CHECK(sources[2].chosen_state == PerHeadProcess::ChosenState::None);
-    CHECK(sources[2].preset->name == STD_030_06);
+    CHECK(sources[2].preset->name == STD_018_06);
     CHECK(sources[2].automatic == nullptr);
     DynamicPrintConfig composed = bundle->full_config_for_print(false);
     CHECK(floats_of(composed, "outer_wall_speed") == std::vector<double>{200., 60., 120., 200.});
@@ -2348,7 +2339,7 @@ TEST_CASE("A chosen preset is saved with the project, loads back unchanged and n
     second.load_config_model("older.3mf", DynamicPrintConfig(without_keys), file_version);
     CHECK(choices_of(second).empty());
     CHECK(second.project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values.empty());
-    CHECK(PerHeadProcess::head_sources(second)[2].preset->name == STD_030_06);
+    CHECK(PerHeadProcess::head_sources(second)[2].preset->name == STD_018_06);
     // The load of a project with the keys after that brings them, then a published load drops them.
     second.load_config_model("speed_picker.3mf", DynamicPrintConfig(loaded), file_version);
     CHECK(choices_of(second) == choice);
@@ -3499,38 +3490,6 @@ TEST_CASE("A line width added to an object is seeded with the value the object p
         CHECK(PerHeadProcess::override_seed(*bundle, key, {1, 4}, &heads) == "112.5%");
         CHECK(heads.empty());
     }
-}
-
-TEST_CASE("Preferred layer heights stay as entered in the presets and the config for slicing carries the planned grid", "[PerHeadProcess][Profiles][EnteredHeights]")
-{
-    using Catch::Matchers::WithinAbs;
-    auto bundle = load_snapmaker_bundle();
-    // Extruders of 0.6 / 0.8 / 0.4 / 0.2 mm on a 0.40 mm process, 0.32 mm entered on the 0.6 mm one.
-    select_u1(*bundle, {0.6, 0.8, 0.4, 0.2}, {0.32, 0., 0., 0.});
-    bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("layer_height", true)->value = 0.4;
-    // The printer's own preferred heights apply with "Custom" (Off, the default, prints one height).
-    bundle->prints.get_edited_preset().config.set_key_value("multi_nozzle_layer_heights",
-        new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhCustom));
-
-    const DynamicPrintConfig sliced = bundle->full_config_for_print(false);
-    CHECK_THAT(sliced.opt_float("layer_height"), WithinAbs(0.11, 1e-9));
-    const std::vector<double> planned  = floats_of(sliced, "extruder_layer_height");
-    const std::vector<double> expected = {0.33, 0.44, 0.33, 0.11};
-    REQUIRE(planned.size() == expected.size());
-    for (size_t i = 0; i < expected.size(); ++i)
-        CHECK_THAT(planned[i], WithinAbs(expected[i], 1e-9));
-    CHECK(sliced.has(extruder_layer_height_planned_key));
-
-    // The edited presets and the full config a project is saved from keep the entered values.
-    CHECK_THAT(bundle->prints.get_edited_preset().config.opt_float("layer_height"), WithinAbs(0.4, 1e-9));
-    CHECK(bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("extruder_layer_height")->values == std::vector<double>{0.32, 0., 0., 0.});
-    const DynamicPrintConfig project = bundle->full_config();
-    CHECK_THAT(project.opt_float("layer_height"), WithinAbs(0.4, 1e-9));
-    const std::vector<double> entered = floats_of(project, "extruder_layer_height");
-    REQUIRE(entered.size() == 4);
-    CHECK_THAT(entered[0], WithinAbs(0.32, 1e-9));
-    CHECK_THAT(entered[1] + entered[2] + entered[3], WithinAbs(0., 1e-9));
-    CHECK_FALSE(project.has(extruder_layer_height_planned_key));
 }
 
 TEST_CASE("A line width override set in one flow column applies to extruders of every flow type", "[PerHeadProcess][PerHeadWidth]")
