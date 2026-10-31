@@ -985,24 +985,24 @@ TEST_CASE("A U1 plate with a 0.6 mm High Flow tool head prints that head alone w
 }
 
 // ---------------------------------------------------------------------------------------------
-// High Flow values for any filament: Generic PETG (one column) gains a High Flow column copied from
+// High Flow values for any filament: Generic PCTG (one column) gains a High Flow column copied from
 // Standard (FilamentFlowColumns.hpp), here with max volumetric speed 22 against the Standard 12.
 // ---------------------------------------------------------------------------------------------
 
 TEST_CASE("A filament given High Flow values prints them on the High Flow extruder and its Standard values elsewhere", "[HighFlow][FilamentFlow]")
 {
-    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PETG", "Generic PETG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
-    constexpr double STANDARD_CAP  = 12.;
+    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PCTG", "Generic PCTG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
+    constexpr double STANDARD_CAP  = 6.;
     constexpr double HIGH_FLOW_CAP = 22.;
     auto               bundle = std::make_unique<PresetBundle>();
     DynamicPrintConfig config = u1_plate_config(*bundle, plate, {nvtStandard, nvtHighFlow, nvtStandard, nvtStandard}, {}, [](PresetBundle &b) {
-        Preset *petg = b.filaments.find_preset("Generic PETG", false, true);
+        Preset *petg = b.filaments.find_preset("Generic PCTG", false, true);
         REQUIRE(petg != nullptr);
         REQUIRE(filament_add_flow_column(petg->config, nvtHighFlow));
         petg->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values[1] = HIGH_FLOW_CAP;
     });
     REQUIRE(config.opt_bool("use_relative_e_distances"));
-    const Preset *petg = bundle->filaments.find_preset("Generic PETG", false, true);
+    const Preset *petg = bundle->filaments.find_preset("Generic PCTG", false, true);
     REQUIRE(petg != nullptr);
     CHECK_THAT(petg->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values,
                Catch::Matchers::Approx(std::vector<double>{STANDARD_CAP, HIGH_FLOW_CAP}));
@@ -1016,7 +1016,7 @@ TEST_CASE("A filament given High Flow values prints them on the High Flow extrud
     CHECK(standard.max_wall_flow < STANDARD_CAP * 1.05);
     CHECK(high_flow.max_wall_flow > STANDARD_CAP * 1.2);
     CHECK(high_flow.max_wall_flow < HIGH_FLOW_CAP * 1.05);
-    // A value both columns share: the nozzle temperature of Generic PETG.
+    // A value both columns share: the nozzle temperature of Generic PCTG.
     CHECK(standard.print_temperature == 255);
     CHECK(high_flow.print_temperature == 255);
 }
@@ -1077,12 +1077,12 @@ TEST_CASE("A narrow per-column value of one filament leaves the values of the ne
 
 TEST_CASE("A Standard change of a filament without High Flow values reaches the Standard and the High Flow extruder", "[HighFlow][FilamentFlow]")
 {
-    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PETG", "Generic PETG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
+    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PCTG", "Generic PCTG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
     const std::vector<NozzleVolumeType> flow_types{nvtStandard, nvtHighFlow, nvtStandard, nvtStandard};
     constexpr int      CHANGED = 245;
     auto               bundle  = std::make_unique<PresetBundle>();
     DynamicPrintConfig config  = u1_plate_config(*bundle, plate, flow_types, {}, [](PresetBundle &b) {
-        Preset *petg = b.filaments.find_preset("Generic PETG", false, true);
+        Preset *petg = b.filaments.find_preset("Generic PCTG", false, true);
         REQUIRE(petg != nullptr);
         REQUIRE(filament_flow_column(petg->config, nvtHighFlow) < 0);
         petg->config.option<ConfigOptionInts>("nozzle_temperature")->values = {CHANGED};
@@ -1106,7 +1106,7 @@ TEST_CASE("A Standard change of a filament without High Flow values reaches the 
 }
 
 // ---------------------------------------------------------------------------------------------
-// Bed and chamber temperatures per column: Generic PETG given High Flow values for the Textured PEI
+// Bed and chamber temperatures per column: Generic PCTG given High Flow values for the Textured PEI
 // Plate and the chamber. Each printed filament counts with the column of the extruder that prints it.
 // ---------------------------------------------------------------------------------------------
 
@@ -1153,9 +1153,9 @@ std::set<int> above_zero(const std::vector<int> &values)
 TEST_CASE("Bed and chamber temperatures of a filament follow the column of the extruder that prints it", "[HighFlow][FilamentFlow][BedChamber]")
 {
     // Textured PEI Plate: first layer 60 / 75, other layers 62 / 77; chamber 35 / 45 (Standard / High Flow).
-    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PETG", "Generic PETG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
+    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PCTG", "Generic PCTG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
     const auto petg_bed_and_chamber_columns = [](PresetBundle &b) {
-        Preset *petg = b.filaments.find_preset("Generic PETG", false, true);
+        Preset *petg = b.filaments.find_preset("Generic PCTG", false, true);
         REQUIRE(petg != nullptr);
         REQUIRE(filament_add_flow_column(petg->config, nvtHighFlow));
         DynamicPrintConfig &config = petg->config;
@@ -1204,13 +1204,13 @@ TEST_CASE("Bed and chamber temperatures of a filament follow the column of the e
 
 TEST_CASE("A filament without High Flow values on a High Flow extruder prints its own temperatures", "[HighFlow][FilamentFlow][BedChamber]")
 {
-    // Generic PLA (220 C, Textured PEI Plate 65) on the Standard extruder 1, Generic PETG (255 C, 80)
+    // Generic PC (280 C, Textured PEI Plate 100) on the Standard extruder 1, Generic PCTG (255 C, 100)
     // on the High Flow extruder 2. Neither preset has a High Flow column: extruder 2 prints the only
-    // column of Generic PETG, never the column of the first filament.
-    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PLA", "Generic PETG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
+    // column of Generic PCTG, never the column of the first filament.
+    const U1Plate plate{U1_MACHINE, U1_PROCESS, {"Generic PC", "Generic PCTG", "Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF"}};
     auto               bundle = std::make_unique<PresetBundle>();
     DynamicPrintConfig config = u1_plate_config(*bundle, plate, {nvtStandard, nvtHighFlow, nvtStandard, nvtStandard});
-    for (const char *name : {"Generic PLA", "Generic PETG"}) {
+    for (const char *name : {"Generic PC", "Generic PCTG"}) {
         const Preset *preset = bundle->filaments.find_preset(name, false, true);
         REQUIRE(preset != nullptr);
         REQUIRE(filament_flow_column(preset->config, nvtHighFlow) < 0);
@@ -1224,8 +1224,8 @@ TEST_CASE("A filament without High Flow values on a High Flow extruder prints it
     const std::string               gcode = two_head_gcode(config);
     const BedChamberFacts           facts = bed_chamber_facts(gcode);
     std::map<int, ShippedToolFacts> tools = shipped_tool_facts(gcode, config.option<ConfigOptionFloats>("filament_diameter")->get_at(0));
-    CHECK(facts.placeholders == ";BED_CHAMBER 65 80 220 255");
-    CHECK(above_zero(facts.bed_wait) == std::set<int>{80});
-    CHECK(tools[0].print_temperature == 220);
+    CHECK(facts.placeholders == ";BED_CHAMBER 100 100 280 255");
+    CHECK(above_zero(facts.bed_wait) == std::set<int>{100});
+    CHECK(tools[0].print_temperature == 280);
     CHECK(tools[1].print_temperature == 255);
 }

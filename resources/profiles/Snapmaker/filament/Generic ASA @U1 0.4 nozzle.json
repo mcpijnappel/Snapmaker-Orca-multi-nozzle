@@ -7,5 +7,101 @@
     "inherits": "Generic ASA @U1 base",
     "compatible_printers": [
         "Snapmaker U1 (0.4 nozzle)"
+    ],
+    "activate_air_filtration": [
+        "0",
+        "1"
+    ],
+    "additional_cooling_fan_speed": [
+        "0",
+        "0"
+    ],
+    "complete_print_exhaust_fan_speed": [
+        "70",
+        "70"
+    ],
+    "during_print_exhaust_fan_speed": [
+        "70",
+        "70"
+    ],
+    "fan_max_speed": [
+        "80",
+        "25"
+    ],
+    "fan_min_speed": [
+        "10",
+        "10"
+    ],
+    "filament_extruder_variant": [
+        "Direct Drive Standard",
+        "Direct Drive High Flow"
+    ],
+    "filament_flow_ratio": [
+        "0.95",
+        "0.94"
+    ],
+    "filament_max_volumetric_speed": [
+        "13.5",
+        "19.8"
+    ],
+    "filament_minimal_purge_on_wipe_tower": [
+        "15",
+        "15"
+    ],
+    "filament_multitool_ramming": [
+        "1",
+        "1"
+    ],
+    "filament_multitool_ramming_flow": [
+        "12",
+        "20"
+    ],
+    "filament_multitool_ramming_volume": [
+        "0.5",
+        "10"
+    ],
+    "filament_retract_length_toolchange": [
+        "10",
+        "5"
+    ],
+    "filament_retraction_length": [
+        "nil",
+        "0.6"
+    ],
+    "filament_retraction_minimum_travel": [
+        "nil",
+        "nil"
+    ],
+    "filament_wipe": [
+        "nil",
+        "nil"
+    ],
+    "filament_wipe_distance": [
+        "nil",
+        "nil"
+    ],
+    "filament_z_hop": [
+        "nil",
+        "nil"
+    ],
+    "filament_z_hop_types": [
+        "nil",
+        "Slope Lift"
+    ],
+    "nozzle_temperature": [
+        "260",
+        "280"
+    ],
+    "nozzle_temperature_initial_layer": [
+        "260",
+        "280"
+    ],
+    "pressure_advance": [
+        "0.02",
+        "0.02"
+    ],
+    "filament_flow_support": [
+        "standard",
+        "high_flow"
     ]
 }

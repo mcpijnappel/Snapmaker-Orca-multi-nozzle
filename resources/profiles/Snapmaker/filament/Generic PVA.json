@@ -9,18 +9,22 @@
         "Snapmaker U1 (0.4 nozzle)"
     ],
     "enable_pressure_advance": [
-        "0"
+        "0",
+        "1"
     ],
     "filament_end_gcode": [
         "; filament end gcode \n\n"
     ],
     "filament_multitool_ramming": [
+        "1",
         "1"
     ],
     "filament_multitool_ramming_flow": [
-        "6"
+        "6",
+        "10"
     ],
     "filament_multitool_ramming_volume": [
+        "0.1",
         "0.1"
     ],
     "filament_start_gcode": [
@@ -30,54 +34,69 @@
         "Generic"
     ],
     "filament_retract_length_toolchange": [
-        "3"
+        "3",
+        "4"
     ],
     "filament_max_volumetric_speed": [
+        "6",
         "6"
     ],
     "nozzle_temperature": [
+        "240",
         "240"
     ],
     "nozzle_temperature_initial_layer": [
+        "240",
         "240"
     ],
     "pressure_advance": [
-        "0.028"
+        "0.028",
+        "0.03"
     ],
     "hot_plate_temp": [
+        "65",
         "65"
     ],
     "hot_plate_temp_initial_layer": [
+        "65",
         "65"
     ],
     "textured_plate_temp": [
+        "65",
         "65"
     ],
     "textured_plate_temp_initial_layer": [
+        "65",
         "65"
     ],
     "filament_type": [
         "PVA"
     ],
     "additional_cooling_fan_speed": [
+        "70",
         "70"
     ],
     "close_fan_the_first_x_layers": [
         "1"
     ],
     "complete_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "cool_plate_temp": [
+        "45",
         "45"
     ],
     "cool_plate_temp_initial_layer": [
+        "45",
         "45"
     ],
     "during_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "fan_min_speed": [
+        "100",
         "100"
     ],
     "filament_cooling_final_speed": [
@@ -96,13 +115,16 @@
         "1.24"
     ],
     "filament_deretraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_flow_ratio": [
-        "0.95"
+        "0.95",
+        "0.97"
     ],
     "filament_flow_support": [
-        "standard"
+        "standard",
+        "high_flow"
     ],
     "filament_loading_speed": [
         "28"
@@ -111,12 +133,15 @@
         "3"
     ],
     "filament_minimal_purge_on_wipe_tower": [
-        "15"
+        "15",
+        "20"
     ],
     "filament_retraction_length": [
-        "nil"
+        "nil",
+        "0.6"
     ],
     "filament_retraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_settings_id": [
@@ -132,12 +157,15 @@
         "100"
     ],
     "filament_z_hop_types": [
-        "nil"
+        "nil",
+        "Slope Lift"
     ],
     "graphic_effect_plate_temp": [
+        "0",
         "0"
     ],
     "graphic_effect_plate_temp_initial_layer": [
+        "0",
         "0"
     ],
     "nozzle_temperature_range_high": [
@@ -151,5 +179,69 @@
     ],
     "chamber_temperatures": [
         "0"
+    ],
+    "activate_air_filtration": [
+        "0",
+        "0"
+    ],
+    "fan_max_speed": [
+        "100",
+        "100"
+    ],
+    "filament_extruder_variant": [
+        "Direct Drive Standard",
+        "Direct Drive High Flow"
+    ],
+    "filament_long_retractions_when_cut": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_before_wipe": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_lift_above": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_lift_below": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_lift_enforce": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_restart_extra": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_restart_extra_toolchange": [
+        "nil",
+        "nil"
+    ],
+    "filament_retract_when_changing_layer": [
+        "nil",
+        "nil"
+    ],
+    "filament_retraction_distances_when_cut": [
+        "nil",
+        "nil"
+    ],
+    "filament_retraction_minimum_travel": [
+        "nil",
+        "nil"
+    ],
+    "filament_wipe": [
+        "nil",
+        "nil"
+    ],
+    "filament_wipe_distance": [
+        "nil",
+        "nil"
+    ],
+    "filament_z_hop": [
+        "nil",
+        "nil"
     ]
 }

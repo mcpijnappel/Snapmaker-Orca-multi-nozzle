@@ -12,72 +12,92 @@
         ""
     ],
     "enable_pressure_advance": [
-        "0"
+        "0",
+        "1"
     ],
     "filament_end_gcode": [
         "\n"
     ],
     "filament_minimal_purge_on_wipe_tower": [
+        "15",
         "15"
     ],
     "filament_multitool_ramming": [
+        "1",
         "1"
     ],
     "filament_multitool_ramming_flow": [
-        "20"
+        "20",
+        "40"
     ],
     "filament_multitool_ramming_volume": [
-        "0.5"
+        "0.5",
+        "5"
     ],
     "filament_vendor": [
         "Generic"
     ],
     "filament_retract_length_toolchange": [
-        "10"
+        "10",
+        "5"
     ],
     "textured_plate_temp": [
+        "65",
         "65"
     ],
     "textured_plate_temp_initial_layer": [
+        "65",
         "65"
     ],
     "hot_plate_temp": [
+        "65",
         "65"
     ],
     "hot_plate_temp_initial_layer": [
+        "65",
         "65"
     ],
     "graphic_effect_plate_temp": [
+        "65",
         "65"
     ],
     "graphic_effect_plate_temp_initial_layer": [
+        "65",
         "65"
     ],
     "filament_type": [
         "PLA"
     ],
     "activate_air_filtration": [
+        "0",
         "0"
     ],
     "activate_chamber_temp_control": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance_bridges": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance_model": [
+        "0,0,0\n0,0,0",
         "0,0,0\n0,0,0"
     ],
     "adaptive_pressure_advance_overhangs": [
+        "0",
         "0"
     ],
     "additional_cooling_fan_speed": [
+        "70",
         "70"
     ],
     "chamber_temperature": [
+        "0",
         "0"
     ],
     "close_fan_the_first_x_layers": [
@@ -87,12 +107,15 @@
     "compatible_prints": [],
     "compatible_prints_condition": "",
     "complete_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "cool_plate_temp": [
+        "35",
         "35"
     ],
     "cool_plate_temp_initial_layer": [
+        "35",
         "35"
     ],
     "default_filament_colour": [
@@ -102,24 +125,29 @@
         "0"
     ],
     "during_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "enable_overhang_bridge_fan": [
         "1"
     ],
     "eng_plate_temp": [
+        "0",
         "0"
     ],
     "eng_plate_temp_initial_layer": [
+        "0",
         "0"
     ],
     "fan_cooling_layer_time": [
         "100"
     ],
     "fan_max_speed": [
+        "100",
         "100"
     ],
     "fan_min_speed": [
+        "100",
         "100"
     ],
     "filament_cooling_final_speed": [
@@ -138,16 +166,19 @@
         "1.24"
     ],
     "filament_deretraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_diameter": [
         "1.75"
     ],
     "filament_flow_ratio": [
-        "0.98"
+        "0.98",
+        "0.966"
     ],
     "filament_flow_support": [
-        "standard"
+        "standard",
+        "high_flow"
     ],
     "filament_is_high_temperature": [
         "0"
@@ -162,10 +193,12 @@
         "3"
     ],
     "filament_long_retractions_when_cut": [
+        "nil",
         "nil"
     ],
     "filament_max_volumetric_speed": [
-        "12"
+        "18",
+        "36"
     ],
     "filament_notes": [
         ""
@@ -174,36 +207,47 @@
         "120 100 6.6 6.8 7.2 7.6 7.9 8.2 8.7 9.4 9.9 10.0| 0.05 6.6 0.45 6.8 0.95 7.8 1.45 8.3 1.95 9.7 2.45 10 2.95 7.6 3.45 7.6 3.95 7.6 4.45 7.6 4.95 7.6"
     ],
     "filament_retract_before_wipe": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_above": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_below": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_enforce": [
+        "nil",
         "nil"
     ],
     "filament_retract_restart_extra": [
+        "nil",
         "nil"
     ],
     "filament_retract_restart_extra_toolchange": [
+        "nil",
         "nil"
     ],
     "filament_retract_when_changing_layer": [
+        "nil",
         "nil"
     ],
     "filament_retraction_distances_when_cut": [
+        "nil",
         "nil"
     ],
     "filament_retraction_length": [
-        "nil"
+        "nil",
+        "1.2"
     ],
     "filament_retraction_minimum_travel": [
+        "nil",
         "nil"
     ],
     "filament_retraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_settings_id": [
@@ -237,16 +281,20 @@
         "100"
     ],
     "filament_wipe": [
+        "nil",
         "nil"
     ],
     "filament_wipe_distance": [
+        "nil",
         "nil"
     ],
     "filament_z_hop": [
-        "nil"
+        "nil",
+        "0.4"
     ],
     "filament_z_hop_types": [
-        "nil"
+        "nil",
+        "Slope Lift"
     ],
     "full_fan_speed_layer": [
         "0"
@@ -261,9 +309,11 @@
         "-1"
     ],
     "nozzle_temperature": [
+        "220",
         "220"
     ],
     "nozzle_temperature_initial_layer": [
+        "220",
         "220"
     ],
     "nozzle_temperature_range_high": [
@@ -282,7 +332,8 @@
         "0.4157"
     ],
     "pressure_advance": [
-        "0.02"
+        "0.02",
+        "0.024"
     ],
     "reduce_fan_stop_start_freq": [
         "1"
@@ -300,9 +351,11 @@
         "20"
     ],
     "supertack_plate_temp": [
+        "35",
         "35"
     ],
     "supertack_plate_temp_initial_layer": [
+        "35",
         "35"
     ],
     "support_material_interface_fan_speed": [
@@ -312,13 +365,19 @@
         "45"
     ],
     "textured_cool_plate_temp": [
+        "40",
         "40"
     ],
     "textured_cool_plate_temp_initial_layer": [
+        "40",
         "40"
     ],
     "version": "0.0.0.0",
     "chamber_temperatures": [
         "0"
+    ],
+    "filament_extruder_variant": [
+        "Direct Drive Standard",
+        "Direct Drive High Flow"
     ]
 }

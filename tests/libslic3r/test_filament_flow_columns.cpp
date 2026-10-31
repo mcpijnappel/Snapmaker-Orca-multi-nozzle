@@ -197,7 +197,7 @@ TEST_CASE("Every per-column filament key keeps both columns through save and loa
     ScopedTemporaryDir dir("orca_filament_columns");
 
     SECTION("a user preset of a one-column preset, given High Flow values") {
-        const Preset *parent = bundle->filaments.find_preset("Generic PETG", false, true);
+        const Preset *parent = bundle->filaments.find_preset("Generic PCTG", false, true);
         REQUIRE(parent != nullptr);
         REQUIRE(texts_of(parent->config, "filament_extruder_variant") == std::vector<std::string>{STANDARD});
         DynamicPrintConfig child = parent->config;
@@ -220,7 +220,7 @@ TEST_CASE("Every per-column filament key keeps both columns through save and loa
 TEST_CASE("A saved filament preset writes its columns in full and without nil", "[FilamentFlow]")
 {
     auto bundle = load_snapmaker_bundle();
-    const Preset *parent = bundle->filaments.find_preset("Generic PETG", false, true);
+    const Preset *parent = bundle->filaments.find_preset("Generic PCTG", false, true);
     REQUIRE(parent != nullptr);
     REQUIRE(texts_of(parent->config, "filament_extruder_variant") == std::vector<std::string>{STANDARD});
     REQUIRE(texts_of(parent->config, "filament_flow_ratio") == std::vector<std::string>{"0.95"});
@@ -384,7 +384,7 @@ TEST_CASE("A Standard change is offered to the High Flow column only while that 
 }
 
 // ---------------------------------------------------------------------------------------------
-// A U1 0.4 plate with extruder 2 on High Flow, Generic PETG given High Flow values in the Filament
+// A U1 0.4 plate with extruder 2 on High Flow, Generic PCTG given High Flow values in the Filament
 // tab and not saved: the edited copy of the system preset holds both columns.
 // ---------------------------------------------------------------------------------------------
 
@@ -392,7 +392,7 @@ namespace {
 
 const char *const U1_MACHINE = "Snapmaker U1 (0.4 nozzle)";
 const char *const U1_PROCESS = "0.20mm Standard @Snapmaker U1 (0.4 nozzle)";
-const char *const PETG       = "Generic PETG";
+const char *const PETG       = "Generic PCTG";
 
 void select_plate_with_high_flow_petg(PresetBundle &bundle, const std::vector<std::string> &slots)
 {
@@ -476,7 +476,7 @@ TEST_CASE("An unsaved High Flow column prints on the High Flow extruder and Stan
         const DynamicPrintConfig composed = bundle->full_config(true);
         const auto *speed = composed.option<ConfigOptionFloats>("filament_max_volumetric_speed");
         REQUIRE(speed != nullptr);
-        CHECK_THAT(speed->values, Catch::Matchers::Approx(std::vector<double>{12., 22., 12., 12.}));
+        CHECK_THAT(speed->values, Catch::Matchers::Approx(std::vector<double>{6., 22., 6., 6.}));
         const auto *temperature = composed.option<ConfigOptionInts>("nozzle_temperature");
         REQUIRE(temperature != nullptr);
         CHECK(temperature->values == std::vector<int>{255, 255, 255, 255});
@@ -507,7 +507,7 @@ TEST_CASE("A project keeps the High Flow column of an unsaved filament", "[Filam
     const Preset *loaded = second->filaments.find_preset(second->filament_presets[slot], false);
     REQUIRE(loaded != nullptr);
     CHECK(texts_of(loaded->config, "filament_extruder_variant") == std::vector<std::string>{STANDARD, HIGH_FLOW});
-    CHECK_THAT(loaded->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values, Catch::Matchers::Approx(std::vector<double>{12., 22.}));
+    CHECK_THAT(loaded->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values, Catch::Matchers::Approx(std::vector<double>{6., 22.}));
     // A key left unchanged has both columns from the system preset.
     CHECK(loaded->config.option<ConfigOptionInts>("nozzle_temperature")->values == std::vector<int>{255, 255});
     CHECK(filament_columns_consistent(loaded->config));
@@ -585,7 +585,7 @@ TEST_CASE("A project filament with a narrow per-column key is padded before its 
     REQUIRE(parent != nullptr);
     REQUIRE(texts_of(parent->config, "filament_extruder_variant") == std::vector<std::string>{STANDARD});
 
-    // The preset as a project stores it: the keys that differ from Generic PETG, one of them with a
+    // The preset as a project stores it: the keys that differ from Generic PCTG, one of them with a
     // single value for two columns.
     Preset embedded(Preset::TYPE_FILAMENT, "My PETG in the project", false);
     embedded.is_project_embedded = true;
@@ -691,7 +691,7 @@ TEST_CASE("Opening a project with High Flow values leaves the system filament un
     const DynamicPrintConfig before   = system->config;
     const double             standard = before.option<ConfigOptionFloats>("filament_max_volumetric_speed")->get_at(0);
 
-    // The filament as the project config holds it: Generic PETG with a High Flow column and one
+    // The filament as the project config holds it: Generic PCTG with a High Flow column and one
     // High Flow value of its own.
     DynamicPrintConfig project = before;
     REQUIRE(filament_add_flow_column(project, nvtHighFlow));
@@ -699,11 +699,11 @@ TEST_CASE("Opening a project with High Flow values leaves the system filament un
     const std::set<std::string> different{"filament_max_volumetric_speed"};
 
     std::string original_name;
-    SECTION("a user preset made from Generic PETG") {
+    SECTION("a user preset made from Generic PCTG") {
         project.option<ConfigOptionString>("inherits", true)->value = PETG;
         original_name                                                = "My PETG from the project";
     }
-    SECTION("Generic PETG itself with changes") {
+    SECTION("Generic PCTG itself with changes") {
         project.option<ConfigOptionString>("inherits", true)->value.clear();
         original_name = PETG;
     }
@@ -881,7 +881,7 @@ const std::vector<std::string> &bed_and_chamber_keys()
     return keys;
 }
 
-// Writes the user preset file `name` (child of Generic PETG unless `inherits` is empty) with the
+// Writes the user preset file `name` (child of Generic PCTG unless `inherits` is empty) with the
 // given keys into `dir`/filament and loads it through the filament loader of `bundle`.
 const Preset &load_user_filament_file(PresetBundle &bundle, const ScopedTemporaryDir &dir, const std::string &name, const std::string &inherits,
                                       const std::vector<std::pair<std::string, std::vector<std::string>>> &values)
@@ -974,7 +974,7 @@ TEST_CASE("A High Flow column saved before the bed and chamber temperatures had 
         CHECK(config.option<ConfigOptionInts>("chamber_temperature")->values == std::vector<int>{40, 40});
         CHECK(config.option<ConfigOptionBools>("activate_chamber_temp_control")->values == std::vector<unsigned char>{1, 1});
         // A key the file does not name follows the parent in both columns.
-        CHECK(config.option<ConfigOptionInts>("textured_plate_temp_initial_layer")->values == std::vector<int>{80, 80});
+        CHECK(config.option<ConfigOptionInts>("textured_plate_temp_initial_layer")->values == std::vector<int>{100, 100});
         for (const std::string &key : bed_and_chamber_keys()) {
             INFO(key);
             const std::vector<std::string> texts = texts_of(config, key);

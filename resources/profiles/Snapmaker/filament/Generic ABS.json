@@ -6,28 +6,34 @@
     "setting_id": "GFSB99",
     "inherits": "Generic ABS @U1 base",
     "filament_max_volumetric_speed": [
-        "15"
+        "15",
+        "19.8"
     ],
     "compatible_printers": [
         "Snapmaker U1 (0.4 nozzle)"
     ],
     "enable_pressure_advance": [
-        "0"
+        "0",
+        "1"
     ],
     "filament_end_gcode": [
         ""
     ],
     "filament_multitool_ramming": [
+        "1",
         "1"
     ],
     "filament_multitool_ramming_flow": [
-        "15"
+        "15",
+        "30"
     ],
     "filament_multitool_ramming_volume": [
-        "0.5"
+        "0.5",
+        "5"
     ],
     "filament_retract_length_toolchange": [
-        "10"
+        "10",
+        "5"
     ],
     "filament_start_gcode": [
         ""
@@ -36,31 +42,38 @@
         "Generic"
     ],
     "nozzle_temperature_initial_layer": [
-        "270"
+        "270",
+        "280"
     ],
     "filament_is_high_temperature": [
         "1"
     ],
     "compatible_prints": [],
     "complete_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "during_print_exhaust_fan_speed": [
+        "70",
         "70"
     ],
     "eng_plate_temp": [
+        "90",
         "90"
     ],
     "eng_plate_temp_initial_layer": [
+        "90",
         "90"
     ],
     "fan_cooling_layer_time": [
         "30"
     ],
     "fan_max_speed": [
-        "80"
+        "80",
+        "60"
     ],
     "fan_min_speed": [
+        "10",
         "10"
     ],
     "filament_cooling_final_speed": [
@@ -76,13 +89,16 @@
         "20"
     ],
     "filament_deretraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_flow_ratio": [
+        "0.95",
         "0.95"
     ],
     "filament_flow_support": [
-        "standard"
+        "standard",
+        "high_flow"
     ],
     "filament_loading_speed": [
         "28"
@@ -91,18 +107,22 @@
         "3"
     ],
     "filament_minimal_purge_on_wipe_tower": [
+        "15",
         "15"
     ],
     "filament_notes": [
         ""
     ],
     "filament_retract_when_changing_layer": [
+        "nil",
         "nil"
     ],
     "filament_retraction_length": [
-        "nil"
+        "nil",
+        "0.2"
     ],
     "filament_retraction_speed": [
+        "nil",
         "nil"
     ],
     "filament_settings_id": [
@@ -115,19 +135,24 @@
         "100"
     ],
     "filament_wipe": [
+        "nil",
         "nil"
     ],
     "filament_z_hop": [
+        "nil",
         "nil"
     ],
     "hot_plate_temp": [
+        "90",
         "90"
     ],
     "hot_plate_temp_initial_layer": [
+        "90",
         "90"
     ],
     "nozzle_temperature": [
-        "270"
+        "270",
+        "280"
     ],
     "overhang_fan_speed": [
         "80"
@@ -136,6 +161,7 @@
         "0.4157"
     ],
     "pressure_advance": [
+        "0.02",
         "0.02"
     ],
     "slow_down_for_layer_cooling": [
@@ -148,36 +174,46 @@
         "20"
     ],
     "textured_plate_temp": [
+        "90",
         "90"
     ],
     "textured_plate_temp_initial_layer": [
+        "90",
         "90"
     ],
     "chamber_temperatures": [
         "0"
     ],
     "activate_air_filtration": [
-        "0"
+        "0",
+        "1"
     ],
     "activate_chamber_temp_control": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance_bridges": [
+        "0",
         "0"
     ],
     "adaptive_pressure_advance_model": [
+        "0,0,0\n0,0,0",
         "0,0,0\n0,0,0"
     ],
     "adaptive_pressure_advance_overhangs": [
+        "0",
         "0"
     ],
     "additional_cooling_fan_speed": [
+        "0",
         "0"
     ],
     "chamber_temperature": [
+        "0",
         "0"
     ],
     "close_fan_the_first_x_layers": [
@@ -186,9 +222,11 @@
     "compatible_printers_condition": "",
     "compatible_prints_condition": "",
     "cool_plate_temp": [
+        "0",
         "0"
     ],
     "cool_plate_temp_initial_layer": [
+        "0",
         "0"
     ],
     "default_filament_colour": [
@@ -210,33 +248,42 @@
         "0"
     ],
     "filament_long_retractions_when_cut": [
+        "nil",
         "nil"
     ],
     "filament_ramming_parameters": [
         "120 100 6.6 6.8 7.2 7.6 7.9 8.2 8.7 9.4 9.9 10.0| 0.05 6.6 0.45 6.8 0.95 7.8 1.45 8.3 1.95 9.7 2.45 10 2.95 7.6 3.45 7.6 3.95 7.6 4.45 7.6 4.95 7.6"
     ],
     "filament_retract_before_wipe": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_above": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_below": [
+        "nil",
         "nil"
     ],
     "filament_retract_lift_enforce": [
+        "nil",
         "nil"
     ],
     "filament_retract_restart_extra": [
+        "nil",
         "nil"
     ],
     "filament_retract_restart_extra_toolchange": [
+        "nil",
         "nil"
     ],
     "filament_retraction_distances_when_cut": [
+        "nil",
         "nil"
     ],
     "filament_retraction_minimum_travel": [
+        "nil",
         "nil"
     ],
     "filament_shrink": [
@@ -264,18 +311,22 @@
         "ABS"
     ],
     "filament_wipe_distance": [
+        "nil",
         "nil"
     ],
     "filament_z_hop_types": [
-        "nil"
+        "nil",
+        "Slope Lift"
     ],
     "full_fan_speed_layer": [
         "0"
     ],
     "graphic_effect_plate_temp": [
+        "0",
         "0"
     ],
     "graphic_effect_plate_temp_initial_layer": [
+        "0",
         "0"
     ],
     "idle_temperature": [
@@ -303,9 +354,11 @@
         "3"
     ],
     "supertack_plate_temp": [
+        "35",
         "35"
     ],
     "supertack_plate_temp_initial_layer": [
+        "35",
         "35"
     ],
     "support_material_interface_fan_speed": [
@@ -315,10 +368,16 @@
         "100"
     ],
     "textured_cool_plate_temp": [
+        "40",
         "40"
     ],
     "textured_cool_plate_temp_initial_layer": [
+        "40",
         "40"
     ],
-    "version": "0.0.0.0"
+    "version": "0.0.0.0",
+    "filament_extruder_variant": [
+        "Direct Drive Standard",
+        "Direct Drive High Flow"
+    ]
 }

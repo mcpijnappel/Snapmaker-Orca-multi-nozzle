@@ -876,7 +876,7 @@ TEST_CASE("A user filament preset of Snapmaker Orca 2.4 with High Flow values ke
 {
     const auto    loaded = load_snapmaker_bundle();
     PresetBundle &bundle = *loaded;
-    const Preset *parent = bundle.filaments.find_preset("Generic PETG", false, true);
+    const Preset *parent = bundle.filaments.find_preset("Generic PCTG", false, true);
     REQUIRE(parent != nullptr);
     REQUIRE(strings_of(parent->config, "filament_extruder_variant") == std::vector<std::string>{STANDARD});
 
@@ -888,7 +888,7 @@ TEST_CASE("A user filament preset of Snapmaker Orca 2.4 with High Flow values ke
     "type": "filament",
     "name": "My PETG 2.4",
     "from": "User",
-    "inherits": "Generic PETG",
+    "inherits": "Generic PCTG",
     "version": "2.4.0",
     "filament_settings_id": ["My PETG 2.4"],
     "filament_flow_support": ["standard", "high_flow"],
@@ -921,11 +921,11 @@ TEST_CASE("The project config lists a filament's High Flow column right after it
     PresetBundle &bundle = *loaded;
     REQUIRE(bundle.printers.select_preset_by_name(U1_MACHINE, true));
     REQUIRE(bundle.prints.select_preset_by_name(U1_PROCESS, true));
-    bundle.filament_presets = {"Generic PETG", "Generic PLA", "Generic PLA", "Generic PLA"};
+    bundle.filament_presets = {"Generic PCTG", "Generic PC", "Generic PC", "Generic PC"};
     bundle.project_config.option<ConfigOptionStrings>("filament_colour", true)->values.assign(4, "#FFFFFF");
     bundle.project_config.option<ConfigOptionInts>("filament_map", true)->values = {1, 2, 3, 4};
     bundle.project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {int(nvtStandard), int(nvtHighFlow), int(nvtStandard), int(nvtStandard)};
-    REQUIRE(bundle.filaments.select_preset_by_name("Generic PETG", true));
+    REQUIRE(bundle.filaments.select_preset_by_name("Generic PCTG", true));
     DynamicPrintConfig &petg = bundle.filaments.get_edited_preset().config;
     REQUIRE(filament_add_flow_column(petg, nvtHighFlow));
     petg.option<ConfigOptionInts>("nozzle_temperature")->values[1] = 265;

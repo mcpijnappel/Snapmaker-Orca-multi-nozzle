@@ -6,7 +6,7 @@
     "setting_id": "GFSG99_01",
     "inherits": "Generic PETG @U1 base",
     "filament_max_volumetric_speed": [
-        "1"
+        "1.3"
     ],
     "compatible_printers": [
         "Snapmaker U1 (0.2 nozzle)"
