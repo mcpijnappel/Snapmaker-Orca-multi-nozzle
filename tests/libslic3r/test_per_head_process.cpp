@@ -388,10 +388,10 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
         const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
         CHECK(source_names(sources) == std::vector<std::string>{"", STD_012_02, STD_018_06, ""});
-        CHECK(sources[0].reason == PerHeadProcess::Reason::HomeSize);
+        CHECK(sources[0].reason == PerHeadProcess::Reason::SelectedSize);
         CHECK(sources[1].reason == PerHeadProcess::Reason::Derived);
         CHECK(sources[2].reason == PerHeadProcess::Reason::Derived);
-        CHECK(sources[3].reason == PerHeadProcess::Reason::HomeSize);
+        CHECK(sources[3].reason == PerHeadProcess::Reason::SelectedSize);
         CHECK(sources[1].composed_keys.size() == 41);
         CHECK(sources[1].kept_keys.empty());
 
@@ -480,31 +480,33 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
     SECTION("the source rule alone: explicit names, an installed default and a size without presets") {
         select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0.12, 0.30, 0.});
         const Preset &selected = bundle->prints.get_selected_preset();
-        PerHeadProcess::Reason reason = PerHeadProcess::Reason::HomeSize;
+        PerHeadProcess::Reason reason = PerHeadProcess::Reason::SelectedSize;
 
         Preset *hq = bundle->prints.find_preset(HQ_010_02, false, true);
         REQUIRE(hq != nullptr);
         hq->is_visible = true;
-        const Preset *chosen = PerHeadProcess::source_for_head(*bundle, machine(*bundle, U1_02), 0.12, selected, HQ_010_02, reason);
+        const Preset *chosen = PerHeadProcess::source_for_head(*bundle, 0.2, 0.12, selected, HQ_010_02, reason);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == HQ_010_02);
         CHECK(reason == PerHeadProcess::Reason::Explicit);
 
-        chosen = PerHeadProcess::source_for_head(*bundle, machine(*bundle, U1_02), 0.12, selected, "0.12mm Standard @Snapmaker U1 (0.2 nozzle) renamed", reason);
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.2, 0.12, selected, "0.12mm Standard @Snapmaker U1 (0.2 nozzle) renamed", reason);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == STD_012_02);
         CHECK(reason == PerHeadProcess::Reason::NotInstalled);
 
-        // A machine preset no process preset lists: the default named by the machine, when installed, else nothing.
-        Preset odd(Preset::TYPE_PRINTER, "Snapmaker U1 (0.5 nozzle)");
-        odd.config.option<ConfigOptionString>("printer_model", true)->value          = "Snapmaker U1";
-        odd.config.option<ConfigOptionString>("default_print_profile", true)->value  = STD_012_02;
-        chosen = PerHeadProcess::source_for_head(*bundle, odd, 0.12, selected, std::string(), reason);
+        // A size whose printer profile no process preset lists: the default named by that profile, when installed, else nothing.
+        DynamicPrintConfig odd_config = machine(*bundle, U1_04).config;
+        odd_config.option<ConfigOptionString>("inherits", true)->value               = "";
+        odd_config.option<ConfigOptionString>("printer_variant", true)->value        = "0.5";
+        odd_config.option<ConfigOptionString>("default_print_profile", true)->value  = STD_012_02;
+        Preset &odd = bundle->printers.load_preset(std::string(), "Snapmaker U1 (0.5 nozzle)", std::move(odd_config), false);
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.5, 0.12, selected, std::string(), reason);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == STD_012_02);
         CHECK(reason == PerHeadProcess::Reason::Derived);
         odd.config.option<ConfigOptionString>("default_print_profile", true)->value = "0.12mm Standard @Snapmaker U1 (0.5 nozzle)";
-        chosen = PerHeadProcess::source_for_head(*bundle, odd, 0.12, selected, std::string(), reason);
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.5, 0.12, selected, std::string(), reason);
         CHECK(chosen == nullptr);
         CHECK(reason == PerHeadProcess::Reason::NoProcessPreset);
     }
@@ -589,7 +591,7 @@ TEST_CASE("On the shipped U1 presets every tool head of another size prints with
                 INFO("tool head " << head + 1 << " (" << sizes[head] << " mm)");
                 if (row.cells[head] == nullptr) {
                     CHECK_FALSE(sources[head].derived);
-                    CHECK(sources[head].reason == PerHeadProcess::Reason::HomeSize);
+                    CHECK(sources[head].reason == PerHeadProcess::Reason::SelectedSize);
                     CHECK(sources[head].step == PerHeadProcess::Step::SelectedPreset);
                     continue;
                 }
@@ -748,7 +750,7 @@ TEST_CASE("A U1 whose tool heads all carry the nozzle size of the printer preset
     REQUIRE(sources.size() == 4);
     for (const PerHeadProcess::Source &source : sources) {
         CHECK_FALSE(source.derived);
-        CHECK(source.reason == PerHeadProcess::Reason::HomeSize);
+        CHECK(source.reason == PerHeadProcess::Reason::SelectedSize);
     }
     CHECK(record->values.empty());
     CHECK(bundle->full_config_for_print(false).option<ConfigOptionStrings>(PerHeadProcess::record_key)->values.empty());
@@ -877,7 +879,7 @@ TEST_CASE("The project records the process preset of every tool head and a load 
         REQUIRE(report.size() == 1);
         CHECK(report[0].head == 1);
         CHECK(report[0].current.empty());
-        CHECK(report[0].reason == PerHeadProcess::Reason::HomeSize);
+        CHECK(report[0].reason == PerHeadProcess::Reason::SelectedSize);
 
         bundle->project_config.option<ConfigOptionStrings>(PerHeadProcess::record_key)->values = {"", "", "0.18mm Standard @Snapmaker U1 (0.6 nozzle) renamed", ""};
         report = PerHeadProcess::load_report(*bundle);
@@ -1915,7 +1917,7 @@ TEST_CASE("The High Flow rule decides from the shared columns of a preset with v
         const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
         for (const PerHeadProcess::Source &source : sources) {
-            CHECK(source.reason == PerHeadProcess::Reason::HomeSize);
+            CHECK(source.reason == PerHeadProcess::Reason::SelectedSize);
             CHECK_FALSE(source.derived);
         }
     }
@@ -1956,7 +1958,7 @@ TEST_CASE("The High Flow rule applies to a High Flow tool head without High Flow
         const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
         REQUIRE(sources.size() == 4);
         for (const PerHeadProcess::Source &source : sources) {
-            CHECK(source.reason == PerHeadProcess::Reason::HomeSize);
+            CHECK(source.reason == PerHeadProcess::Reason::SelectedSize);
             CHECK_FALSE(source.derived);
         }
         CHECK(bundle->full_config_for_print(false).equals(bundle->full_config(false)));
@@ -1999,24 +2001,23 @@ TEST_CASE("The High Flow rule applies to a High Flow tool head without High Flow
     SECTION("the source rule with a filter: the accepted presets alone, the nearest of any class before the default") {
         select_owner_plate(*bundle);
         const Preset &selected = bundle->prints.get_selected_preset();
-        const Preset &u1_04    = machine(*bundle, U1_04);
-        PerHeadProcess::Reason reason = PerHeadProcess::Reason::HomeSize;
+        PerHeadProcess::Reason reason = PerHeadProcess::Reason::SelectedSize;
         auto has_high_flow = [&printer](const Preset &candidate) { return PerHeadProcess::column_for_head(candidate.config, 1, nvtHighFlow, printer) >= 0; };
         // 0.20mm Standard is the one 0.4 mm preset with a High Flow column: exact height, the machine's default.
-        const Preset *chosen = PerHeadProcess::source_for_head(*bundle, u1_04, 0., selected, std::string(), reason, has_high_flow);
+        const Preset *chosen = PerHeadProcess::source_for_head(*bundle, 0.4, 0., selected, std::string(), reason, has_high_flow);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == STD_020_04);
         CHECK(reason == PerHeadProcess::Reason::Derived);
         // A preferred layer height no accepted preset has: the nearest accepted one, whatever its class (step 2b).
-        chosen = PerHeadProcess::source_for_head(*bundle, u1_04, 0.12, selected, std::string(), reason, has_high_flow);
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.4, 0.12, selected, std::string(), reason, has_high_flow);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == STD_020_04);
         // A filter nothing passes: no preset, the machine's default included.
-        chosen = PerHeadProcess::source_for_head(*bundle, u1_04, 0., selected, std::string(), reason, [](const Preset &) { return false; });
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.4, 0., selected, std::string(), reason, [](const Preset &) { return false; });
         CHECK(chosen == nullptr);
         CHECK(reason == PerHeadProcess::Reason::NoProcessPreset);
         // Without a filter the rule is what it was.
-        chosen = PerHeadProcess::source_for_head(*bundle, u1_04, 0.12, selected, std::string(), reason);
+        chosen = PerHeadProcess::source_for_head(*bundle, 0.4, 0.12, selected, std::string(), reason);
         REQUIRE(chosen != nullptr);
         CHECK(chosen->name == "0.12mm Standard @Snapmaker U1 (0.4 nozzle)");
     }
@@ -2176,7 +2177,7 @@ TEST_CASE("A tool head of the printer preset's size takes a chosen preset, and a
     REQUIRE(sources.size() == 4);
     CHECK(sources[0].chosen_state == PerHeadProcess::ChosenState::Applied);
     CHECK(sources[0].automatic == nullptr);
-    CHECK(sources[1].reason == PerHeadProcess::Reason::HomeSize);
+    CHECK(sources[1].reason == PerHeadProcess::Reason::SelectedSize);
     DynamicPrintConfig composed = bundle->full_config_for_print(false);
     CHECK(floats_of(composed, "outer_wall_speed") == std::vector<double>{60., 200., 200., 200.});
     // The record names the chosen preset; the choice key is not written by the pre-apply pass.
@@ -2191,7 +2192,7 @@ TEST_CASE("A tool head of the printer preset's size takes a chosen preset, and a
     CHECK(sources[0].chosen_state == PerHeadProcess::ChosenState::SameAsSelected);
     CHECK(sources[0].step == PerHeadProcess::Step::Chosen);
     CHECK_FALSE(sources[0].derived);
-    CHECK(sources[0].reason == PerHeadProcess::Reason::HomeSize);
+    CHECK(sources[0].reason == PerHeadProcess::Reason::SelectedSize);
     CHECK(choices_of(*bundle) == std::vector<std::string>{HQ_020_04});
     CHECK(bundle->full_config_for_print(false).equals(bundle->full_config(false)));
 
@@ -2592,7 +2593,7 @@ TEST_CASE("A High Flow tool head set to the Standard speeds prints the selected 
     CHECK(sources[1].flow == nvtStandard);
     CHECK(sources[1].flow_chosen);
     CHECK_FALSE(sources[1].derived);
-    CHECK(sources[1].reason == PerHeadProcess::Reason::HomeSize);
+    CHECK(sources[1].reason == PerHeadProcess::Reason::SelectedSize);
     CHECK(sources[1].step == PerHeadProcess::Step::SelectedPreset);
     REQUIRE(sources[1].preset != nullptr);
     CHECK(sources[1].preset->name == HQ_020_04);
@@ -3548,7 +3549,7 @@ TEST_CASE("A multi-nozzle preset gives a tool head of another size its own prese
     REQUIRE(sources.size() == 4);
     CHECK(source_names(sources) == std::vector<std::string>{"", "", "", of_0_2});
     for (size_t head = 0; head < 3; ++head)
-        CHECK(sources[head].reason == PerHeadProcess::Reason::HomeSize);
+        CHECK(sources[head].reason == PerHeadProcess::Reason::SelectedSize);
     CHECK(sources[3].step == PerHeadProcess::Step::MultiNozzleSize);
     CHECK(sources[3].composed_keys.size() == 41);
 
@@ -3593,4 +3594,64 @@ TEST_CASE("A High Flow tool head under a multi-nozzle preset prints the preset's
     const Preset *standard = bundle->prints.find_preset("0.16mm Standard @Snapmaker U1 (0.4 nozzle)", false);
     REQUIRE(standard != nullptr);
     CHECK_THAT(outer[1], Catch::Matchers::WithinAbs(floats_of(standard->config, "outer_wall_speed").front(), 1e-9));
+}
+
+TEST_CASE("The tool heads take their sources by their own size, whatever size the printer preset was made for", "[PerHeadProcess][Profiles][phs_no_home_size]")
+{
+    auto bundle = load_snapmaker_bundle();
+    // The same heads and the same process preset on each per-size printer preset: the same sources.
+    for (const char *printer : {U1_02, U1_04, "Snapmaker U1 (0.6 nozzle)", "Snapmaker U1 (0.8 nozzle)"}) {
+        INFO(printer);
+        select_u1(*bundle, {0.4, 0.2, 0.6, 0.4}, {0., 0., 0., 0.}, STD_020_04, printer);
+        const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
+        REQUIRE(sources.size() == 4);
+        CHECK(source_names(sources) == std::vector<std::string>{"", STD_012_02, STD_018_06, ""});
+        CHECK(sources[0].reason == PerHeadProcess::Reason::SelectedSize);
+        CHECK(sources[1].reason == PerHeadProcess::Reason::Derived);
+        CHECK(sources[2].reason == PerHeadProcess::Reason::Derived);
+        CHECK(sources[3].reason == PerHeadProcess::Reason::SelectedSize);
+    }
+    // A 0.6 mm process preset prints its own size and derives the others.
+    select_u1(*bundle, {0.6, 0.6, 0.4, 0.6}, {0., 0., 0., 0.}, STD_030_06, U1_04);
+    const std::vector<PerHeadProcess::Source> sources = PerHeadProcess::head_sources(*bundle);
+    REQUIRE(sources.size() == 4);
+    CHECK(sources[0].reason == PerHeadProcess::Reason::SelectedSize);
+    CHECK(sources[2].reason == PerHeadProcess::Reason::Derived);
+    CHECK(sources[3].reason == PerHeadProcess::Reason::SelectedSize);
+}
+
+TEST_CASE("Tool heads of one size list the process presets of that size", "[PerHeadProcess][Profiles][phs_process_list]")
+{
+    auto bundle = load_snapmaker_bundle();
+    auto compatible = [&bundle](const char *name) {
+        const Preset *preset = bundle->prints.find_preset(name, false);
+        REQUIRE(preset != nullptr);
+        return preset->is_compatible;
+    };
+    const char *const MULTI_NOZZLE = "Multi-nozzle Normal @Snapmaker U1";
+
+    SECTION("four 0.6 mm heads on the 0.4 mm printer preset") {
+        select_u1(*bundle, {0.6, 0.6, 0.6, 0.6}, {0., 0., 0., 0.}, STD_020_04, U1_04);
+        bundle->update_compatible(PresetSelectCompatibleType::Always);
+        CHECK(compatible(STD_030_06));
+        CHECK(compatible(STD_018_06));
+        CHECK_FALSE(compatible(HQ_020_04));
+        CHECK_FALSE(compatible(STD_012_02));
+        // The 0.4 mm preset was no longer compatible: the 0.6 mm default took its place.
+        CHECK(NozzleFilament::preset_nozzle_size(*bundle, bundle->prints.get_selected_preset()) == 0.6);
+    }
+    SECTION("four 0.4 mm heads on the 0.6 mm printer preset") {
+        select_u1(*bundle, {0.4, 0.4, 0.4, 0.4}, {0., 0., 0., 0.}, STD_030_06, "Snapmaker U1 (0.6 nozzle)");
+        bundle->update_compatible(PresetSelectCompatibleType::Never);
+        CHECK(compatible(STD_020_04));
+        CHECK(compatible(HQ_020_04));
+        CHECK_FALSE(compatible(STD_018_06));
+    }
+    SECTION("mixed sizes list the multi-nozzle presets, not the presets of one size") {
+        select_u1(*bundle, {0.4, 0.6, 0.4, 0.4}, {0., 0., 0., 0.}, STD_020_04, U1_04);
+        bundle->update_compatible(PresetSelectCompatibleType::Never);
+        CHECK(compatible(MULTI_NOZZLE));
+        CHECK_FALSE(compatible(HQ_020_04));
+        CHECK_FALSE(compatible(STD_030_06));
+    }
 }

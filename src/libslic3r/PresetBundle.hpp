@@ -461,13 +461,13 @@ public:
     // Snapmaker Orca: preference "process_follows_nozzle" (PerHeadProcess.hpp), off unless the application
     // sets it. A preset chosen for a head applies either way (gate: PerHeadProcess::active).
     bool                        process_follows_nozzle { false };
-    // Session memory of the rule, never stored: (family, machine preset name) -> the user preset
+    // Session memory of the rule, never stored: (family, nozzle size as text) -> the user preset
     // a slot left because of its size (NozzleFilament::remember_user_preset()). target_for_slot()
     // prefers it over the system version while it exists, is installed and fits.
     std::map<std::pair<std::string, std::string>, std::string> nozzle_filament_memory;
-    // Per slot compatibility: Preset::is_compatible, unless State::mixed and the slot has a tool
-    // head; then "fits" rates against that head's machine preset and "selectable" also admits user
-    // presets and system presets without a version for its size. A State lasts until slots change.
+    // Per slot compatibility: Preset::is_compatible, unless the rule is on and the slot has a tool
+    // head; then "fits" rates against that head's nozzle size and "selectable" also admits presets
+    // of a material without a version for its size. A State lasts until slots change.
     bool                        filament_slot_fits(const Preset &preset, size_t slot) const;
     bool                        filament_slot_fits(const NozzleFilament::State &state, const Preset &preset, size_t slot) const;
     bool                        filament_slot_selectable(const Preset &preset, size_t slot) const;
@@ -483,7 +483,7 @@ public:
     // A hidden target becomes visible and, with `app_config`, is entered in its filament section.
     size_t                      apply_nozzle_filament_targets(const std::vector<NozzleFilament::SlotTarget> &targets, AppConfig *app_config = nullptr);
     // The per slot form of the loop that ends update_selections() and load_selections(); false when
-    // tool heads of different nozzle sizes are not in use and mainline's loop has to run.
+    // the nozzle size rule is off and mainline's loop has to run.
     bool                        repair_filament_slots_per_head();
     // The preset a broken filament slot takes when all extruders share one nozzle size: the edited
     // filament (update_compatible()'s pick) if installed and compatible, else the first compatible one.

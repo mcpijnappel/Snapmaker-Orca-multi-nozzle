@@ -56,7 +56,7 @@ const Preset *width_source(const Source &source)
         return source.preset;
     if (source.reason == Reason::HighFlow)
         // The speeds come from the sibling with a High Flow column; the widths from the preset of
-        // the head's size the rule gave it first, or the selected preset for a home-size head.
+        // the head's size the rule gave it first, or the selected preset for a head of its size.
         return source.size_preset;
     return source.preset;
 }
@@ -130,13 +130,24 @@ bool compatible(const PresetBundle &bundle, const Preset &process, const Preset 
     return is_compatible_with_printer(bundle.prints.get_preset_with_vendor_profile(process), bundle.printers.get_preset_with_vendor_profile(machine));
 }
 
-// The system process presets compatible with `machine`, `selected` excluded, whatever their
-// visibility; in the order of the collection, which is the order of the names.
-std::vector<const Preset*> candidates_for(const PresetBundle &bundle, const Preset &machine, const Preset &selected)
+// compatible() with the printer for a tool head of nozzle size `size`; false for a size the printer
+// has no profile for.
+bool compatible(const PresetBundle &bundle, const Preset &process, double size)
+{
+    const Preset *machine = NozzleFilament::size_machine(bundle, size);
+    return machine != nullptr && compatible(bundle, process, *machine);
+}
+
+// The system process presets compatible with a head of nozzle size `size`, `selected` excluded,
+// whatever their visibility; in the order of the collection, which is the order of the names.
+std::vector<const Preset*> candidates_for(const PresetBundle &bundle, double size, const Preset &selected)
 {
     std::vector<const Preset*> out;
+    const Preset *machine = NozzleFilament::size_machine(bundle, size);
+    if (machine == nullptr)
+        return out;
     for (const Preset &preset : bundle.prints)
-        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, machine) && !is_multi_nozzle_size(bundle, preset) &&
+        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, *machine) && !is_multi_nozzle_size(bundle, preset) &&
             !is_multi_nozzle_height_preset(preset))
             out.emplace_back(&preset);
     return out;
@@ -331,11 +342,11 @@ double target_layer_height(const PresetBundle &bundle)
     return bundle.prints.get_selected_idx() == size_t(-1) ? 0. : layer_height_of(bundle.prints.get_selected_preset());
 }
 
-const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double target_height_mm,
+const Preset* source_for_head(const PresetBundle &bundle, double nozzle_size, double target_height_mm,
                               const Preset &selected, const std::string &explicit_name, Reason &reason,
                               const std::function<bool(const Preset &)> &accept, RuleTrace *trace)
 {
-    std::vector<const Preset*> candidates = candidates_for(bundle, machine, selected);
+    std::vector<const Preset*> candidates = candidates_for(bundle, nozzle_size, selected);
     if (accept)
         candidates.erase(std::remove_if(candidates.begin(), candidates.end(), [&accept](const Preset *candidate) { return !accept(*candidate); }),
                          candidates.end());
@@ -356,7 +367,7 @@ const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine,
         const Preset *named = resolve_chosen(bundle, explicit_name);
         if (named == nullptr)
             by_rule = Reason::NotInstalled;
-        else if (compatible(bundle, *named, machine) && (!accept || accept(*named)))
+        else if (compatible(bundle, *named, nozzle_size) && (!accept || accept(*named)))
             return found(named, Reason::Explicit, Step::Chosen);
         else
             by_rule = Reason::Unfit;
@@ -367,7 +378,8 @@ const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine,
     // not move the source).
     const double      target_height = target_height_mm > 0. ? target_height_mm : layer_height_of(selected);
     const std::string quality       = quality_class_of(bundle, selected);
-    const std::string default_name  = default_print_profile_of(machine);
+    const Preset     *machine       = NozzleFilament::size_machine(bundle, nozzle_size);
+    const std::string default_name  = machine == nullptr ? std::string() : default_print_profile_of(*machine);
 
     for (const std::string &class_name : class_ladder(quality)) {
         std::vector<const Preset *> of_class;
@@ -418,7 +430,9 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
     const Preset &printer  = bundle.printers.get_edited_preset();
     const Preset &selected = bundle.prints.get_selected_preset();
     const Preset *parent   = system_parent(bundle);
-    const double  home     = NozzleFilament::home_nozzle_size(printer.config);
+    // The nozzle size the selected preset is made for: a head of that size prints with it. A preset
+    // made for no single size serves every head.
+    const double  selected_size = NozzleFilament::preset_nozzle_size(bundle, selected);
     const bool    multi_nozzle = parent != nullptr && has_multi_nozzle_sizes(bundle, *parent);
     const std::set<std::string> edited = all_edited_keys(bundle);
     auto split_keys = [&edited](Source &source) {
@@ -435,9 +449,9 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
         source.preset      = &selected;
         source.flow        = effective_flow(bundle, head);
         source.flow_chosen = flow_chosen(bundle, head);
-        const Preset *machine   = head < state.head_machine.size() && state.head_machine[head] != nullptr ? state.head_machine[head] : &printer;
-        const bool    home_size = machine == &printer && (home <= 0. || same_height(state.head_size[head], home));
-        source.chosen           = with_choices ? chosen_of(bundle, head) : std::string();
+        const double  head_size     = state.head_size[head];
+        const bool    selected_fits = selected_size <= 0. || same_height(head_size, selected_size);
+        source.chosen               = with_choices ? chosen_of(bundle, head) : std::string();
         // Without a system parent every key counts as edited (all_edited_keys): nothing can be
         // composed, a choice included (it would take all 32 keys with no way to tell what the user
         // edited). The guard stays ahead of the choice.
@@ -450,7 +464,7 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             continue;
         }
         // The choice: an explicit act applies whether the preference is on or off and on a head of
-        // the home size. One that is not installed or not made for the head's size stays in the
+        // the selected preset's size. One that is not installed or not made for the head's size stays in the
         // project, inactive, and the rule prints (it applies again when it fits).
         Reason carried          = Reason::Derived;
         bool   same_as_selected = false;
@@ -483,12 +497,12 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             continue;
         }
         // Snapmaker Orca Max: a multi-nozzle preset carries its values per nozzle size. A head
-        // prints with the preset's hidden preset of its size; a size without one is the size the
-        // selected preset's own values are made for, whatever size the printer preset is based on.
+        // prints with the preset's hidden preset of its size; a size without one prints with the
+        // selected preset's own values.
         if (multi_nozzle && !same_as_selected) {
-            const Preset *of_size = multi_nozzle_size_preset(bundle, *parent, state.head_size[head]);
+            const Preset *of_size = multi_nozzle_size_preset(bundle, *parent, head_size);
             if (of_size == nullptr) {
-                source.reason = Reason::HomeSize;
+                source.reason = Reason::SelectedSize;
                 continue;
             }
             source.preset     = of_size;
@@ -499,8 +513,12 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             split_keys(source);
             continue;
         }
-        if (machine == &printer) {
-            source.reason = home_size ? Reason::HomeSize : Reason::NoMachinePreset;
+        if (selected_fits) {
+            source.reason = Reason::SelectedSize;
+            continue;
+        }
+        if (NozzleFilament::size_machine(bundle, head_size) == nullptr) {
+            source.reason = Reason::NoMachinePreset;
             continue;
         }
         if (same_as_selected) {
@@ -511,7 +529,7 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
         }
         Reason        reason   = Reason::Derived;
         RuleTrace     trace;
-        const Preset *by_rule  = source_for_head(bundle, *machine, 0., selected, std::string(), reason, {}, &trace);
+        const Preset *by_rule  = source_for_head(bundle, head_size, 0., selected, std::string(), reason, {}, &trace);
         if (by_rule == nullptr) {
             source.reason = Reason::NoProcessPreset;
             continue;
@@ -524,7 +542,7 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
         split_keys(source);
     }
     // The edited copy of the selected preset: holds unsaved per-head values (compose reads it too);
-    // its shared columns tell has_high_flow_values whether a home-size head has High Flow values of
+    // its shared columns tell has_high_flow_values whether a head printing with the selected preset has High Flow values of
     // its own (once any head has a value the copy is wide and every head owns a High Flow column).
     const DynamicPrintConfig &edited_config = bundle.prints.get_edited_preset().config;
     // The preset of the head's size before the High Flow rule below may re-pick a speeds source:
@@ -539,16 +557,15 @@ std::vector<Source> compute_sources(const PresetBundle &bundle, bool with_choice
             Source &source = out[head];
             if (source.flow != nvtHighFlow || source.step == Step::Chosen)
                 continue;
-            if (source.reason != Reason::HomeSize && source.reason != Reason::Derived && source.reason != Reason::NotInstalled && source.reason != Reason::Unfit)
+            if (source.reason != Reason::SelectedSize && source.reason != Reason::Derived && source.reason != Reason::NotInstalled && source.reason != Reason::Unfit)
                 continue;
             const bool has = source.derived && source.preset != nullptr ? column_for_head(source.preset->config, head, nvtHighFlow, printer.config) >= 0 :
                                                                           has_high_flow_values(edited_config, head, printer.config);
             if (has)
                 continue;
-            const Preset *machine   = head < state.head_machine.size() && state.head_machine[head] != nullptr ? state.head_machine[head] : &printer;
             Reason        reason    = Reason::Derived;
             RuleTrace     trace;
-            const Preset *by_rule   = source_for_head(bundle, *machine, 0., selected, std::string(), reason,
+            const Preset *by_rule   = source_for_head(bundle, state.head_size[head], 0., selected, std::string(), reason,
                                                       [&printer, head](const Preset &candidate) { return column_for_head(candidate.config, head, nvtHighFlow, printer.config) >= 0; },
                                                       &trace);
             if (by_rule == nullptr)
@@ -721,10 +738,8 @@ bool fits(const PresetBundle &bundle, const Preset &preset, size_t head, std::st
     const NozzleFilament::State state = NozzleFilament::head_state(bundle);
     if (!state.rule_on || head >= state.head_size.size())
         return answer(false, std::string());
-    const Preset &printer = bundle.printers.get_edited_preset();
-    const Preset *machine = head < state.head_machine.size() && state.head_machine[head] != nullptr ? state.head_machine[head] : &printer;
-    const double  home    = NozzleFilament::home_nozzle_size(printer.config);
-    if (machine == &printer && !(home <= 0. || same_height(state.head_size[head], home)))
+    const Preset *machine = NozzleFilament::size_machine(bundle, state.head_size[head]);
+    if (machine == nullptr)
         return answer(false, "no machine preset");
     // A preset without a compatible_printers list and without a condition is compatible with every
     // printer by itself (is_compatible_with_printer): its system root says what it is made for.
@@ -739,12 +754,9 @@ bool fits(const PresetBundle &bundle, const Preset &preset, size_t head, std::st
             return answer(false, "grid");
         return answer(true, std::string());
     }
-    // The size of the preset's machine, when a machine preset of this printer model accepts it.
-    const std::string model = printer.config.opt_string("printer_model");
-    for (const Preset &candidate : bundle.printers)
-        if (candidate.is_system && candidate.config.opt_string("printer_model") == model && compatible(bundle, *judged, candidate))
-            if (const auto *sizes = candidate.config.option<ConfigOptionFloats>("nozzle_diameter"); sizes != nullptr && !sizes->values.empty())
-                return answer(false, "size " + float_to_string_decimal_point(sizes->values.front()));
+    // The size the preset is made for, when it names one.
+    if (const double size = NozzleFilament::preset_nozzle_size(bundle, *judged); size > 0.)
+        return answer(false, "size " + float_to_string_decimal_point(size));
     return answer(false, std::string());
 }
 
@@ -768,9 +780,8 @@ std::vector<Candidate> picker_candidates(const PresetBundle &bundle, size_t head
     if (!state.rule_on || head >= state.head_size.size() || bundle.prints.get_selected_idx() == size_t(-1))
         return out;
     const Preset &printer = bundle.printers.get_edited_preset();
-    const Preset *machine = head < state.head_machine.size() && state.head_machine[head] != nullptr ? state.head_machine[head] : &printer;
-    const double  home    = NozzleFilament::home_nozzle_size(printer.config);
-    if (machine == &printer && !(home <= 0. || same_height(state.head_size[head], home)))
+    const Preset *machine = NozzleFilament::size_machine(bundle, state.head_size[head]);
+    if (machine == nullptr)
         return out;
     const Preset &selected = bundle.prints.get_selected_preset();
     // The flow whose column the head prints: the nozzle's, or the Standard column chosen for a High Flow nozzle.

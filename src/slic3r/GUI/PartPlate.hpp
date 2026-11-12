@@ -363,6 +363,9 @@ public:
     bool check_single_extruder_mixed_filament_risk(const DynamicPrintConfig &config, std::string &warning_text) const;
     bool check_mixture_filament_compatible(const DynamicPrintConfig& config, std::string &error_msg);
     bool check_compatible_of_nozzle_and_filament(const DynamicPrintConfig & config, const std::vector<std::string>& filament_presets, std::string& error_msg);
+    // Snapmaker Orca Max: every filament this plate uses is made for the nozzle size of the tool head
+    // that prints it, or for no size (NozzleFilament::size_mismatches); false with `error_msg` otherwise.
+    bool check_filament_nozzle_sizes(const DynamicPrintConfig &config, std::string &error_msg);
 
     /* instance related operations*/
     //judge whether instance is bound in plate or not

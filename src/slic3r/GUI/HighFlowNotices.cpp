@@ -41,22 +41,11 @@ std::vector<std::string> split_variants(const std::string &list)
     return variants;
 }
 
-// The nozzle size a printer preset was made for, 0 when the preset does not say.
-double preset_nozzle_size(const DynamicPrintConfig &printer_config)
+// The nozzle size of tool head `head`, 0 when unknown.
+double head_nozzle_size(const DynamicPrintConfig &printer_config, size_t head)
 {
-    return NozzleFilament::home_nozzle_size(printer_config);
-}
-
-// The nozzle size of tool head `head` when it differs from the size the preset was made for; 0 for
-// the preset's own size and when either size is unknown.
-double other_nozzle_size(const DynamicPrintConfig &printer_config, size_t head)
-{
-    const double preset_size = preset_nozzle_size(printer_config);
-    const auto  *diameters   = printer_config.option<ConfigOptionFloats>("nozzle_diameter");
-    if (preset_size <= 0. || diameters == nullptr || head >= diameters->values.size())
-        return 0.;
-    const double head_size = diameters->values[head];
-    return head_size > 0. && std::abs(head_size - preset_size) >= EPSILON ? head_size : 0.;
+    const auto *diameters = printer_config.option<ConfigOptionFloats>("nozzle_diameter");
+    return diameters == nullptr || head >= diameters->values.size() || diameters->values[head] <= 0. ? 0. : diameters->values[head];
 }
 
 bool contains_high_flow(const std::vector<int> &types)
@@ -92,8 +81,8 @@ std::vector<int> offered_volume_types(const DynamicPrintConfig &printer_config, 
     std::vector<int> offered = declared_volume_types(printer_config, head);
     if (contains_high_flow(offered))
         return offered;
-    // A head of another size than the preset's: the machine preset of its size decides.
-    const double size = other_nozzle_size(printer_config, head);
+    // The vendor data of the head's size decides.
+    const double size = head_nozzle_size(printer_config, head);
     if (size > 0. && size_offers && size_offers(size, head)) {
         offered.push_back(int(nvtHighFlow));
         std::sort(offered.begin(), offered.end());
@@ -110,29 +99,30 @@ SizeOffersHighFlow size_offers_high_flow(const PresetBundle &bundle)
 {
     const PresetBundle *presets = &bundle;
     return [presets](double nozzle_size, size_t head) {
+        // A printer without a model has no vendor data.
         const std::string model = presets->printers.get_edited_preset().config.opt_string("printer_model");
+        if (model.empty())
+            return false;
         if (nozzle_size <= 0.) {
             // Any size of the model: the Flow row of a Standard-only preset.
-            if (model.empty())
-                return false;
             for (const Preset &preset : presets->printers)
                 if (preset.config.opt_string("printer_model") == model && head_declares_high_flow(preset.config, head))
                     return true;
             return false;
         }
-        const Preset *machine = NozzleFilament::head_machine_preset(presets->printers, model, nozzle_size);
+        const Preset *machine = NozzleFilament::size_machine(*presets, nozzle_size);
         return machine != nullptr && head_declares_high_flow(machine->config, head);
     };
 }
 
 bool head_can_use_high_flow(const DynamicPrintConfig &printer_config, size_t head, const SizeOffersHighFlow &size_offers)
 {
-    // The preset's own size, or a preset that does not name its size: its declared columns decide.
-    const double size = other_nozzle_size(printer_config, head);
-    if (size <= 0.)
+    // The vendor data of the head's size decides, whatever the printer preset declares. Without vendor
+    // data or a known size, the declared columns decide.
+    const double size = head_nozzle_size(printer_config, head);
+    if (size <= 0. || !size_offers)
         return head_declares_high_flow(printer_config, head);
-    // Another size: the machine preset of that size decides, whatever the printer preset declares.
-    return size_offers && size_offers(size, head);
+    return size_offers(size, head);
 }
 
 std::vector<size_t> sanitize(const DynamicPrintConfig &printer_config, std::vector<int> &nozzle_volume_types, const SizeOffersHighFlow &size_offers)

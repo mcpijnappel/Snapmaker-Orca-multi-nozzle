@@ -4477,7 +4477,7 @@ wxString TabPrint::head_selection_description() const
             case Reason::NoParent:
                 sentence = _L("The process preset is detached.");
                 break;
-            case Reason::HomeSize:
+            case Reason::SelectedSize:
                 break;
             default:
                 if (source.derived)
@@ -6958,10 +6958,11 @@ wxString TabFilament::high_flow_save_info() const
             // TRN %1% is a system filament preset, %2% a nozzle size such as 0.4
             info = format_wxstr(_L("%1% stays unchanged. The new preset holds its Standard values and your High Flow values. Slots on %2% mm extruders that use %1% switch to it."),
                                 saved.name, size_text);
-        const Preset *machine = slot >= 0 ? NozzleFilament::head_state(*m_preset_bundle).machine_of(size_t(slot)) : nullptr;
-        if (machine == nullptr)
-            machine = &m_preset_bundle->printers.get_edited_preset();
-        const std::vector<const Preset *> children = NozzleFilament::user_children(*m_preset_bundle, saved, *machine);
+        // The size of the slot's tool head; without one, the size the preset is made for.
+        double size = slot >= 0 ? NozzleFilament::head_state(*m_preset_bundle).size_of(size_t(slot)) : 0.;
+        if (size <= 0.)
+            size = NozzleFilament::preset_nozzle_size(*m_preset_bundle, saved);
+        const std::vector<const Preset *> children = NozzleFilament::user_children(*m_preset_bundle, saved, size);
         if (children.size() == 1)
             // TRN %1% is a system filament preset, %2% a user preset made from it
             info += "\n" + format_wxstr(_L("%1% already has the user preset %2%. To keep one preset per material: Cancel, pick %2% in this slot and choose Transfer when asked about unsaved changes."),
@@ -9631,13 +9632,18 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach, bool save_to_proje
     // Orca: check if compatible_printers exists and is not empty, set it to the current printer if it is empty
     // Ensures that custom filaments based on system are not accidentally allowed for all printers
     // Can still be set for all after creation
-    // Snapmaker Orca: pinned to the machine preset of the slot's extruder when that carries another
-    // nozzle size than the printer preset (NozzleFilament::printer_to_pin).
-    if (m_presets->type() == Preset::TYPE_FILAMENT && !exist_preset && edited_preset.is_system) {
-        ConfigOptionStrings* compatible_printers = m_config->option<ConfigOptionStrings>("compatible_printers");
-        if (compatible_printers && compatible_printers->values.empty())
-            compatible_printers->values.push_back(
-                NozzleFilament::printer_to_pin(*m_preset_bundle, m_presets_choice != nullptr ? m_presets_choice->get_filament_idx() : -1));
+    // Snapmaker Orca: pinned to the printer for the nozzle size of the slot's extruder
+    // (NozzleFilament::printer_to_pin). Snapmaker Orca Max: a new preset saved from a slot whose
+    // extruder carries another size than the preset is made for is made for the extruder's size: it
+    // is the user's own version of the material for that size.
+    if (m_presets->type() == Preset::TYPE_FILAMENT && !exist_preset) {
+        const int            slot                = m_presets_choice != nullptr ? m_presets_choice->get_filament_idx() : -1;
+        ConfigOptionStrings *compatible_printers = m_config->option<ConfigOptionStrings>("compatible_printers");
+        const double         head_size           = slot >= 0 ? NozzleFilament::head_state(*m_preset_bundle).size_of(size_t(slot)) : 0.;
+        const double         made_for            = NozzleFilament::preset_nozzle_size(*m_preset_bundle, edited_preset);
+        const bool           other_size          = head_size > 0. && made_for > 0. && std::abs(head_size - made_for) > EPSILON;
+        if (compatible_printers != nullptr && ((compatible_printers->values.empty() && edited_preset.is_system) || other_size))
+            compatible_printers->values = { NozzleFilament::printer_to_pin(*m_preset_bundle, slot) };
     }
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.json
     m_presets->save_current_preset(name, detach, save_to_project, nullptr);

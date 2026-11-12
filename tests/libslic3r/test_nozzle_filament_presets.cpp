@@ -153,13 +153,15 @@ TEST_CASE("The U1 filaments come as one preset per nozzle size and family", "[No
     CHECK(coverage.size() == 4);
 }
 
-TEST_CASE("version_for finds the preset of a family for a machine preset", "[NozzleFilament][nozzle_filament_version]")
+TEST_CASE("version_for finds the preset of a family for a nozzle size", "[NozzleFilament][nozzle_filament_version]")
 {
-    auto                    bundle    = load_snapmaker_bundle();
-    const PresetCollection &filaments = bundle->filaments;
+    auto bundle = load_snapmaker_bundle();
 
+    // The version for the size of `machine_name`, asked on the printer of that model.
     auto version_name = [&](const std::string &preset, const std::string &machine_name) {
-        const Preset *version = NozzleFilament::version_for(filaments, system_filament(*bundle, preset), machine(*bundle, machine_name));
+        REQUIRE(bundle->printers.select_preset_by_name(machine_name, true));
+        const double  size    = NozzleFilament::parse_nozzle_size(machine(*bundle, machine_name).config.opt_string("printer_variant"));
+        const Preset *version = NozzleFilament::version_for(*bundle, system_filament(*bundle, preset), size);
         return version == nullptr ? std::string() : version->name;
     };
 
@@ -188,7 +190,10 @@ TEST_CASE("version_for finds the preset of a family for a machine preset", "[Noz
     SECTION("the nozzle size a preset is pinned to") {
         CHECK_THAT(NozzleFilament::preset_nozzle_size(*bundle, system_filament(*bundle, PLA_02)), Catch::Matchers::WithinAbs(0.2, 1e-9));
         CHECK_THAT(NozzleFilament::preset_nozzle_size(*bundle, system_filament(*bundle, PLA_04)), Catch::Matchers::WithinAbs(0.4, 1e-9));
-        CHECK_THAT(NozzleFilament::home_nozzle_size(machine(*bundle, U1_08).config), Catch::Matchers::WithinAbs(0.8, 1e-9));
+        // A process preset carries the size of its printer as well.
+        const Preset *process_08 = bundle->prints.find_preset("0.40mm Standard @Snapmaker U1 (0.8 nozzle)", false);
+        REQUIRE(process_08 != nullptr);
+        CHECK_THAT(NozzleFilament::preset_nozzle_size(*bundle, *process_08), Catch::Matchers::WithinAbs(0.8, 1e-9));
         CHECK(NozzleFilament::head_machine_preset(bundle->printers, "Snapmaker U1", "0.6") == &machine(*bundle, U1_06));
         CHECK(NozzleFilament::head_machine_preset(bundle->printers, "Snapmaker U1", 0.6) == &machine(*bundle, U1_06));
         CHECK(NozzleFilament::head_machine_preset(bundle->printers, "Snapmaker U1", 0.5) == nullptr);
@@ -200,29 +205,35 @@ TEST_CASE("The gate of the nozzle size rule", "[NozzleFilament][nozzle_filament_
     auto bundle = load_snapmaker_bundle();
     select_u1(*bundle, { 0.4, 0.4, 0.4, 0.4 }, { PLA_04, PLA_04, PLA_04, PLA_04 });
 
-    SECTION("every head on the size of the printer preset: the rule is on, nothing is mixed") {
+    SECTION("every head on one size: the rule is on, nothing is mixed") {
         const NozzleFilament::State state = NozzleFilament::state(*bundle);
         CHECK(state.rule_on);
         CHECK_FALSE(state.mixed);
-        REQUIRE(state.head_machine.size() == 4);
-        for (const Preset *head : state.head_machine)
-            CHECK(head == &bundle->printers.get_edited_preset());
+        CHECK(state.head_size == std::vector<double>{ 0.4, 0.4, 0.4, 0.4 });
         CHECK(state.slot_head == std::vector<size_t>{ 0, 1, 2, 3 });
+        CHECK(NozzleFilament::size_machine(*bundle, 0.4) == &bundle->printers.get_edited_preset());
     }
-    SECTION("one head off the size") {
+    SECTION("one head of another size") {
         bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.2, 0.4, 0.4, 0.4 };
         const NozzleFilament::State state = NozzleFilament::state(*bundle);
         CHECK(state.rule_on);
         CHECK(state.mixed);
-        CHECK(state.head_machine[0] == &machine(*bundle, U1_02));
-        CHECK(state.head_machine[1] == &bundle->printers.get_edited_preset());
+        CHECK(state.size_of(0) == 0.2);
+        CHECK(state.size_of(1) == 0.4);
+        CHECK(NozzleFilament::size_machine(*bundle, 0.2) == &machine(*bundle, U1_02));
     }
-    SECTION("a size without a profile mixes nothing") {
-        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.5, 0.4, 0.4, 0.4 };
+    SECTION("every head on another size than the printer preset: nothing is mixed") {
+        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.6, 0.6, 0.6, 0.6 };
         const NozzleFilament::State state = NozzleFilament::state(*bundle);
         CHECK(state.rule_on);
         CHECK_FALSE(state.mixed);
-        CHECK(state.head_machine[0] == &bundle->printers.get_edited_preset());
+    }
+    SECTION("a size without a profile has no printer to stand for it") {
+        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.5, 0.4, 0.4, 0.4 };
+        const NozzleFilament::State state = NozzleFilament::state(*bundle);
+        CHECK(state.rule_on);
+        CHECK(state.mixed);
+        CHECK(NozzleFilament::size_machine(*bundle, 0.5) == nullptr);
     }
     SECTION("the flag is off") {
         bundle->nozzle_filament_enabled = false;
@@ -274,7 +285,7 @@ TEST_CASE("target_for_slot names the preset a slot should hold", "[NozzleFilamen
     using NozzleFilament::Reason;
     auto bundle = load_snapmaker_bundle();
 
-    SECTION("system presets: switched, unchanged, no version, the version of the printer preset") {
+    SECTION("system presets: switched, unchanged, no version") {
         select_u1(*bundle, { 0.2, 0.4, 0.6, 0.2 }, { PLA_04, PLA_04, PLA_02, TPU_04 });
         const NozzleFilament::SlotTarget first = target(*bundle, 0);
         CHECK(first.reason == Reason::Switched);
@@ -301,13 +312,13 @@ TEST_CASE("target_for_slot names the preset a slot should hold", "[NozzleFilamen
         CHECK(fourth.to == TPU_04);
         CHECK_FALSE(fourth.switches());
 
-        // ... and a slot that held the 0.8 TPU gets that version of the printer preset.
+        // ... and a slot that held the 0.8 TPU keeps it: no size is preferred over another.
         bundle->filament_presets[3] = "Generic TPU @U1 0.8 nozzle";
-        CHECK(target(*bundle, 3).reason == Reason::HomeVersionUsed);
-        CHECK(target(*bundle, 3).to == TPU_04);
-        CHECK(target(*bundle, 3).switches());
+        CHECK(target(*bundle, 3).reason == Reason::NoVersion);
+        CHECK(target(*bundle, 3).to == "Generic TPU @U1 0.8 nozzle");
+        CHECK_FALSE(target(*bundle, 3).switches());
 
-        // A tool head of the home size takes the wrong size back.
+        // A 0.4 mm tool head takes the wrong size back.
         bundle->filament_presets[1] = PLA_08;
         CHECK(target(*bundle, 1).reason == Reason::Switched);
         CHECK(target(*bundle, 1).to == PLA_04);
@@ -406,7 +417,7 @@ TEST_CASE("target_for_slot names the preset a slot should hold", "[NozzleFilamen
         // The user picks the 0.2 version by hand (Plater::priv::on_select_preset notes the outgoing preset).
         NozzleFilament::remember_user_preset(*bundle, 0, "My PLA");
         CHECK(bundle->nozzle_filament_memory.size() == 1);
-        CHECK(bundle->nozzle_filament_memory.begin()->first.second == U1_04);
+        CHECK(bundle->nozzle_filament_memory.begin()->first.second == "0.4");
         bundle->filament_presets[0] = PLA_02;
         CHECK(target(*bundle, 0).reason == Reason::Unchanged);
 
@@ -449,7 +460,7 @@ TEST_CASE("target_for_slot names the preset a slot should hold", "[NozzleFilamen
         CHECK(bundle->nozzle_filament_memory.empty());
     }
 
-    SECTION("a preset that restricts no printer fits every head and is flagged on an off-size one") {
+    SECTION("a preset that restricts no printer fits every head and is flagged on a head of another size than 0.4 mm") {
         DynamicPrintConfig config = system_filament(*bundle, PLA_04).config;
         config.option<ConfigOptionString>("inherits", true)->value.clear();
         config.option<ConfigOptionStrings>("compatible_printers", true)->values.clear();
@@ -459,6 +470,10 @@ TEST_CASE("target_for_slot names the preset a slot should hold", "[NozzleFilamen
         CHECK(target(*bundle, 0).size_agnostic);
         CHECK(target(*bundle, 1).reason == Reason::Unchanged);
         CHECK_FALSE(target(*bundle, 1).size_agnostic);
+        // Four 0.6 mm heads, whatever the printer preset: every head is flagged.
+        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.6, 0.6, 0.6, 0.6 };
+        CHECK(target(*bundle, 1).reason == Reason::Unchanged);
+        CHECK(target(*bundle, 1).size_agnostic);
     }
 
     SECTION("unsaved changes stay with the preset while another slot names it") {
@@ -594,9 +609,9 @@ TEST_CASE("A filament slot is rated against the machine preset of its tool head"
     // No 0.2 TPU exists: the 0.4 one may print on the 0.2 head.
     CHECK(fits_per_slot(*bundle, TPU_04) == std::vector<bool>{ false, true, true, true });
     CHECK(selectable_per_slot(*bundle, TPU_04) == std::vector<bool>{ true, true, true, true });
-    // A user preset is never hidden by its size.
+    // A user preset of another size is hidden like a system preset when the material has a version for the size.
     CHECK(fits_per_slot(*bundle, "My PLA") == std::vector<bool>{ false, true, true, true });
-    CHECK(selectable_per_slot(*bundle, "My PLA") == std::vector<bool>{ true, true, true, true });
+    CHECK(selectable_per_slot(*bundle, "My PLA") == std::vector<bool>{ false, true, true, true });
     // A preset of another size than any head.
     CHECK(fits_per_slot(*bundle, PLA_08) == std::vector<bool>{ false, false, false, false });
     CHECK(selectable_per_slot(*bundle, PLA_08) == std::vector<bool>{ false, false, false, false });
@@ -788,13 +803,14 @@ TEST_CASE("After a printer preset change the kept names yield the versions of th
 {
     auto bundle = load_snapmaker_bundle();
 
-    // The 0.4 version of every family, and whether the family has a 0.2 version.
+    // The 0.4 version of every family, and whether the family has a 0.2 version on the U1.
+    REQUIRE(bundle->printers.select_preset_by_name(U1_04, true));
     std::vector<std::pair<std::string, bool>> families;
     for (const Preset &preset : bundle->filaments) {
         const auto *list = preset.config.option<ConfigOptionStrings>("compatible_printers");
         if (!preset.is_system || list == nullptr || list->values != std::vector<std::string>{ U1_04 })
             continue;
-        families.emplace_back(preset.name, NozzleFilament::version_for(bundle->filaments, preset, machine(*bundle, U1_02)) != nullptr);
+        families.emplace_back(preset.name, NozzleFilament::version_for(*bundle, preset, 0.2) != nullptr);
     }
     REQUIRE(families.size() == 43);
 
@@ -854,8 +870,15 @@ TEST_CASE("Broken slots are repaired per tool head", "[NozzleFilament][nozzle_fi
         REQUIRE(bundle->repair_filament_slots_per_head());
         CHECK(bundle->filament_presets == std::vector<std::string>{ PLA_02, PLA_08, PLA_04, PLA_04 });
     }
-    SECTION("nothing mixed: mainline's loop has to run") {
+    SECTION("one size on every head: the slots follow it as well") {
         select_u1(*bundle, { 0.4, 0.4, 0.4, 0.4 }, { PLA_02, PLA_04, PLA_04, PLA_04 });
+        bundle->update_compatible(PresetSelectCompatibleType::Never);
+        REQUIRE(bundle->repair_filament_slots_per_head());
+        CHECK(bundle->filament_presets.front() == PLA_04);
+    }
+    SECTION("rule off: mainline's loop has to run") {
+        select_u1(*bundle, { 0.4, 0.4, 0.4, 0.4 }, { PLA_02, PLA_04, PLA_04, PLA_04 });
+        bundle->nozzle_filament_enabled = false;
         CHECK_FALSE(bundle->repair_filament_slots_per_head());
         CHECK(bundle->filament_presets.front() == PLA_02);
     }
@@ -1440,7 +1463,6 @@ TEST_CASE("The log line of a slot names the trigger, the tool head, its size and
     NozzleFilament::SlotTarget beyond;
     beyond.slot = 4;
     CHECK(NozzleFilament::describe_target(beyond, "Check", {}) == "NozzleFilament: trigger=Check filament=5 head=- size=- flow=- from=\"\" to=\"\" reason=Skipped");
-    CHECK(std::string(NozzleFilament::reason_name(Reason::HomeVersionUsed)) == "HomeVersionUsed");
     CHECK(std::string(NozzleFilament::reason_name(Reason::DirtyKept)) == "DirtyKept");
 }
 
@@ -1551,14 +1573,14 @@ TEST_CASE("A second user preset of a material keeps a user preset of another siz
     add_user_filament(*bundle, "My PETG", PETG_04);
     // Extruder 2 carries 0.4 mm while its slot holds the 0.6 mm user preset.
     select_u1(*bundle, { 0.6, 0.4, 0.4, 0.4 }, { "My PETG @0.6", "My PETG @0.6", PETG_04, PETG_04 });
-    CHECK(NozzleFilament::user_children(*bundle, system_filament(*bundle, PETG_04), machine(*bundle, U1_04)).size() == 1);
+    CHECK(NozzleFilament::user_children(*bundle, system_filament(*bundle, PETG_04), 0.4).size() == 1);
     NozzleFilament::SlotTarget second = target(*bundle, 1);
     CHECK(second.reason == NozzleFilament::Reason::Switched);
     CHECK(second.to == "My PETG");
 
     // A user preset saved with High Flow values from a system preset is a second child.
     add_user_filament(*bundle, "Generic PETG - Copy", PETG_04);
-    CHECK(NozzleFilament::user_children(*bundle, system_filament(*bundle, PETG_04), machine(*bundle, U1_04)).size() == 2);
+    CHECK(NozzleFilament::user_children(*bundle, system_filament(*bundle, PETG_04), 0.4).size() == 2);
     second = target(*bundle, 1);
     CHECK(second.reason == NozzleFilament::Reason::UserPresetKept);
     CHECK(second.to == "My PETG @0.6");
@@ -1638,4 +1660,70 @@ TEST_CASE("A slot on a High Flow extruder marks a filament with High Flow values
     // Without High Flow values: the size marker alone, or the name alone.
     CHECK(NozzleFilament::size_marked_label(name, NozzleFilament::high_flow_marker("0.4 mm", false)) == "0.4 mm \xC2\xB7 Generic PETG - Copy");
     CHECK(NozzleFilament::size_marked_label(name, NozzleFilament::high_flow_marker("", false)) == name);
+}
+
+TEST_CASE("A slot lists the presets of its head's size, a material without one, and blocks slicing with another size", "[NozzleFilament][nozzle_filament_strict]")
+{
+    using NozzleFilament::Reason;
+    auto bundle = load_snapmaker_bundle();
+    const char *const TPU_08 = "Generic TPU @U1 0.8 nozzle";
+    add_user_filament(*bundle, "My PLA", PLA_04);
+    select_u1(*bundle, { 0.2, 0.4, 0.4, 0.4 }, { PLA_02, PLA_04, TPU_04, PLA_04 });
+    const NozzleFilament::State state = NozzleFilament::state(*bundle);
+
+    SECTION("the head's size is listed, other sizes of a material that has one are not") {
+        CHECK(bundle->filament_slot_selectable(state, system_filament(*bundle, PLA_02), 0));
+        CHECK_FALSE(bundle->filament_slot_selectable(state, system_filament(*bundle, PLA_04), 0));
+        CHECK_FALSE(bundle->filament_slot_selectable(state, system_filament(*bundle, PLA_08), 0));
+        // A user preset of another size is not listed either.
+        CHECK_FALSE(bundle->filament_slot_selectable(state, *bundle->filaments.find_preset("My PLA", false), 0));
+        CHECK(bundle->filament_slot_selectable(state, *bundle->filaments.find_preset("My PLA", false), 1));
+    }
+    SECTION("a material without a version for the size is listed in each of its sizes, and does not fit") {
+        CHECK(bundle->filament_slot_selectable(state, system_filament(*bundle, TPU_04), 0));
+        CHECK(bundle->filament_slot_selectable(state, system_filament(*bundle, TPU_08), 0));
+        CHECK_FALSE(bundle->filament_slot_fits(state, system_filament(*bundle, TPU_04), 0));
+    }
+    SECTION("the same with one size on every head") {
+        bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter")->values = { 0.2, 0.2, 0.2, 0.2 };
+        const NozzleFilament::State uniform = NozzleFilament::state(*bundle);
+        REQUIRE_FALSE(uniform.mixed);
+        CHECK_FALSE(bundle->filament_slot_selectable(uniform, system_filament(*bundle, PLA_04), 1));
+        CHECK(bundle->filament_slot_selectable(uniform, system_filament(*bundle, TPU_04), 1));
+    }
+    SECTION("a used filament made for another size blocks slicing; one made for no size does not") {
+        const std::vector<size_t> heads{ 0, 1, 2, 3 };
+        const std::vector<double> sizes{ 0.2, 0.4, 0.4, 0.4 };
+        CHECK(NozzleFilament::size_mismatches(*bundle, heads, sizes, { 0, 1, 2, 3 }).empty());
+        bundle->filament_presets[0] = TPU_04;
+        std::vector<NozzleFilament::SizeMismatch> mismatches = NozzleFilament::size_mismatches(*bundle, heads, sizes, { 0, 1, 2, 3 });
+        REQUIRE(mismatches.size() == 1);
+        CHECK(mismatches.front().slot == 0);
+        CHECK(mismatches.front().head == 0);
+        CHECK(mismatches.front().preset == TPU_04);
+        CHECK_THAT(mismatches.front().preset_size, Catch::Matchers::WithinAbs(0.4, 1e-9));
+        CHECK_THAT(mismatches.front().head_size, Catch::Matchers::WithinAbs(0.2, 1e-9));
+        // A slot the plate does not use.
+        CHECK(NozzleFilament::size_mismatches(*bundle, heads, sizes, { 1, 2 }).empty());
+        // A filament made for no size.
+        DynamicPrintConfig config = system_filament(*bundle, PLA_04).config;
+        config.option<ConfigOptionString>("inherits", true)->value.clear();
+        config.option<ConfigOptionStrings>("compatible_printers", true)->values.clear();
+        bundle->filaments.load_preset(std::string(), "Root TPU", std::move(config), false).is_visible = true;
+        bundle->filament_presets[0] = "Root TPU";
+        CHECK(NozzleFilament::size_mismatches(*bundle, heads, sizes, { 0 }).empty());
+    }
+    SECTION("a user preset saved for a head of another size is made for that size") {
+        add_user_filament(*bundle, "My TPU 0.2", TPU_04);
+        Preset *mine = bundle->filaments.find_preset("My TPU 0.2", false, true);
+        REQUIRE(mine != nullptr);
+        CHECK_THAT(NozzleFilament::preset_nozzle_size(*bundle, *mine), Catch::Matchers::WithinAbs(0.4, 1e-9));
+        // What Tab::save_preset writes for slot 1 on the 0.2 mm head.
+        mine->config.option<ConfigOptionStrings>("compatible_printers", true)->values = { NozzleFilament::printer_to_pin(*bundle, 0) };
+        CHECK(NozzleFilament::printer_to_pin(*bundle, 0) == U1_02);
+        CHECK_THAT(NozzleFilament::preset_nozzle_size(*bundle, *mine), Catch::Matchers::WithinAbs(0.2, 1e-9));
+        CHECK(bundle->filament_slot_fits(state, *mine, 0));
+        bundle->filament_presets[0] = "My TPU 0.2";
+        CHECK(NozzleFilament::size_mismatches(*bundle, { 0, 1, 2, 3 }, { 0.2, 0.4, 0.4, 0.4 }, { 0 }).empty());
+    }
 }

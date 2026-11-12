@@ -33,23 +33,23 @@ bool head_declares_high_flow(const DynamicPrintConfig &printer_config, size_t he
 // Which nozzle sizes offer High Flow is a property of the vendor data: size d offers it for tool
 // head `head` when the machine preset of the printer model for d declares it; a `nozzle_size`
 // <= 0 asks whether any size of the model does. A function keeps the rules testable on bare
-// configs; empty means "the preset's own size only".
+// configs; empty means "the printer preset's declared columns only".
 using SizeOffersHighFlow = std::function<bool(double nozzle_size, size_t head)>;
 
-// The GUI's SizeOffersHighFlow: asks head_declares_high_flow() of the model's machine preset for the size
-// (NozzleFilament::head_machine_preset), every one for a size <= 0; false without one. Keeps a pointer
+// The GUI's SizeOffersHighFlow: asks head_declares_high_flow() of the printer for the size
+// (NozzleFilament::size_machine), every preset of the model for a size <= 0; false without one. Keeps a pointer
 // to `bundle`.
 SizeOffersHighFlow size_offers_high_flow(const PresetBundle &bundle);
 
-// The volume types the Flow row of tool head `head` offers: the declared ones, plus High Flow for a
-// head whose nozzle size differs from the preset's and that `size_offers` answers for (a 0.4 mm head
-// on the 0.6 mm U1 preset offers what the 0.4 mm preset declares). In enum order, never empty.
+// The volume types the Flow row of tool head `head` offers: the declared ones, plus High Flow when
+// `size_offers` answers for the head's nozzle size (a 0.4 mm head on the 0.6 mm U1 preset offers what
+// the 0.4 mm preset declares). In enum order, never empty.
 std::vector<int> offered_volume_types(const DynamicPrintConfig &printer_config, size_t head, const SizeOffersHighFlow &size_offers = {});
 bool head_offers_high_flow(const DynamicPrintConfig &printer_config, size_t head, const SizeOffersHighFlow &size_offers = {});
 
-// The tool head carries a nozzle size the vendor data has High Flow values for: the size the preset
-// was made for ("printer_variant") when the preset declares High Flow for the head, another size when
-// `size_offers` answers for it, whatever the printer preset declares.
+// The tool head carries a nozzle size the vendor data has High Flow values for: `size_offers` answers
+// for the head's size, whatever the printer preset declares; without `size_offers` (or a known size)
+// the printer preset declares High Flow for the head.
 bool head_can_use_high_flow(const DynamicPrintConfig &printer_config, size_t head, const SizeOffersHighFlow &size_offers = {});
 
 // Resets every High Flow entry of `nozzle_volume_types` whose tool head cannot use High Flow to

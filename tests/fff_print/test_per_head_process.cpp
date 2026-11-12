@@ -1388,7 +1388,7 @@ std::unique_ptr<OwnerPlateSlice> offsize_plate_slice(const char *machine, const 
     DynamicPrintConfig &printer = bundle.printers.get_edited_preset().config;
     const Preset       *home    = bundle.printers.find_preset(machine, false, true);
     REQUIRE(home != nullptr);
-    const double home_size = NozzleFilament::home_nozzle_size(home->config);
+    const double home_size = NozzleFilament::parse_nozzle_size(home->config.opt_string("printer_variant"));
     printer.set_key_value("nozzle_diameter", new ConfigOptionFloats(OFFSIZE_DIAMETERS));
     printer.set_key_value("extruder_layer_height", new ConfigOptionFloats(std::vector<double>(HEADS, 0.)));
     for (size_t head = 0; head < HEADS; ++head) {
@@ -1649,7 +1649,7 @@ TEST_CASE("On a plate of four nozzle sizes the High Flow tool head set to the St
     CHECK(slice->sources[1].flow_chosen);
     CHECK(slice->sources[1].flow == nvtStandard);
     CHECK_FALSE(slice->sources[1].derived);
-    CHECK(slice->sources[1].reason == PerHeadProcess::Reason::HomeSize);
+    CHECK(slice->sources[1].reason == PerHeadProcess::Reason::SelectedSize);
     for (size_t head : {size_t(0), size_t(2), size_t(3)}) {
         REQUIRE(slice->sources[head].derived);
         REQUIRE(slice->sources[head].preset != nullptr);

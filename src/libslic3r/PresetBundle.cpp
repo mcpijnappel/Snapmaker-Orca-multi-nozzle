@@ -3529,8 +3529,8 @@ void PresetBundle::update_selections(AppConfig &config)
     this->update_compatible(PresetSelectCompatibleType::Always);
     this->update_multi_material_filament_presets();
 
-    // Snapmaker Orca: with tool heads of different nozzle sizes a broken slot gets a preset for the
-    // size of its own tool head (repair_filament_slots_per_head); otherwise mainline's loop, with
+    // Snapmaker Orca: with the nozzle size rule on a broken slot gets a preset for the size of its
+    // own tool head (repair_filament_slots_per_head); otherwise mainline's loop, with
     // the editor's filament as the replacement (filament_slot_fallback_name).
     if (! this->repair_filament_slots_per_head()) {
         std::string first_visible_filament_name;
@@ -3756,8 +3756,8 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
         }
     }
 
-    // Snapmaker Orca: with tool heads of different nozzle sizes a broken slot gets a preset for the
-    // size of its own tool head (see update_selections); otherwise mainline's loop, with the
+    // Snapmaker Orca: with the nozzle size rule on a broken slot gets a preset for the size of its
+    // own tool head (see update_selections); otherwise mainline's loop, with the
     // editor's filament as the replacement (filament_slot_fallback_name).
     if (! this->repair_filament_slots_per_head()) {
         std::string first_visible_filament_name;
@@ -4170,8 +4170,9 @@ void PresetBundle::update_num_filaments(unsigned int to_del_flament_id)
 // the preset layer. See PresetBundle.hpp and libslic3r/NozzleFilamentPresets.hpp.
 bool PresetBundle::filament_slot_fits(const NozzleFilament::State &state, const Preset &preset, size_t slot) const
 {
-    const Preset *machine = state.mixed ? state.machine_of(slot) : nullptr;
-    return machine == nullptr ? preset.is_compatible : NozzleFilament::fits(*this, preset, *machine);
+    if (!state.rule_on || state.head_of(slot) == NozzleFilament::no_head)
+        return preset.is_compatible;
+    return NozzleFilament::fits(*this, preset, state.size_of(slot));
 }
 
 bool PresetBundle::filament_slot_fits(const Preset &preset, size_t slot) const
@@ -4181,14 +4182,18 @@ bool PresetBundle::filament_slot_fits(const Preset &preset, size_t slot) const
 
 bool PresetBundle::filament_slot_selectable(const NozzleFilament::State &state, const Preset &preset, size_t slot) const
 {
-    const Preset *machine = state.mixed ? state.machine_of(slot) : nullptr;
-    if (machine == nullptr)
+    if (!state.rule_on || state.head_of(slot) == NozzleFilament::no_head)
         return preset.is_compatible;
-    if (NozzleFilament::fits(*this, preset, *machine))
+    const double size = state.size_of(slot);
+    if (NozzleFilament::fits(*this, preset, size))
         return true;
-    // Made for the size of the printer preset: a user preset is never hidden by its size, and a
-    // material without a version for the size of this tool head prints with the one it has.
-    return preset.is_compatible && (!preset.is_system || NozzleFilament::version_for(this->filaments, preset, *machine) == nullptr);
+    // Made for another size of this printer: listed only for a material without a version for the
+    // size of this tool head ("No x mm version"); the plate does not slice with it
+    // (NozzleFilament::size_mismatches).
+    if (!NozzleFilament::fits_printer(*this, preset))
+        return false;
+    const Preset *system = NozzleFilament::system_ancestor(this->filaments, preset);
+    return system == nullptr || NozzleFilament::version_for(*this, *system, size) == nullptr;
 }
 
 bool PresetBundle::filament_slot_selectable(const Preset &preset, size_t slot) const
@@ -4201,7 +4206,7 @@ const Preset& PresetBundle::first_slot_fit(size_t slot, const std::function<int(
     // Without a preference of the caller the default material of the printer ranks first.
     auto quality = [this, &preference](const Preset &preset) -> int { return preference ? preference(preset) : this->default_material_rank(preset); };
     const NozzleFilament::State state = NozzleFilament::state(*this);
-    if (state.mixed && state.machine_of(slot) != nullptr) {
+    if (state.rule_on && state.head_of(slot) != NozzleFilament::no_head) {
         const size_t idx = this->filaments.first_compatible_idx(quality, [this, &state, slot](const Preset &preset) { return this->filament_slot_fits(state, preset, slot); });
         const Preset &fit = this->filaments.preset(idx);
         // Index 0 is the answer for "nothing found" as well as the default preset.
@@ -4305,7 +4310,7 @@ int PresetBundle::default_material_rank(const Preset &filament) const
 bool PresetBundle::repair_filament_slots_per_head()
 {
     const NozzleFilament::State state = NozzleFilament::state(*this);
-    if (!state.mixed)
+    if (!state.rule_on)
         return false;
     for (size_t slot = 0; slot < this->filament_presets.size(); ++slot) {
         std::string  &name   = this->filament_presets[slot];
@@ -4314,7 +4319,13 @@ bool PresetBundle::repair_filament_slots_per_head()
         if (preset != nullptr && preset->is_visible && this->filament_slot_selectable(state, *preset, slot))
             continue;
         std::string replacement = preset == nullptr ? std::string() : usable_nozzle_filament_target(*this, state, slot);
-        name = replacement.empty() ? this->first_slot_fit(slot).name : replacement;
+        if (replacement.empty()) {
+            // Mainline's replacement (the editor's filament) where the slot may hold it.
+            const Preset *fallback = this->filaments.find_preset(this->filament_slot_fallback_name(), false, true);
+            replacement = fallback != nullptr && fallback->is_visible && this->filament_slot_selectable(state, *fallback, slot) ?
+                              fallback->name : this->first_slot_fit(slot).name;
+        }
+        name = replacement;
     }
     return true;
 }
@@ -8978,11 +8989,23 @@ void PresetBundle::update_compatible(PresetSelectCompatibleType select_other_pri
 	switch (printer_preset.printer_technology()) {
     case ptFFF:
     {
-		assert(printer_preset.config.has("default_print_profile"));
-		assert(printer_preset.config.has("default_filament_profile"));
-        const std::vector<std::string> &prefered_filament_profiles = printer_preset.config.option<ConfigOptionStrings>("default_filament_profile")->values;
-        this->prints.update_compatible(printer_preset_with_vendor_profile, nullptr, select_other_print_if_incompatible,
-            PreferedPrintProfileMatch(this->prints.get_selected_idx() == size_t(-1) ? nullptr : &this->prints.get_edited_preset(), printer_preset.config.opt_string("default_print_profile"), snapmaker_printer));
+        // Snapmaker Orca Max: tool heads that all carry one nozzle size are served by the process and
+        // filament presets of that size, whatever size the printer preset was made for
+        // (NozzleFilament::size_machine). Mixed sizes are rated against the printer preset here and
+        // per tool head below.
+        const Preset *rating_printer = &printer_preset;
+        if (snapmaker_printer) {
+            const NozzleFilament::State heads = NozzleFilament::head_state(*this);
+            if (heads.rule_on && !heads.mixed && !heads.head_size.empty())
+                if (const Preset *machine = NozzleFilament::size_machine(*this, heads.head_size.front()); machine != nullptr)
+                    rating_printer = machine;
+        }
+        const PresetWithVendorProfile rating_printer_with_vendor_profile = this->printers.get_preset_with_vendor_profile(*rating_printer);
+		assert(rating_printer->config.has("default_print_profile"));
+		assert(rating_printer->config.has("default_filament_profile"));
+        const std::vector<std::string> &prefered_filament_profiles = rating_printer->config.option<ConfigOptionStrings>("default_filament_profile")->values;
+        this->prints.update_compatible(rating_printer_with_vendor_profile, nullptr, select_other_print_if_incompatible,
+            PreferedPrintProfileMatch(this->prints.get_selected_idx() == size_t(-1) ? nullptr : &this->prints.get_edited_preset(), rating_printer->config.opt_string("default_print_profile"), snapmaker_printer));
         // Snapmaker Orca Max: with mixed nozzle sizes the multi-nozzle process presets plan the whole
         // print, so the list drops the system presets of one nozzle size (when a multi-nozzle preset is
         // there to take their place). The selected preset stays listed.
@@ -9011,17 +9034,17 @@ void PresetBundle::update_compatible(PresetSelectCompatibleType select_other_pri
             Preset *preset = this->filaments.find_preset(this->filament_presets[idx], false);
             filament_preset_was_compatible[idx] = preset != nullptr && preset->is_compatible;
         }
-        // Snapmaker Orca: with mixed nozzle sizes a slot is rated against its tool head's machine preset.
+        // Snapmaker Orca: with the nozzle size rule on a slot is rated against the nozzle size of its tool head.
         // "Was selectable" is taken before the flags change; the editor keeps a preset a slot holds fittingly.
         const NozzleFilament::State nozzle_filament_state = NozzleFilament::state(*this);
         std::vector<char>           filament_preset_was_selectable(this->filament_presets.size(), false);
         bool                        keep_selected_filament = false;
-        if (nozzle_filament_state.mixed) {
+        if (nozzle_filament_state.rule_on) {
             const std::string edited_filament = this->filaments.get_selected_idx() == size_t(-1) ? std::string() : this->filaments.get_edited_preset().name;
             for (size_t idx = 0; idx < this->filament_presets.size(); ++ idx) {
                 const Preset *preset = this->filaments.find_preset(this->filament_presets[idx], false);
                 filament_preset_was_selectable[idx] = preset != nullptr && this->filament_slot_selectable(nozzle_filament_state, *preset, idx);
-                if (preset != nullptr && ! edited_filament.empty() && preset->name == edited_filament && nozzle_filament_state.machine_of(idx) != nullptr &&
+                if (preset != nullptr && ! edited_filament.empty() && preset->name == edited_filament && nozzle_filament_state.head_of(idx) != NozzleFilament::no_head &&
                     this->filament_slot_fits(nozzle_filament_state, *preset, idx))
                     keep_selected_filament = true;
             }
@@ -9035,13 +9058,13 @@ void PresetBundle::update_compatible(PresetSelectCompatibleType select_other_pri
         for (size_t idx = 0; idx < prefered_filament_profiles.size(); ++idx) {
             BOOST_LOG_TRIVIAL(info) << boost::format("prefered filament： %1%") % prefered_filament_profiles[idx];
         }
-        this->filaments.update_compatible(printer_preset_with_vendor_profile, &print_preset_with_vendor_profile, select_other_filament_if_incompatible,
+        this->filaments.update_compatible(rating_printer_with_vendor_profile, &print_preset_with_vendor_profile, select_other_filament_if_incompatible,
             PreferedFilamentsProfileMatch(*this, this->filaments.get_selected_idx() == size_t(-1) ? nullptr : &this->filaments.get_edited_preset(), prefered_filament_profiles),
             keep_selected_filament);
         if (select_other_filament_if_incompatible != PresetSelectCompatibleType::Never) {
             // Verify validity of the current filament presets.
             const std::string prefered_filament_profile = prefered_filament_profiles.empty() ? std::string() : prefered_filament_profiles.front();
-            if (nozzle_filament_state.mixed) {
+            if (nozzle_filament_state.rule_on) {
                 // Snapmaker Orca: the general loop, also for one filament, per slot. A slot that may not
                 // keep its preset gets the version of its material for its tool head, else the best
                 // preset that fits the tool head. Mainline's block below is untouched.
@@ -9053,8 +9076,13 @@ void PresetBundle::update_compatible(PresetSelectCompatibleType select_other_pri
                          ! (select_other_filament_if_incompatible == PresetSelectCompatibleType::Always || filament_preset_was_selectable[idx])))
                         continue;
                     std::string replacement = preset == nullptr ? std::string() : usable_nozzle_filament_target(*this, nozzle_filament_state, idx);
+                    // A slot without a material of its own is matched like the editor's filament, as
+                    // mainline's block below does.
+                    const Preset *like = preset;
+                    if ((like == nullptr || like->is_default) && this->filaments.get_selected_idx() != size_t(-1))
+                        like = &this->filaments.get_selected_preset();
                     if (replacement.empty())
-                        replacement = this->first_slot_fit(idx, PreferedFilamentProfileMatch(*this, preset,
+                        replacement = this->first_slot_fit(idx, PreferedFilamentProfileMatch(*this, like,
                             (idx < prefered_filament_profiles.size()) ? prefered_filament_profiles[idx] : prefered_filament_profile)).name;
                     filament_name = replacement;
                 }

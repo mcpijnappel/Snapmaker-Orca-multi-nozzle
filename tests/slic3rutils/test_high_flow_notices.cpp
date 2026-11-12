@@ -272,17 +272,17 @@ TEST_CASE("A filament is rated for the tool head that prints it", "[HighFlow][No
 
 TEST_CASE("A tool head may run High Flow with a nozzle size the vendor data has High Flow values for", "[HighFlow][Notices]")
 {
-    SECTION("declared and of the preset's size, or of a size the vendor data offers") {
+    SECTION("declared without vendor data, else of a size the vendor data offers") {
         const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4, 0.6, 0.4 });
         CHECK(HighFlowNotices::declared_volume_types(printer, 0) == std::vector<int>{ int(nvtStandard), int(nvtHighFlow) });
         CHECK(HighFlowNotices::head_declares_high_flow(printer, 2));
         CHECK(HighFlowNotices::head_can_use_high_flow(printer, 0));
-        // Without the function only the preset's own size may run High Flow.
-        CHECK_FALSE(HighFlowNotices::head_can_use_high_flow(printer, 2));
+        // Without the function the printer preset's declared columns decide, for every size.
+        CHECK(HighFlowNotices::head_can_use_high_flow(printer, 2));
         CHECK(HighFlowNotices::head_can_use_high_flow(printer, 2, offers({ 0.4, 0.6, 0.8 })));
         CHECK_FALSE(HighFlowNotices::head_can_use_high_flow(printer, 2, offers({ 0.4 })));
-        // The preset's own size never asks the function.
-        CHECK(HighFlowNotices::head_can_use_high_flow(printer, 0, offers({})));
+        // With the function every head asks it for its own size, whatever the preset declares.
+        CHECK_FALSE(HighFlowNotices::head_can_use_high_flow(printer, 0, offers({})));
     }
     SECTION("a printer that declares no variants offers Standard only") {
         const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4 }, "");
@@ -300,10 +300,10 @@ TEST_CASE("A tool head may run High Flow with a nozzle size the vendor data has 
         std::vector<int> offered = types;
         CHECK(HighFlowNotices::sanitize(printer, offered, offers({ 0.4, 0.6, 0.8 })).empty());
         CHECK(offered == types);
-        CHECK(HighFlowNotices::sanitize(printer, types) == std::vector<size_t>{ 1, 3 });
+        CHECK(HighFlowNotices::sanitize(printer, types, offers({ 0.4 })) == std::vector<size_t>{ 1, 3 });
         CHECK(types == std::vector<int>{ int(nvtHighFlow), int(nvtStandard), int(nvtStandard), int(nvtStandard) });
         // A second pass finds nothing.
-        CHECK(HighFlowNotices::sanitize(printer, types).empty());
+        CHECK(HighFlowNotices::sanitize(printer, types, offers({ 0.4 })).empty());
 
         // A size the vendor data has no values for is reset whatever the function offers elsewhere.
         const DynamicPrintConfig with_0_2 = u1_like_printer({ 0.4, 0.6, 0.2, 0.8 });
@@ -483,24 +483,25 @@ TEST_CASE("A Flow row is hidden, a choice, or ruled out by the nozzle size", "[H
         // unless the vendor data has High Flow values for that size.
         const DynamicPrintConfig printer = u1_like_printer({ 0.6 }, "Direct Drive High Flow");
         CHECK(HighFlowNotices::flow_row_state(printer, 0) == FlowRowState::Hidden);
-        CHECK_FALSE(HighFlowNotices::flow_choice_usable(printer, 0));
+        CHECK_FALSE(HighFlowNotices::flow_choice_usable(printer, 0, offers({ 0.4 })));
         CHECK(HighFlowNotices::flow_choice_usable(printer, 0, offers({ 0.4, 0.6, 0.8 })));
     }
     SECTION("the nozzle size and the vendor data decide between a choice and a ruled out row") {
         DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4, 0.6, 0.2 });
-        CHECK(HighFlowNotices::flow_row_state(printer, 0) == FlowRowState::Choice);
-        CHECK(HighFlowNotices::flow_row_state(printer, 2) == FlowRowState::RuledOut);
-        CHECK(HighFlowNotices::flow_choice_usable(printer, 0));
-        CHECK_FALSE(HighFlowNotices::flow_choice_usable(printer, 2));
+        CHECK(HighFlowNotices::flow_row_state(printer, 0, offers({ 0.4 })) == FlowRowState::Choice);
+        CHECK(HighFlowNotices::flow_row_state(printer, 2, offers({ 0.4 })) == FlowRowState::RuledOut);
+        CHECK(HighFlowNotices::flow_choice_usable(printer, 0, offers({ 0.4 })));
+        CHECK_FALSE(HighFlowNotices::flow_choice_usable(printer, 2, offers({ 0.4 })));
         CHECK(HighFlowNotices::flow_row_state(printer, 2, offers({ 0.4, 0.6, 0.8 })) == FlowRowState::Choice);
         CHECK(HighFlowNotices::flow_choice_usable(printer, 2, offers({ 0.4, 0.6, 0.8 })));
         CHECK(HighFlowNotices::flow_row_state(printer, 3, offers({ 0.4, 0.6, 0.8 })) == FlowRowState::RuledOut);
 
-        // A preset that does not name its nozzle size rules nothing out, with or without the function.
-        printer.erase("printer_variant");
+        // Without vendor data the declared columns decide for every size; the size the preset was
+        // made for ("printer_variant") plays no role.
         CHECK(HighFlowNotices::flow_row_state(printer, 2) == FlowRowState::Choice);
         CHECK(HighFlowNotices::flow_choice_usable(printer, 2));
-        CHECK(HighFlowNotices::flow_row_state(printer, 3, offers({ 0.4 })) == FlowRowState::Choice);
+        printer.erase("printer_variant");
+        CHECK(HighFlowNotices::flow_row_state(printer, 2, offers({ 0.4 })) == FlowRowState::RuledOut);
     }
     SECTION("a tool head beyond the list has no row") {
         const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.4, 0.6, 0.4 });
@@ -562,10 +563,10 @@ TEST_CASE("A tool head of another size than the printer preset offers High Flow 
         CHECK(HighFlowNotices::flow_row_state(printer, 1) == FlowRowState::Hidden);
         CHECK(HighFlowNotices::flow_row_state(printer, 1, offers({ 0.6 })) == FlowRowState::Hidden);
     }
-    SECTION("the preset's own size asks its declared columns, not the function") {
-        // A 0.6 mm head on this preset stays Standard even where the function would answer for 0.6 mm.
-        CHECK(HighFlowNotices::offered_volume_types(printer, 0, offers({ 0.4, 0.6 })) == standard_only);
-        CHECK_FALSE(HighFlowNotices::head_can_use_high_flow(printer, 0, offers({ 0.4, 0.6 })));
+    SECTION("a head of the size the preset was made for asks the function like any other") {
+        // printer_variant plays no role: the vendor data of the head's size decides.
+        CHECK(HighFlowNotices::offered_volume_types(printer, 0, offers({ 0.4, 0.6 })) == both);
+        CHECK(HighFlowNotices::head_can_use_high_flow(printer, 0, offers({ 0.4, 0.6 })));
     }
 }
 
@@ -574,7 +575,9 @@ TEST_CASE("A ruled out tool head shows the first declared type", "[HighFlow][Flo
     const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.6 });
 
     CHECK(HighFlowNotices::shown_volume_type(printer, 0, int(nvtHighFlow)) == int(nvtHighFlow));
-    CHECK(HighFlowNotices::shown_volume_type(printer, 1, int(nvtHighFlow)) == int(nvtStandard));
+    // Without vendor data the declared columns decide; with it, the size of the tool head.
+    CHECK(HighFlowNotices::shown_volume_type(printer, 1, int(nvtHighFlow)) == int(nvtHighFlow));
+    CHECK(HighFlowNotices::shown_volume_type(printer, 1, int(nvtHighFlow), offers({ 0.4 })) == int(nvtStandard));
     CHECK(HighFlowNotices::shown_volume_type(printer, 1, int(nvtHighFlow), offers({ 0.4, 0.6, 0.8 })) == int(nvtHighFlow));
 
     CHECK(HighFlowNotices::shown_volume_type(printer, 0, int(nvtStandard)) == int(nvtStandard));

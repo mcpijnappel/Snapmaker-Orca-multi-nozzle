@@ -394,6 +394,7 @@ class GLCanvas3D
         SpiralLiftNearBoundary,  // model too close to the bed boundary for spiral lift
         TPUPrintableError,
         FilamentPrintableError,
+        FilamentNozzleSizeError,     // Snapmaker Orca Max: a filament made for another nozzle size than its tool head
         LeftExtruderPrintableError, // before slice
         RightExtruderPrintableError, // before slice
         MultiExtruderPrintableError,      // after slice

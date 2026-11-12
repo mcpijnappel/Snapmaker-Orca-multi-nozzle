@@ -589,20 +589,20 @@ bool PresetComboBox::filament_slot_state(NozzleFilament::State &state) const
 
 const Preset* PresetComboBox::machine_filament_for_slot(const NozzleFilament::State &state, const std::string &filament_name, const Preset *mainline_match) const
 {
-    const Preset *machine = state.mixed ? state.machine_of(size_t(m_filament_idx)) : nullptr;
-    if (machine == nullptr || machine == &m_preset_bundle->printers.get_edited_preset())
+    if (!state.mixed || state.head_of(size_t(m_filament_idx)) == NozzleFilament::no_head)
         return mainline_match;
-    // The tool head carries another size than the printer preset. The name probe of the caller
-    // rates against the printer preset, so it finds the version of that size or nothing at all;
-    // the version for the tool head is the member of the same family that serves its machine preset.
+    // The tool heads carry different sizes. The name probe of the caller rates against the printer
+    // preset, so it may find the version of another size or nothing at all; the version for the tool
+    // head is the member of the same family made for the head's size.
+    const double            size      = state.size_of(size_t(m_filament_idx));
     const PresetCollection &filaments = m_preset_bundle->filaments;
     if (mainline_match != nullptr)
         if (const Preset *system = NozzleFilament::system_ancestor(filaments, *mainline_match); system != nullptr)
-            if (const Preset *version = NozzleFilament::version_for(filaments, *system, *machine); version != nullptr)
+            if (const Preset *version = NozzleFilament::version_for(*m_preset_bundle, *system, size); version != nullptr)
                 return version;
     for (const Preset &candidate : filaments)
         if (candidate.is_system && candidate.alias == filament_name)
-            if (const Preset *version = NozzleFilament::version_for(filaments, candidate, *machine); version != nullptr)
+            if (const Preset *version = NozzleFilament::version_for(*m_preset_bundle, candidate, size); version != nullptr)
                 return version;
     return mainline_match;
 }
@@ -614,10 +614,9 @@ wxString PresetComboBox::nozzle_size_marker(const NozzleFilament::State &state, 
     const double size = NozzleFilament::preset_nozzle_size(*m_preset_bundle, preset);
     if (size <= 0.)
         return {};
-    const size_t head      = state.head_of(size_t(m_filament_idx));
-    const double head_size = head < state.head_size.size() ? state.head_size[head] : 0.;
-    const double home      = NozzleFilament::home_nozzle_size(m_preset_bundle->printers.get_edited_preset().config);
-    if ((head_size <= 0. || std::abs(size - head_size) < EPSILON) && (home <= 0. || std::abs(size - home) < EPSILON))
+    // Marked only when the preset is made for another size than the slot's tool head.
+    const double head_size = state.size_of(size_t(m_filament_idx));
+    if (head_size <= 0. || std::abs(size - head_size) < EPSILON)
         return {};
     // TRN: the nozzle size a filament preset is made for, in front of its name in the filament list. %1% is a number like 0.2.
     return format_wxstr(_L("%1% mm"), nozzle_size_text(size));

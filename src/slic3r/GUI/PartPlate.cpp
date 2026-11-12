@@ -1985,6 +1985,32 @@ bool PartPlate::check_compatible_of_nozzle_and_filament(const DynamicPrintConfig
     return false;
 }
 
+bool PartPlate::check_filament_nozzle_sizes(const DynamicPrintConfig &config, std::string &error_msg)
+{
+    error_msg.clear();
+    PresetBundle *bundle = wxGetApp().preset_bundle;
+    const auto   *sizes  = config.option<ConfigOptionFloats>("nozzle_diameter");
+    if (bundle == nullptr || wxGetApp().plater() == nullptr || sizes == nullptr || !NozzleFilament::head_state(*bundle).rule_on)
+        return true;
+    std::vector<size_t> used;
+    for (int filament : get_extruders(true))   // 1-based
+        if (filament >= 1)
+            used.emplace_back(size_t(filament - 1));
+    const std::vector<size_t> heads = wxGetApp().plater()->filament_tool_heads(bundle->filament_presets.size(), sizes->values.size(), this);
+    const std::vector<NozzleFilament::SizeMismatch> mismatches = NozzleFilament::size_mismatches(*bundle, heads, sizes->values, used);
+    if (mismatches.empty())
+        return true;
+    for (const NozzleFilament::SizeMismatch &mismatch : mismatches) {
+        if (!error_msg.empty())
+            error_msg += "\n";
+        // TRN %1% filament number, %2% preset name, %3% and %5% nozzle sizes such as 0.4, %4% nozzle number
+        error_msg += GUI::format(_u8L("Filament %1% uses \"%2%\", made for a %3% mm nozzle, but nozzle %4% that prints it is %5% mm. "
+                                      "Choose a preset for %5% mm, or save your own from this slot."),
+                                 mismatch.slot + 1, mismatch.preset, mismatch.preset_size, mismatch.head + 1, mismatch.head_size);
+    }
+    return false;
+}
+
 /*Vec3d PartPlate::calculate_wipe_tower_size(const DynamicPrintConfig &config, const double w, const double wipe_volume, int plate_extruder_size, bool use_global_objects) const
 {
     Vec3d  wipe_tower_size;

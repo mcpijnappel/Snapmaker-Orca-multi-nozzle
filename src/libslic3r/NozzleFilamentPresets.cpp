@@ -47,6 +47,66 @@ bool is_family_member(const Preset &candidate, const Preset &of)
     return candidate.is_system && candidate.system_inherits == of.system_inherits && candidate.alias == of.alias;
 }
 
+// The nozzle size a printer preset was made for ("printer_variant" as a number), 0 when the
+// preset does not say.
+double machine_nozzle_size(const Preset &machine)
+{
+    const auto *variant = machine.config.option<ConfigOptionString>("printer_variant");
+    return variant == nullptr ? 0. : parse_nozzle_size(variant->value);
+}
+
+// The collection a filament or process preset belongs to.
+const PresetCollection* collection_of(const PresetBundle &bundle, const Preset &preset)
+{
+    switch (preset.type) {
+    case Preset::TYPE_FILAMENT: return &bundle.filaments;
+    case Preset::TYPE_PRINT:    return &bundle.prints;
+    default:                    return nullptr;
+    }
+}
+
+// fits() against the printer preset that stands for a tool head.
+bool fits_machine(const PresetBundle &bundle, const Preset &filament, const Preset &machine)
+{
+    const PresetWithVendorProfile filament_with_vendor = bundle.filaments.get_preset_with_vendor_profile(filament);
+    const Preset                 &printer              = bundle.printers.get_edited_preset();
+    const bool                    is_edited_printer    = &machine == &printer;
+    const PresetWithVendorProfile machine_with_vendor  = bundle.printers.get_preset_with_vendor_profile(machine);
+    if (!is_compatible_with_printer(filament_with_vendor, machine_with_vendor))
+        return false;
+    const PresetWithVendorProfile printer_with_vendor = is_edited_printer ? machine_with_vendor : bundle.printers.get_preset_with_vendor_profile(printer);
+    // The library arm of is_compatible_with_printer rates the ACTIVE printer: a library preset
+    // hidden from it stays hidden, whatever machine preset stands for the tool head.
+    if (!is_edited_printer && filament_with_vendor.vendor != nullptr && filament_with_vendor.vendor->name == PresetBundle::ORCA_FILAMENT_LIBRARY) {
+        const std::set<std::string> &excluded = filament.m_excluded_from;
+        if (excluded.find(printer.name) != excluded.end() || excluded.find(printer.inherits()) != excluded.end())
+            return false;
+    }
+    return is_compatible_with_print(filament_with_vendor, bundle.prints.get_edited_preset_with_vendor_profile(), printer_with_vendor);
+}
+
+// version_for() against the printer preset that stands for a tool head.
+const Preset* version_for_machine(const PresetCollection &filaments, const Preset &system_preset, const Preset &machine)
+{
+    if (!system_preset.is_system || system_preset.system_inherits.empty() || system_preset.alias.empty())
+        return nullptr;
+    const PresetWithVendorProfile machine_with_vendor(machine, machine.vendor);
+    const Preset                 *version = nullptr;
+    for (const Preset &candidate : filaments) {
+        if (!is_family_member(candidate, system_preset) || !restricts_printers(candidate))
+            continue;
+        if (!is_compatible_with_printer(filaments.get_preset_with_vendor_profile(candidate), machine_with_vendor))
+            continue;
+        if (version != nullptr) {
+            BOOST_LOG_TRIVIAL(warning) << "NozzleFilament: \"" << version->name << "\" and \"" << candidate.name << "\" both serve \""
+                                       << machine.name << "\"; the family has no single version for it";
+            return nullptr;
+        }
+        version = &candidate;
+    }
+    return version;
+}
+
 } // namespace
 
 std::vector<size_t> filament_heads(size_t filament_count, size_t head_count, const std::vector<int> &filament_map, bool map_is_binding, size_t master_head)
@@ -78,12 +138,6 @@ std::string high_flow_marker(const std::string &size_text, bool has_high_flow_va
     return size_text.empty() ? std::string("HF") : size_text + " \xC2\xB7 HF";
 }
 
-double home_nozzle_size(const DynamicPrintConfig &printer_config)
-{
-    const auto *variant = printer_config.option<ConfigOptionString>("printer_variant");
-    return variant == nullptr ? 0. : parse_nozzle_size(variant->value);
-}
-
 const Preset* head_machine_preset(const PrinterPresetCollection &printers, const std::string &model, const std::string &variant_label)
 {
     if (variant_label.empty())
@@ -98,6 +152,15 @@ const Preset* head_machine_preset(const PrinterPresetCollection &printers, const
     if (nozzle_size <= 0.)
         return nullptr;
     return find_machine_preset(printers, model, [nozzle_size](const std::string &variant) { return same_size(parse_nozzle_size(variant), nozzle_size); });
+}
+
+const Preset* size_machine(const PresetBundle &bundle, double size)
+{
+    const Preset &printer = bundle.printers.get_edited_preset();
+    const double  own     = machine_nozzle_size(printer);
+    if (own <= 0. || same_size(own, size))
+        return &printer;
+    return head_machine_preset(bundle.printers, printer.config.opt_string("printer_model"), size);
 }
 
 State state(const PresetBundle &bundle)
@@ -124,18 +187,8 @@ State head_state(const PresetBundle &bundle)
 
     out.rule_on   = true;
     out.head_size = diameters->values;
-    out.head_machine.assign(out.head_size.size(), &printer);
-    const double      home  = home_nozzle_size(printer.config);
-    const std::string model = printer.config.opt_string("printer_model");
-    for (size_t head = 0; head < out.head_size.size(); ++head) {
-        if (home <= 0. || same_size(out.head_size[head], home))
-            continue;
-        // A size without a profile leaves the head with the printer preset: nothing follows.
-        if (const Preset *machine = head_machine_preset(bundle.printers, model, out.head_size[head]); machine != nullptr && machine != &printer) {
-            out.head_machine[head] = machine;
-            out.mixed              = true;
-        }
-    }
+    for (double size : out.head_size)
+        out.mixed = out.mixed || !same_size(size, out.head_size.front());
 
     // Presets follow the project level map. It binds when the project maps its filaments by hand;
     // otherwise filament i is printed by tool head i. (A printer that groups its filaments onto
@@ -180,33 +233,19 @@ bool restricts_printers(const Preset &preset)
     return (list != nullptr && !list->values.empty()) || !preset.compatible_printers_condition().empty();
 }
 
-const Preset* version_for(const PresetCollection &filaments, const Preset &system_preset, const Preset &machine)
+const Preset* version_for(const PresetBundle &bundle, const Preset &system_preset, double size)
 {
-    if (!system_preset.is_system || system_preset.system_inherits.empty() || system_preset.alias.empty())
-        return nullptr;
-    const PresetWithVendorProfile machine_with_vendor(machine, machine.vendor);
-    const Preset                 *version = nullptr;
-    for (const Preset &candidate : filaments) {
-        if (!is_family_member(candidate, system_preset) || !restricts_printers(candidate))
-            continue;
-        if (!is_compatible_with_printer(filaments.get_preset_with_vendor_profile(candidate), machine_with_vendor))
-            continue;
-        if (version != nullptr) {
-            BOOST_LOG_TRIVIAL(warning) << "NozzleFilament: \"" << version->name << "\" and \"" << candidate.name << "\" both serve \""
-                                       << machine.name << "\"; the family has no single version for it";
-            return nullptr;
-        }
-        version = &candidate;
-    }
-    return version;
+    const Preset *machine = size_machine(bundle, size);
+    return machine == nullptr ? nullptr : version_for_machine(bundle.filaments, system_preset, *machine);
 }
 
-double preset_nozzle_size(const PresetBundle &bundle, const Preset &filament)
+double preset_nozzle_size(const PresetBundle &bundle, const Preset &preset)
 {
-    const Preset *system = system_ancestor(bundle.filaments, filament);
-    if (system == nullptr)
+    // The preset's own list: a user preset saved for a tool head of another size than its system
+    // preset carries that size (Tab::save_preset).
+    if (collection_of(bundle, preset) == nullptr)
         return 0.;
-    const auto *list = system->config.option<ConfigOptionStrings>("compatible_printers");
+    const auto *list = preset.config.option<ConfigOptionStrings>("compatible_printers");
     if (list == nullptr || list->values.empty())
         return 0.;
     double size = 0.;
@@ -214,7 +253,7 @@ double preset_nozzle_size(const PresetBundle &bundle, const Preset &filament)
         const Preset *machine = bundle.printers.find_preset(name, false);
         if (machine == nullptr)
             continue;
-        const double machine_size = home_nozzle_size(machine->config);
+        const double machine_size = machine_nozzle_size(*machine);
         if (machine_size <= 0. || (size > 0. && !same_size(size, machine_size)))
             return 0.;
         size = machine_size;
@@ -222,23 +261,26 @@ double preset_nozzle_size(const PresetBundle &bundle, const Preset &filament)
     return size;
 }
 
-bool fits(const PresetBundle &bundle, const Preset &filament, const Preset &machine)
+bool fits(const PresetBundle &bundle, const Preset &filament, double size)
 {
-    const PresetWithVendorProfile filament_with_vendor = bundle.filaments.get_preset_with_vendor_profile(filament);
-    const Preset                 &printer              = bundle.printers.get_edited_preset();
-    const bool                    is_edited_printer    = &machine == &printer;
-    const PresetWithVendorProfile machine_with_vendor  = bundle.printers.get_preset_with_vendor_profile(machine);
-    if (!is_compatible_with_printer(filament_with_vendor, machine_with_vendor))
+    if (const Preset *machine = size_machine(bundle, size); machine != nullptr)
+        return fits_machine(bundle, filament, *machine);
+    // A size the printer model has no profile for: only a preset made for no size.
+    return preset_nozzle_size(bundle, filament) <= 0. && fits_machine(bundle, filament, bundle.printers.get_edited_preset());
+}
+
+bool fits_printer(const PresetBundle &bundle, const Preset &filament)
+{
+    const Preset &printer = bundle.printers.get_edited_preset();
+    if (fits_machine(bundle, filament, printer))
+        return true;
+    const std::string model = printer.config.opt_string("printer_model");
+    if (model.empty())
         return false;
-    const PresetWithVendorProfile printer_with_vendor = is_edited_printer ? machine_with_vendor : bundle.printers.get_preset_with_vendor_profile(printer);
-    // The library arm of is_compatible_with_printer rates the ACTIVE printer: a library preset
-    // hidden from it stays hidden, whatever machine preset stands for the tool head.
-    if (!is_edited_printer && filament_with_vendor.vendor != nullptr && filament_with_vendor.vendor->name == PresetBundle::ORCA_FILAMENT_LIBRARY) {
-        const std::set<std::string> &excluded = filament.m_excluded_from;
-        if (excluded.find(printer.name) != excluded.end() || excluded.find(printer.inherits()) != excluded.end())
-            return false;
-    }
-    return is_compatible_with_print(filament_with_vendor, bundle.prints.get_edited_preset_with_vendor_profile(), printer_with_vendor);
+    for (const Preset &machine : bundle.printers)
+        if (machine.is_system && &machine != &printer && machine.config.opt_string("printer_model") == model && fits_machine(bundle, filament, machine))
+            return true;
+    return false;
 }
 
 namespace {
@@ -252,10 +294,10 @@ SlotTarget resolve_slot(const PresetBundle &bundle, const State &state, size_t s
         return out;
     out.head = state.head_of(slot);
     out.from = out.to = bundle.filament_presets[slot];
-    const Preset *machine = state.machine_of(slot);
-    if (machine == nullptr || out.from.empty() || out.from == PresetBundle::ORCA_DEFAULT_FILAMENT_PLACEHOLDER)
+    if (out.head == no_head || out.from.empty() || out.from == PresetBundle::ORCA_DEFAULT_FILAMENT_PLACEHOLDER)
         return out;
-    out.head_size = state.head_size[out.head];
+    out.head_size     = state.head_size[out.head];
+    const double size = out.head_size;
 
     // find_preset() resolves "renamed_from" and hands out the edited copy of the selected preset,
     // so presets are told apart by name below, never by address.
@@ -266,10 +308,9 @@ SlotTarget resolve_slot(const PresetBundle &bundle, const State &state, size_t s
     out.to = preset->name;
     out.preset_size = preset_nozzle_size(bundle, *preset);
 
-    const Preset &printer = bundle.printers.get_edited_preset();
-    if (fits(bundle, *preset, *machine)) {
+    if (fits(bundle, *preset, size)) {
         out.reason        = Reason::Unchanged;
-        out.size_agnostic = machine != &printer && !restricts_printers(*preset);
+        out.size_agnostic = !same_size(size, standard_nozzle_size) && !restricts_printers(*preset);
         return out;
     }
 
@@ -280,19 +321,19 @@ SlotTarget resolve_slot(const PresetBundle &bundle, const State &state, size_t s
     }
     // A user preset of this family that was left for its size earlier in the session comes back
     // before any other answer: the way back of "My PLA" after the tool head returned to its size.
-    if (const auto remembered = bundle.nozzle_filament_memory.find({ family_key(filaments, *system), machine->name });
+    if (const auto remembered = bundle.nozzle_filament_memory.find({ family_key(filaments, *system), float_to_string_decimal_point(size) });
         remembered != bundle.nozzle_filament_memory.end() && remembered->second != preset->name) {
         const Preset *user = filaments.find_preset(remembered->second, false);
         if (user != nullptr && user->name == remembered->second && !user->is_system && !user->is_default && user->is_visible &&
-            fits(bundle, *user, *machine)) {
+            fits(bundle, *user, size)) {
             out.to     = user->name;
             out.reason = Reason::Switched;
             return out;
         }
     }
 
-    const Preset *version = version_for(filaments, *system, *machine);
-    if (version != nullptr && !fits(bundle, *version, *machine))
+    const Preset *version = version_for(bundle, *system, size);
+    if (version != nullptr && !fits(bundle, *version, size))
         // Served by its list, refused by the process preset or the library exclusion.
         version = nullptr;
 
@@ -300,19 +341,13 @@ SlotTarget resolve_slot(const PresetBundle &bundle, const State &state, size_t s
         if (version != nullptr) {
             out.to     = version->name;
             out.reason = Reason::Switched;
-            return out;
-        }
-        const Preset *home = machine == &printer ? nullptr : version_for(filaments, *system, printer);
-        if (home != nullptr && home->name != preset->name && fits(bundle, *home, printer)) {
-            out.to     = home->name;
-            out.reason = Reason::HomeVersionUsed;
         } else
             out.reason = Reason::NoVersion;
         return out;
     }
 
     // A user preset moves only to the one visible user preset made from the version for this size.
-    const std::vector<const Preset*> counterparts = version != nullptr ? user_children(bundle, *version, *machine, preset->name) : std::vector<const Preset*>();
+    const std::vector<const Preset*> counterparts = version != nullptr ? user_children(bundle, *version, size, preset->name) : std::vector<const Preset*>();
     if (counterparts.size() == 1) {
         out.to     = counterparts.front()->name;
         out.reason = Reason::Switched;
@@ -326,13 +361,31 @@ SlotTarget resolve_slot(const PresetBundle &bundle, const State &state, size_t s
 
 } // namespace
 
-std::vector<const Preset*> user_children(const PresetBundle &bundle, const Preset &system, const Preset &machine, const std::string &exclude)
+std::vector<SizeMismatch> size_mismatches(const PresetBundle &bundle, const std::vector<size_t> &filament_head, const std::vector<double> &head_size,
+                                          const std::vector<size_t> &slots)
+{
+    std::vector<SizeMismatch> out;
+    for (size_t slot : slots) {
+        if (slot >= bundle.filament_presets.size() || slot >= filament_head.size() || filament_head[slot] >= head_size.size())
+            continue;
+        const Preset *preset = bundle.filaments.find_preset(bundle.filament_presets[slot], false);
+        if (preset == nullptr || preset->is_default)
+            continue;
+        const double made = preset_nozzle_size(bundle, *preset);
+        const size_t head = filament_head[slot];
+        if (made > 0. && head_size[head] > 0. && !same_size(made, head_size[head]))
+            out.push_back({ slot, head, preset->name, made, head_size[head] });
+    }
+    return out;
+}
+
+std::vector<const Preset*> user_children(const PresetBundle &bundle, const Preset &system, double size, const std::string &exclude)
 {
     std::vector<const Preset*> out;
     for (const Preset &candidate : bundle.filaments)
         if (const Preset *ancestor = candidate.is_system || candidate.is_default || !candidate.is_visible || candidate.name == exclude ?
                                          nullptr : system_ancestor(bundle.filaments, candidate);
-            ancestor != nullptr && ancestor->name == system.name && fits(bundle, candidate, machine))
+            ancestor != nullptr && ancestor->name == system.name && fits(bundle, candidate, size))
             out.emplace_back(&candidate);
     return out;
 }
@@ -341,7 +394,7 @@ std::string printer_to_pin(const PresetBundle &bundle, int slot)
 {
     if (slot >= 0) {
         const State   heads   = head_state(bundle);
-        const Preset *machine = heads.machine_of(size_t(slot));
+        const Preset *machine = heads.head_of(size_t(slot)) == no_head ? nullptr : size_machine(bundle, heads.size_of(size_t(slot)));
         if (machine != nullptr && machine != &bundle.printers.get_edited_preset())
             return machine->name;
     }
@@ -357,10 +410,7 @@ bool fits_high_flow_extruder(const PresetBundle &bundle, const Preset &filament)
     for (size_t head = 0; head < volume_types->values.size(); ++head) {
         if (volume_types->values[head] != int(nvtHighFlow))
             continue;
-        const Preset *machine = head < heads.head_machine.size() ? heads.head_machine[head] : nullptr;
-        if (machine == nullptr)
-            machine = &bundle.printers.get_edited_preset();
-        if (fits(bundle, filament, *machine))
+        if (head < heads.head_size.size() ? fits(bundle, filament, heads.head_size[head]) : fits_printer(bundle, filament))
             return true;
     }
     return false;
@@ -373,10 +423,7 @@ std::vector<size_t> slots_to_switch(const PresetBundle &bundle, const std::strin
     for (size_t slot = 0; slot < bundle.filament_presets.size(); ++slot) {
         if (bundle.filament_presets[slot] != from)
             continue;
-        const Preset *machine = heads.machine_of(slot);
-        if (machine == nullptr)
-            machine = &bundle.printers.get_edited_preset();
-        if (fits(bundle, to, *machine))
+        if (heads.head_of(slot) != no_head ? fits(bundle, to, heads.size_of(slot)) : fits_printer(bundle, to))
             out.emplace_back(slot);
     }
     return out;
@@ -397,23 +444,22 @@ void remember_user_preset(PresetBundle &bundle, size_t slot, const std::string &
     if (preset == nullptr || preset->is_system || preset->is_default)
         return;
     const std::string family = family_key(bundle.filaments, *preset);
-    const Preset     *slot_machine = state.machine_of(slot);
-    if (family.empty() || slot_machine == nullptr || fits(bundle, *preset, *slot_machine))
+    if (family.empty() || state.head_of(slot) == no_head || fits(bundle, *preset, state.size_of(slot)))
         return;
-    // The machine presets of this printer model: the edited one and the system presets of the other sizes.
-    const Preset &printer = bundle.printers.get_edited_preset();
-    const auto   *model   = printer.config.option<ConfigOptionString>("printer_model");
-    auto note = [&bundle, &family, preset](const Preset &machine) {
-        if (fits(bundle, *preset, machine))
-            bundle.nozzle_filament_memory[{ family, machine.name }] = preset->name;
-    };
-    note(printer);
-    if (model != nullptr && !model->value.empty())
-        for (const Preset &machine : bundle.printers) {
-            const auto *other = machine.config.option<ConfigOptionString>("printer_model");
-            if (machine.is_system && machine.name != printer.name && other != nullptr && other->value == model->value)
-                note(machine);
-        }
+    // The nozzle sizes of this printer model: the edited preset's and those of its system presets.
+    const Preset     &printer = bundle.printers.get_edited_preset();
+    const std::string model   = printer.config.opt_string("printer_model");
+    std::set<double>  sizes;
+    if (const double own = machine_nozzle_size(printer); own > 0.)
+        sizes.insert(own);
+    if (!model.empty())
+        for (const Preset &machine : bundle.printers)
+            if (machine.is_system && machine.config.opt_string("printer_model") == model)
+                if (const double size = machine_nozzle_size(machine); size > 0.)
+                    sizes.insert(size);
+    for (double size : sizes)
+        if (fits(bundle, *preset, size))
+            bundle.nozzle_filament_memory[{ family, float_to_string_decimal_point(size) }] = preset->name;
 }
 
 SlotTarget target_for_slot(const PresetBundle &bundle, const State &state, size_t slot, const std::vector<size_t> &heads)
@@ -446,7 +492,6 @@ const char* reason_name(Reason reason)
     switch (reason) {
     case Reason::Unchanged:       return "Unchanged";
     case Reason::Switched:        return "Switched";
-    case Reason::HomeVersionUsed: return "HomeVersionUsed";
     case Reason::NoVersion:       return "NoVersion";
     case Reason::NoFamily:        return "NoFamily";
     case Reason::UserPresetKept:  return "UserPresetKept";

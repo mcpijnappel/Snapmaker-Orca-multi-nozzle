@@ -249,6 +249,8 @@ static std::string format_number(float value)
 }
 
 wxString filament_printable_error_msg;
+// Snapmaker Orca Max: the text of EWarning::FilamentNozzleSizeError while it is shown.
+std::string filament_nozzle_size_error_msg;
 
 GLCanvas3D::LayersEditing::~LayersEditing()
 {
@@ -3362,6 +3364,16 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             bool filament_printable = cur_plate->check_filament_printable(full_config_temp, filament_printable_error_msg);
             _set_warning_notification(EWarning::FilamentPrintableError, !filament_printable);
 
+            // Snapmaker Orca Max: a filament made for another nozzle size than its tool head blocks slicing.
+            std::string nozzle_size_msg;
+            const bool  nozzle_sizes_fit = cur_plate->check_filament_nozzle_sizes(full_config_temp, nozzle_size_msg);
+            if (nozzle_size_msg != filament_nozzle_size_error_msg) {
+                // The notification is closed by its text: the old text goes first.
+                _set_warning_notification(EWarning::FilamentNozzleSizeError, false);
+                filament_nozzle_size_error_msg = nozzle_size_msg;
+            }
+            _set_warning_notification(EWarning::FilamentNozzleSizeError, !nozzle_sizes_fit);
+
             bool single_extruder_mixed_risk = cur_plate->check_single_extruder_mixed_filament_risk(full_config_temp, get_single_extruder_mixed_filament_warning_text());
             _set_warning_notification(EWarning::SingleExtruderMixedFilament, single_extruder_mixed_risk);
 
@@ -3371,7 +3383,8 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             bool filament_mixture_compatible = cur_plate->check_mixture_filament_compatible(full_config_temp, get_filament_mixture_warning_text());
             _set_warning_notification(EWarning::MixtureFilamentIncompatible, !filament_mixture_compatible);
 
-            bool model_fits = contained_min_one && !m_model->objects.empty() && !partlyOut && object_results.filaments.empty() && tpu_valid && filament_printable;
+            bool model_fits = contained_min_one && !m_model->objects.empty() && !partlyOut && object_results.filaments.empty() && tpu_valid && filament_printable &&
+                              nozzle_sizes_fit;
             // Honor the missing-plugin block so this geometry-only path does not re-enable slicing
             // that Plater::validate_current_plate disabled (otherwise moving an object would briefly
             // re-enable the Slice button while required plugins are still missing).
@@ -3391,6 +3404,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             //_set_warning_notification(EWarning::SlaSupportsOutside, false);
            _set_warning_notification(EWarning::TPUPrintableError, false);
            _set_warning_notification(EWarning::FilamentPrintableError, false);
+           _set_warning_notification(EWarning::FilamentNozzleSizeError, false);
            _set_warning_notification(EWarning::MixUsePLAAndPETG, false);
            _set_warning_notification(EWarning::SingleExtruderMixedFilament, false);
            _set_warning_notification(EWarning::PrimeTowerOutside, false);
@@ -11409,6 +11423,11 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
     }
     case EWarning::FilamentPrintableError: {
         text  = filament_printable_error_msg.ToUTF8();
+        error = ErrorType::SLICING_ERROR;
+        break;
+    }
+    case EWarning::FilamentNozzleSizeError: {
+        text  = filament_nozzle_size_error_msg;
         error = ErrorType::SLICING_ERROR;
         break;
     }

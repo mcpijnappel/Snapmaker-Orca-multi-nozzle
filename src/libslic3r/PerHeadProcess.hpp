@@ -22,10 +22,10 @@ namespace PerHeadProcess {
 
 enum class Reason {
     Off,             // the preference "process_follows_nozzle" is off
-    HomeSize,        // the head carries the nozzle size of the printer preset
+    SelectedSize,    // the head carries the nozzle size the selected process preset is made for (or that preset names none)
     Derived,         // the head prints with the preset the automatic rule chose
     Explicit,        // the head prints with the preset the project names for it
-    NoMachinePreset, // the head's size has no machine preset: nothing to follow
+    NoMachinePreset, // the printer has no profile for the head's size: nothing to follow
     NoProcessPreset, // no system process preset for the head's size is installed
     NoParent,        // the selected preset has no system parent (detached or imported): every key counts as edited
     NotInstalled,    // the preset the project names is not installed; the automatic rule applied instead
@@ -61,7 +61,7 @@ struct Source
     size_t                   head { 0 };
     const Preset            *preset { nullptr };  // the process preset the head prints with; never nullptr in a returned entry
     bool                     derived { false };   // false: the selected preset
-    Reason                   reason { Reason::HomeSize };
+    Reason                   reason { Reason::SelectedSize };
     Step                     step { Step::SelectedPreset };
     std::string              class_used;          // ClassLadder: the class the ladder landed on ("Standard")
     std::vector<std::string> composed_keys;       // keys taken from `preset` (empty unless derived)
@@ -260,11 +260,11 @@ struct RuleTrace
     std::string class_used;
 };
 
-// The system preset a head of `machine` (its size's machine preset) prints with: an installed compatible
+// The system preset a head of nozzle size `nozzle_size` prints with: an installed compatible
 // `explicit_name` (Explicit); else, `selected` excluded, the preset nearest the target height (target_height_mm
 // when > 0, else `selected`'s) in `selected`'s class, then down the ladder (Color Mixing: High Quality, then Standard),
 // then default_print_profile, then the first by name. `accept` filters; `trace` gets the step.
-const Preset* source_for_head(const PresetBundle &bundle, const Preset &machine, double target_height_mm,
+const Preset* source_for_head(const PresetBundle &bundle, double nozzle_size, double target_height_mm,
                               const Preset &selected, const std::string &explicit_name, Reason &reason,
                               const std::function<bool(const Preset &)> &accept = {}, RuleTrace *trace = nullptr);
 
@@ -288,9 +288,9 @@ bool active(const PresetBundle &bundle);
 // The chosen preset by name, a vendor rename resolved through find_preset(name, false); nullptr
 // when not installed.
 const Preset *resolve_chosen(const PresetBundle &bundle, const std::string &name);
-// Whether `preset` fits tool head `head`: compatible with the printer preset on a home-size head, with
-// the head's machine preset otherwise, never without a machine preset. A preset without compatibility
-// conditions is judged by its system root. `reason`: "size <x>", "no machine preset" or "".
+// Whether `preset` fits tool head `head`: compatible with the printer for the head's nozzle size
+// (NozzleFilament::size_machine), never for a size the printer has no profile for. A preset without
+// compatibility conditions is judged by its system root. `reason`: "size <x>", "no machine preset" or "".
 bool fits(const PresetBundle &bundle, const Preset &preset, size_t head, std::string *reason = nullptr);
 // The choices rewritten to the current names of renamed vendor presets; called by the project
 // load, once, before the dirty state takes its initial copy.
@@ -375,7 +375,7 @@ struct LoadReportEntry
     double      nozzle_size { 0. };
     std::string recorded;            // the record, never empty
     std::string current;             // the preset the head prints with now; empty: the selected preset
-    Reason      reason { Reason::HomeSize }; // why the head prints with `current`
+    Reason      reason { Reason::SelectedSize }; // why the head prints with `current`
     bool        recorded_installed { true }; // the recorded preset is still in the bundle
 };
 

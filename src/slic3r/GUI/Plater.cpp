@@ -32272,7 +32272,6 @@ static Plater::NozzleFollowResult nozzle_follow_report(const PresetBundle *bundl
                     first_switched = &target;
             }
             break;
-        case Reason::HomeVersionUsed:
         case Reason::NoVersion: {
             const Preset *preset = bundle->filaments.find_preset(target.to, false);
             const std::string material = preset != nullptr && !preset->alias.empty() ? preset->alias : target.to;
@@ -32452,7 +32451,6 @@ void Plater::check_nozzle_filament_versions()
 
         if (!targets.empty()) {
             const NozzleFilament::State state = NozzleFilament::state(*bundle);
-            const double                home  = NozzleFilament::home_nozzle_size(bundle->printers.get_edited_preset().config);
             const std::vector<size_t>   plate_heads = this->filament_tool_heads(bundle->filament_presets.size(), state.head_size.size());
             for (size_t slot = 0; slot < plate_heads.size() && slot < state.slot_head.size(); ++slot) {
                 const size_t plate_head = plate_heads[slot];
@@ -32461,10 +32459,12 @@ void Plater::check_nozzle_filament_versions()
                 const size_t follows = state.slot_head[slot];
                 std::string  line;
                 if (follows == NozzleFilament::no_head) {
-                    // A filament beyond the tool heads follows none; its preset is rated against the printer preset.
-                    if (home > 0. && std::abs(home - state.head_size[plate_head]) > EPSILON)
-                        line = GUI::format(_u8L("On this plate filament %1% is printed by nozzle %2% (%3% mm), while its preset follows the printer preset (%4% mm)."),
-                                           slot + 1, plate_head + 1, state.head_size[plate_head], home);
+                    // A filament beyond the tool heads follows none: its preset may be made for another size.
+                    const Preset *preset = bundle->filaments.find_preset(bundle->filament_presets[slot], false);
+                    const double  made   = preset == nullptr ? 0. : NozzleFilament::preset_nozzle_size(*bundle, *preset);
+                    if (made > 0. && std::abs(made - state.head_size[plate_head]) > EPSILON)
+                        line = GUI::format(_u8L("On this plate filament %1% is printed by nozzle %2% (%3% mm), while its preset is made for a %4% mm nozzle."),
+                                           slot + 1, plate_head + 1, state.head_size[plate_head], made);
                 } else if (follows != plate_head && follows < state.head_size.size() &&
                            std::abs(state.head_size[follows] - state.head_size[plate_head]) > EPSILON)
                     line = GUI::format(_u8L("On this plate filament %1% is printed by nozzle %2% (%3% mm), while its preset follows nozzle %4% (%5% mm)."),
@@ -32523,7 +32523,7 @@ void Plater::check_per_head_process_record()
                 line += " " + _u8L("The preset is not installed.");
             else if (entry.reason == PerHeadProcess::Reason::Off)
                 line += " " + _u8L("The option \"Process speeds and line widths follow the nozzle size\" is off.");
-            else if (entry.reason == PerHeadProcess::Reason::HomeSize || entry.reason == PerHeadProcess::Reason::NoMachinePreset)
+            else if (entry.reason == PerHeadProcess::Reason::SelectedSize || entry.reason == PerHeadProcess::Reason::NoMachinePreset)
                 line += " " + _u8L("The nozzle size of the extruder changed.");
             else if (entry.reason == PerHeadProcess::Reason::Derived && entry.recorded_installed) {
                 // Both presets installed system presets and the head still derived by the rule: a

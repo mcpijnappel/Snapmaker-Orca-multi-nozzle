@@ -35,10 +35,6 @@ std::vector<size_t> filament_heads(size_t filament_count, size_t head_count, con
 // is no size.
 double parse_nozzle_size(const std::string &text);
 
-// The nozzle size a printer preset was made for ("printer_variant" as a number), 0 when the
-// preset does not say. With 0 every tool head counts as carrying the home size.
-double home_nozzle_size(const DynamicPrintConfig &printer_config);
-
 // The machine preset of printer model `model` for the nozzle size spelled `variant_label`
 // ("0.2", the spelling of "printer_variant"): the system preset, else a custom one. Visibility
 // plays no role. nullptr when the model has no profile of that size.
@@ -46,33 +42,36 @@ const Preset* head_machine_preset(const PrinterPresetCollection &printers, const
 // The same by value, for a caller that holds the diameter and not the spelling of the profile.
 const Preset* head_machine_preset(const PrinterPresetCollection &printers, const std::string &model, double nozzle_size);
 
+// The machine preset that stands for a tool head of nozzle size `size` on the edited printer preset:
+// the edited preset itself when it was made for that size or names no size, else the preset of
+// that size of the printer model (head_machine_preset). nullptr when the model has no profile of
+// that size. The one place a tool head's size is mapped onto the vendor's per-size printer
+// profiles; every rule below asks it with the head's own size, never with the printer's.
+const Preset* size_machine(const PresetBundle &bundle, double size);
+
 struct State
 {
     // Level 1: the rule applies to this printer at all (PresetBundle::nozzle_filament_enabled, FFF,
     // more than one nozzle, no single extruder multi material, a Snapmaker printer preset).
     bool rule_on { false };
-    // Level 2: rule_on, and at least one tool head carries another size than the printer preset
-    // while a machine preset of that size exists.
+    // Level 2: rule_on, and the tool heads carry different nozzle sizes.
     bool mixed { false };
-    // Per tool head: the machine preset that stands for it. The edited printer preset for a head
-    // of the home size and for a head whose size has no profile. Empty unless rule_on.
-    std::vector<const Preset*> head_machine;
     // Per tool head: "nozzle_diameter". Empty unless rule_on.
     std::vector<double>        head_size;
     // Per filament slot: its tool head, or no_head. Empty unless rule_on.
     std::vector<size_t>        slot_head;
 
-    size_t        head_of(size_t slot) const { return slot < slot_head.size() ? slot_head[slot] : no_head; }
-    // nullptr for a slot without a tool head.
-    const Preset* machine_of(size_t slot) const
+    size_t head_of(size_t slot) const { return slot < slot_head.size() ? slot_head[slot] : no_head; }
+    // The nozzle size of the tool head of `slot`; 0 for a slot without a tool head.
+    double size_of(size_t slot) const
     {
         const size_t head = this->head_of(slot);
-        return head < head_machine.size() ? head_machine[head] : nullptr;
+        return head < head_size.size() ? head_size[head] : 0.;
     }
 };
 State state(const PresetBundle &bundle);
 // The same without the gate on PresetBundle::nozzle_filament_enabled: which tool head carries
-// which size and machine preset, whatever the filament rule is set to. The process rule
+// which size, whatever the filament rule is set to. The process rule
 // (PerHeadProcess) reads it under its own preference.
 State head_state(const PresetBundle &bundle);
 
@@ -90,13 +89,32 @@ const Preset* system_ancestor(const PresetCollection &filaments, const Preset &p
 // no nozzle size.
 bool restricts_printers(const Preset &preset);
 
-// The system preset of the family of `system_preset` (Preset::system_inherits + alias) that serves
-// `machine`. nullptr when no member or two members (logged) serve it, or without a family.
-const Preset* version_for(const PresetCollection &filaments, const Preset &system_preset, const Preset &machine);
+// The system filament preset of the family of `system_preset` (Preset::system_inherits + alias)
+// made for a tool head of nozzle size `size`. nullptr when no member or two members (logged) serve
+// it, or without a family.
+const Preset* version_for(const PresetBundle &bundle, const Preset &system_preset, double size);
 
-// The nozzle size a filament preset is pinned to: "printer_variant" of the machine presets its
-// system ancestor lists, when they agree. 0 when the preset pins no single size.
-double preset_nozzle_size(const PresetBundle &bundle, const Preset &filament);
+// The nozzle size a filament or process preset is made for (its size tag): the size of the machine
+// presets it lists, when they agree. 0 when the preset is made for no single size.
+double preset_nozzle_size(const PresetBundle &bundle, const Preset &preset);
+
+// The nozzle a filament made for no size is assumed to be tuned for (SlotTarget::size_agnostic).
+constexpr double standard_nozzle_size = 0.4;
+
+// A filament slot whose preset is made for another nozzle size than the tool head that prints it.
+struct SizeMismatch
+{
+    size_t      slot { 0 };
+    size_t      head { 0 };
+    std::string preset;
+    double      preset_size { 0. };
+    double      head_size { 0. };
+};
+// The slots of `slots` (0-based) whose preset is made for another size (preset_nozzle_size) than
+// their tool head `filament_head[slot]` of size `head_size[head]` carries. A preset made for no
+// size, and a slot without a tool head, never mismatch. The plate does not slice with one.
+std::vector<SizeMismatch> size_mismatches(const PresetBundle &bundle, const std::vector<size_t> &filament_head, const std::vector<double> &head_size,
+                                          const std::vector<size_t> &slots);
 
 // Combo label with the size first ("0.6 mm · Generic PLA") so a narrow combo cuts the name, not
 // the size. `label` unchanged when `size_text` is empty. Display only.
@@ -106,26 +124,31 @@ std::string size_marked_label(const std::string &label, const std::string &size_
 // unchanged for a preset without them.
 std::string high_flow_marker(const std::string &size_text, bool has_high_flow_values);
 
-// `filament` may print on a tool head that `machine` stands for: compatible with that machine
-// preset, not excluded from the edited printer preset (the arm of the filament library) and
-// compatible with the edited process preset.
-bool fits(const PresetBundle &bundle, const Preset &filament, const Preset &machine);
+// `filament` may print on a tool head of nozzle size `size`: made for that size or for none, compatible
+// with the printer for that size (size_machine()), not excluded from the edited printer preset (the
+// arm of the filament library) and compatible with the edited process preset.
+bool fits(const PresetBundle &bundle, const Preset &filament, double size);
+
+// `filament` may print on this printer with a nozzle of some size: fits() for one of the sizes the
+// printer model has a profile for, or for the edited printer preset.
+bool fits_printer(const PresetBundle &bundle, const Preset &filament);
 
 // The visible user presets made from system preset `system` (system_ancestor()) that may print
-// on a tool head `machine` stands for (fits()); the preset named `exclude` is left out.
-std::vector<const Preset*> user_children(const PresetBundle &bundle, const Preset &system, const Preset &machine, const std::string &exclude = {});
+// on a tool head of nozzle size `size` (fits()); the preset named `exclude` is left out.
+std::vector<const Preset*> user_children(const PresetBundle &bundle, const Preset &system, double size, const std::string &exclude = {});
 
 // Printer a user filament saved from an unrestricted system filament is pinned to ("compatible_printers"):
-// the machine preset of slot `slot`'s head when its nozzle size differs, else the printer preset's parent.
+// the printer for the nozzle size of slot `slot`'s head (size_machine()) when that is another preset than
+// the edited one, else the printer preset's parent.
 std::string printer_to_pin(const PresetBundle &bundle, int slot);
 
 // `filament` may print on an extruder set to High Flow ("nozzle_volume_type" of the project): fits() with
-// the machine preset of that extruder (head_state()), the edited printer preset for one without.
+// the nozzle size of that extruder (head_state()).
 bool fits_high_flow_extruder(const PresetBundle &bundle, const Preset &filament);
 
-// The filament slots holding preset `from` whose tool head `to` may print on (fits() with the machine
-// preset of the head, head_state(); the edited printer preset for a slot without one): the slots a
-// preset saved from `from` under a new name takes over.
+// The filament slots holding preset `from` whose tool head `to` may print on (fits() with the nozzle
+// size of the head, head_state(); fits_printer() for a slot without one): the slots a preset saved
+// from `from` under a new name takes over.
 std::vector<size_t> slots_to_switch(const PresetBundle &bundle, const std::string &from, const Preset &to);
 
 // The family of `preset` as one string (parent and alias of its system ancestor); empty for a
@@ -139,8 +162,7 @@ void remember_user_preset(PresetBundle &bundle, size_t slot, const std::string &
 enum class Reason {
     Unchanged,          // the slot holds a preset that fits its tool head
     Switched,           // `to` is the version for the size of the tool head
-    HomeVersionUsed,    // no version for that size; `to` is the version of the printer preset
-    NoVersion,          // no version for that size, and the slot holds the one of the printer preset already
+    NoVersion,          // no version for that size; the slot keeps its preset
     NoFamily,           // the preset belongs to no family (no parent, no alias)
     UserPresetKept,     // a user preset without exactly one counterpart for that size
     DirtyKept,          // the preset carries unsaved changes that no other slot would keep
@@ -152,15 +174,15 @@ struct SlotTarget
     size_t      slot { 0 };
     size_t      head { no_head };
     std::string from;                       // the name the slot holds, as it holds it
-    std::string to;                         // the name it should hold: another preset when Switched / HomeVersionUsed,
+    std::string to;                         // the name it should hold: another preset when Switched,
                                             // else the preset it holds (under its present name, had it been renamed)
     Reason      reason { Reason::Skipped };
-    bool        size_agnostic { false };    // fits, restricts no printer, and the tool head is off the home size
+    bool        size_agnostic { false };    // fits, restricts no printer, on a tool head of another size than standard_nozzle_size
     std::string suggestion;                 // UserPresetKept: the system version for the size of the tool head
     double      head_size { 0. };
     double      preset_size { 0. };         // preset_nozzle_size() of `from`
 
-    bool switches() const { return (reason == Reason::Switched || reason == Reason::HomeVersionUsed) && to != from; }
+    bool switches() const { return reason == Reason::Switched && to != from; }
 };
 
 // What slot `slot` should hold. `heads` names the tool heads a pass moves (empty: all of them); it
