@@ -26,18 +26,29 @@ Decided 2026-11-13: keep only our own preset format for the U1's filaments and p
   have to open in stock Snapmaker Orca.
 - **Updates:** a converter is the only way Snapmaker's profiles enter the repo.
 
-Order: inventory of the current presets (which values differ per size, layer height and quality), then
-design and implementation together.
+The inventory of the current presets is done: `doc/u1-preset-inventory.md`, with the per-preset tables as
+CSV files in `doc/u1-preset-inventory/`. Next: design and implementation together in one session.
 
-What a first check of Snapmaker's U1 process presets showed (to be confirmed by the inventory):
+What the inventory found (43 filament materials in 129 presets, 34 of them in more than one size; 90
+process files: 18 stock, 7 Multi-nozzle plates, 42 hidden, 23 bases):
 
-- Line widths are exactly nozzle + 0.02 mm, except 0.45 mm on 0.4 for inner wall and sparse infill, and for
-  top surface at 0.24-0.28 mm layers.
-- Support top and bottom Z distance are min(layer height, 0.20).
-- Speeds are one table for 0.4 and one shared by 0.2, 0.6 and 0.8. On 0.4 at 0.16-0.28 mm layers they fit a
-  flow cap of about 25 mm³/s.
-- Accelerations follow the quality level, not the nozzle.
-- First-layer width, height and speeds are a few numbers per size.
+- **Line widths** are exactly nozzle + 0.02 mm. Exceptions: 0.45 mm on 0.4 for inner wall and sparse infill,
+  and for top surface at 0.24-0.28 mm layers; the first-layer width is 125% of the nozzle on 0.2 and 0.4.
+- **Support top and bottom Z distance** are min(layer height, 0.20), with one stock exception (0.4
+  "0.10mm Color Mixing" has 0.12).
+- **Speeds** need a table, not a formula. 0.2, 0.6 and 0.8 share one set with a handful of exceptions; on
+  0.4 they step with layer height (0.08-0.12 slow, 0.16 and up fast) plus the High Quality preset. A flow
+  cap of about 25 mm³/s fits 0.4 only at 0.24 and 0.28 mm layers.
+- **Accelerations** come in two sets, 4000/2000 and 10000/5000. High Quality presets and 0.4 at 0.08-0.12 mm
+  use the slow set, everything else the fast one.
+- **Prime volume** is about 225 x layer height in the stock presets.
+- **First layer:** width and speeds are a few numbers per size; the height is not (it varies per preset).
+- **Hidden and plate presets carry values of the base they inherit**, not of their own layer height: a
+  hidden 0.6 preset at 0.16 mm has prime volume 68, plates have the 0.4 stock prime volume at 0.05-0.14 mm
+  layers, and support Z deviates the same way. The overhaul should compute these.
+- **Data oddities** in our files and in Snapmaker's 02.03.08.00 are listed in section 4 of the inventory
+  (missing flow limit on PLA Rainbow 0.2, duplicate preset ids, leaked comparison text in Snapmaker's new
+  presets, inconsistent column markers).
 
 ## Faults to settle
 
@@ -57,8 +68,9 @@ What a first check of Snapmaker's U1 process presets showed (to be confirmed by 
    raw layer below (`src/libslic3r/LayerRegion.cpp:1049`), which can include area the previous run left out.
    Test slice 4.
 5. **Command-line slicer refuses our own projects.** A project names the printer "Snapmaker U1 (0.4 nozzle)"
-   (written on purpose for stock compatibility) and the command line does not map that name as the app does.
-   May resolve itself in the preset overhaul, which drops two-way compatibility.
+   (written on purpose for stock compatibility) and the command line does not map that name as the app does:
+   `src/Snapmaker_Orca.cpp:2969` looks the name up in the process preset's printer list, which holds
+   "Snapmaker U1" (read from code, not run; inventory section 3.5). May resolve itself in the preset overhaul, which drops two-way compatibility.
 
 ## Profiles
 

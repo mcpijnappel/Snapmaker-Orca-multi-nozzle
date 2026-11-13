@@ -1,0 +1,148 @@
+family,size,preset,key,standard_column,second_column_(high_flow)
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,fan_max_speed,50,60
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_max_volumetric_speed,15,22
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_multitool_ramming_flow,20,30
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_multitool_ramming_volume,10,5
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_retraction_length,0.4,0.2
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,nozzle_temperature,265,280
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,fan_max_speed,30,25
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_flow_ratio,0.95,0.94
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_max_volumetric_speed,15,22
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_retraction_length,0.2,0.6
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,nozzle_temperature,270,280
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,nozzle_temperature_initial_layer,270,280
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,filament_flow_ratio,1.045,1.02
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,filament_max_volumetric_speed,5,8
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,pressure_advance,0.4,0.38
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,additional_cooling_fan_speed,10,0
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,fan_max_speed,40,60
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,fan_min_speed,20,30
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_deretraction_speed,nil,40
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_flow_ratio,0.95,0.955
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_max_volumetric_speed,20,30
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_multitool_ramming_flow,20,45
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_multitool_ramming_volume,5,10
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_retract_length_toolchange,5,10
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_retraction_length,nil,0.8
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_retraction_speed,nil,40
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_wipe_distance,nil,1
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,pressure_advance,0.02,0.035
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,pressure_advance,0.04,0.038
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,additional_cooling_fan_speed,0,20
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_flow_ratio,0.95,1.01
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_max_volumetric_speed,12,18
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_multitool_ramming_flow,10,13
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_multitool_ramming_volume,5,0.5
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_retraction_length,nil,0.6
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,nozzle_temperature,255,260
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,nozzle_temperature_initial_layer,255,260
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,pressure_advance,0.02,0.028
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_retract_length_toolchange,10,5
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_retraction_length,nil,0.5
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,additional_cooling_fan_speed,80,100
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_flow_ratio,0.97,0.98
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_max_volumetric_speed,16,18
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,pressure_advance,0.02,0.023
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,additional_cooling_fan_speed,100,80
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,filament_flow_ratio,0.97,0.98
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,filament_max_volumetric_speed,18,22
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,filament_retract_length_toolchange,10,15
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,filament_retraction_length,1,0.8
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,pressure_advance,0.02,0.023
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,filament_flow_ratio,0.92,0.987
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,filament_multitool_ramming_flow,30,40
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,filament_multitool_ramming_volume,5,10
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,filament_retract_length_toolchange,5,10
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,pressure_advance,0.016,0.028
+Snapmaker PLA Matte,0.2,Snapmaker PLA Matte @U1 0.2 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,additional_cooling_fan_speed,80,100
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_flow_ratio,1,0.99
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_max_volumetric_speed,22,40
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_retraction_length,nil,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_wipe_distance,nil,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,nozzle_temperature,215,220
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,nozzle_temperature_initial_layer,215,220
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Rainbow,0.4,Snapmaker PLA Rainbow @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Rainbow,0.4,Snapmaker PLA Rainbow @U1 0.4 nozzle,filament_flow_ratio,0.96,0.97
+Snapmaker PLA Rainbow,0.4,Snapmaker PLA Rainbow @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Rainbow,0.4,Snapmaker PLA Rainbow @U1 0.4 nozzle,filament_max_volumetric_speed,16,40
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1 0.4 nozzle,additional_cooling_fan_speed,70,80
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1 0.4 nozzle,filament_max_volumetric_speed,10,12
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,filament_max_volumetric_speed,20,40
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,filament_multitool_ramming_flow,30,40
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,additional_cooling_fan_speed,70,80
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_max_volumetric_speed,18,12
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_multitool_ramming_flow,20,25
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_multitool_ramming_volume,10,5
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_retract_length_toolchange,10,5
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,filament_retraction_length,0.8,0.2
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,nozzle_temperature,220,230
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,nozzle_temperature_initial_layer,220,230
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_max_volumetric_speed,18,20
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_retract_length_toolchange,5,6
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_z_hop_types,nil,Auto Lift
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,pressure_advance,0.025,0.024
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,additional_cooling_fan_speed,0,100
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_max_volumetric_speed,15,20
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_multitool_ramming_flow,20,30
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_retract_length_toolchange,5,15
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_retraction_length,1,0.8
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,nozzle_temperature,240,230
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,nozzle_temperature_initial_layer,240,230
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,pressure_advance,0.01,0.02
+Snapmaker PVA,0.4,Snapmaker PVA @U1 0.4 nozzle,filament_flow_ratio,1,0.97
+Snapmaker PVA,0.4,Snapmaker PVA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PVA,0.4,Snapmaker PVA @U1 0.4 nozzle,filament_max_volumetric_speed,5,6
+Snapmaker PVA,0.4,Snapmaker PVA @U1 0.4 nozzle,filament_retraction_length,0.4,0.6
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_flow_ratio,1,0.95
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_max_volumetric_speed,12,18
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,filament_flow_ratio,1.045,1.046
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,filament_retract_length_toolchange,2,4
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,filament_retraction_length,1.2,1.7
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,nozzle_temperature,230,220
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,nozzle_temperature_initial_layer,230,220
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,fan_max_speed,50,100
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,fan_min_speed,10,100
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,filament_multitool_ramming_flow,15,10
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,filament_multitool_ramming_volume,5,0.01
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,filament_retract_length_toolchange,3.6,10
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,filament_z_hop_types,Slope Lift,Spiral Lift
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,pressure_advance,0.23,0.205

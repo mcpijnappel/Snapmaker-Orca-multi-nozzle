@@ -1,0 +1,57 @@
+key,0.08 High Quality (0.2 nozzle),0.10 High Quality (0.2 nozzle),0.12 Standard (0.2 nozzle),0.08 Standard (0.4 nozzle),0.10 Color Mixing (0.4 nozzle),0.12 Standard (0.4 nozzle),0.16 Standard (0.4 nozzle),0.20 High Quality (0.4 nozzle),0.20 Standard (0.4 nozzle),0.24 Standard (0.4 nozzle),0.28 Standard (0.4 nozzle),0.18 Standard (0.6 nozzle),0.24 Standard (0.6 nozzle),0.30 Standard (0.6 nozzle),0.24 Standard (0.8 nozzle),0.32 Standard (0.8 nozzle),0.40 Standard (0.8 nozzle),0.40 Strength (0.8 nozzle)
+bottom_shell_layers,5,5,5,7,5,5,4,3,3,3,3,3,3,3,3,3,3,5
+bridge_density,,,,,,,,80%,100%,,,,,,,70%,60%,60%
+bridge_flow,1,1,1,1,1,1,1,0.8,1,1,1,1,1,1,1,0.7,0.8,0.8
+bridge_speed,50,50,50,50,50,50,50,50,50,50,50,30,30,30,30,30,30,30
+default_acceleration,4000,4000,10000,4000,4000,4000,10000,4000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000
+filter_out_gap_fill,,,,,,,,,,,,1,1,1,1,1,1,1
+gap_fill_target,,,,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom,topbottom
+gap_infill_speed,50,50,50,150,230,230,250,250,250,230,200,50,50,50,50,50,50,50
+initial_layer_infill_speed,60,70,70,105,105,105,105,105,105,105,105,55,55,55,55,55,55,55
+initial_layer_line_width,125%,125%,125%,125%,125%,125%,125%,125%,125%,125%,125%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+initial_layer_print_height,0.1,0.12,0.14,0.2,0.1,0.2,0.2,0.25,0.25,0.2,0.2,0.24,0.3,0.3,0.32,0.4,0.4,0.4
+initial_layer_speed,30,40,40,50,50,50,50,50,50,50,50,35,35,35,35,35,35,35
+inner_wall_acceleration,,,,,4000,,,4000,,,,,,,,,,
+inner_wall_line_width,110%,110%,110%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+inner_wall_speed,150,150,150,120,150,150,300,150,300 | 600,230,200,150,150,150,150,150,150,100
+internal_bridge_speed,,,,,,,,,,,,100%,100%,100%,100%,100%,100%,100%
+internal_solid_infill_line_width,110%,110%,110%,105%,105%,105%,105%,105%,105%,105%,105%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+internal_solid_infill_pattern,,,,,,,,rectilinear,rectilinear,,,,,,,,,
+internal_solid_infill_speed,150,150,150,150,180,180,250,200,250 | 600,230,200,150,150,150,150,150,150,150
+ironing_flow,10%,10%,10%,8%,10%,10%,10%,10%,10%,10%,10%,10%,10%,10%,10%,10%,10%,10%
+layer_height,0.08,0.1,0.12,0.08,0.1,0.12,0.16,0.2,0.2,0.24,0.28,0.18,0.24,0.3,0.24,0.32,0.4,0.4
+line_width,110%,110%,110%,105%,105%,105%,105%,105%,105%,105%,105%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+min_width_top_surface,,,,,,,,200%,200%,,,,,,90,,200%,200%
+outer_wall_acceleration,2000,2000,5000,2000,2000,2000,5000,2000,5000,5000,5000,5000,5000,5000,5000,5000,5000,5000
+outer_wall_line_width,110%,110%,110%,105%,105%,105%,105%,105%,105%,105%,105%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+outer_wall_speed,60,60,120,90,60,60,200,60,200 | 500,200,200,120,120,120,120,120,120,80
+overhang_1_4_speed,0,0,0,60,60,60,60,60,0,0,0,0,0,0,0,0,0,0
+overhang_2_4_speed,50,50,50,30,30,30,30,30,50,50,50,50,50,50,50,50,50,50
+overhang_3_4_speed,30,30,30,10,10,10,10,10,30,30,30,15,15,15,25,25,25,25
+overhang_4_4_speed,10,10,10,10,10,10,10,10,10,10,10,10,10,10,5,5,5,5
+precise_z_height,,,,,,,,0,0,,,,,,,,,
+preheat_time,,,,,,,,30,30,,,,,,,,,
+prime_tower_width,30,28,28,30,30,30,30,30,30,30,30,30,30,30,30,30,30,30
+prime_volume,18,25,27,18,27,27,36,45,45,54,63,41,55,68,54,72,90,90
+print_extruder_id,,,,,,,,,1,,,,,,,,,
+print_extruder_variant,,,,,,,,,Direct Drive Standard | Direct Drive High Flow,,,,,,,,,
+process_flow_support,,,,,,,,,standard | high_flow,,,,,,,,,
+seam_gap,,,,,,,,15%,15%,,,15%,15%,15%,15%,15%,15%,15%
+sparse_infill_density,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,15%,30%
+sparse_infill_line_width,110%,110%,110%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,112.5%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+sparse_infill_pattern,gyroid,gyroid,gyroid,gyroid,gyroid,gyroid,gyroid,grid,grid,grid,grid,gyroid,grid,grid,grid,grid,grid,grid
+sparse_infill_speed,100,100,100,200,180,180,270,200,270 | 600,230,200,100,150,100,100,100,100,100
+support_bottom_z_distance,0.08,0.1,0.12,0.08,0.12,0.12,0.16,0.2,0.2,0.2,0.2,0.18,0.2,0.2,0.2,0.2,0.2,0.2
+support_line_width,110%,110%,110%,105%,105%,105%,105%,105%,105%,105%,105%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+support_threshold_angle,30,30,30,15,25,25,30,30,30,35,40,30,35,35,30,35,40,40
+support_top_z_distance,0.08,0.1,0.12,0.08,0.12,0.12,0.16,0.2,0.2,0.2,0.2,0.18,0.2,0.2,0.2,0.2,0.2,0.2
+top_color_penetration_layers,5,5,5,5,5,5,5,5,5,4,4,3,3,3,3,3,3,5
+top_shell_layers,7,7,7,9,5,5,6,5,5,4,4,3,3,3,3,3,3,5
+top_shell_thickness,0.8,0.8,0.8,0.8,0.6,0.6,1.0,1.0,1.0,1.0,1.0,0.8,0.8,0.8,0.8,0.8,0.8,0.8
+top_surface_line_width,110%,110%,110%,105%,105%,105%,105%,105%,105%,112.5%,112.5%,103.33%,103.33%,103.33%,102.5%,102.5%,102.5%,102.5%
+top_surface_pattern,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonicline,monotonic,monotonic,monotonic,monotonic
+top_surface_speed,150,150,150,90,150,150,200,150,200,200,200,150,150,150,150,150,150,150
+wall_loops,4,4,4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,6
+wipe_speed,,,,,,,,50,50,,,,,,,,,
+wipe_tower_cone_angle,,,,15,15,15,15,15,15,15,15,,,,,,,
+wipe_tower_filament,,,,0,0,0,0,0,0,0,0,,,,,,,

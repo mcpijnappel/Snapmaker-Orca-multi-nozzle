@@ -1,0 +1,62 @@
+key,families_with_value_difference,families
+filament_max_volumetric_speed,31,Generic ABS; Generic ASA; Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic Support For PLA; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker PETG-CF; Snapmaker PLA Full Spectrum; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_multitool_ramming_flow,24,Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker PETG-CF; Snapmaker PLA Full Spectrum; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 95A HF
+supertack_plate_temp,23,Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic Support For PLA; Generic TPU; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Matte; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+supertack_plate_temp_initial_layer,23,Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic Support For PLA; Generic TPU; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Matte; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_multitool_ramming_volume,22,Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG Translucent; Snapmaker PETG-CF; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PVA; Snapmaker TPU; Snapmaker TPU 95A HF
+pressure_advance,20,Generic PETG; Generic PETG HF; Generic PETG-GF; Generic TPU; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_retraction_length,18,Generic PETG HF; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_flow_ratio,15,Snapmaker ABS; Snapmaker ASA; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_retract_length_toolchange,14,Generic PLA High Speed; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Matte; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_cost,13,Generic PETG; Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PETG Translucent; Snapmaker PLA Full Spectrum; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU
+nozzle_temperature,13,Generic PETG HF; Generic TPU; Generic TPU 95A HF; Snapmaker ABS; Snapmaker PEBA 90A; Snapmaker PETG Translucent; Snapmaker PLA SnapSpeed; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_end_gcode,12,Generic PETG; Generic PETG HF; Generic PETG-CF; Generic PETG-GF; Generic PLA; Generic PLA High Speed; Generic PLA Silk; Generic PLA-CF; Generic TPU 95A HF; Snapmaker PETG HF; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+nozzle_temperature_initial_layer,10,Generic PETG HF; Generic TPU; Generic TPU 95A HF; Snapmaker PEBA 90A; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_minimal_purge_on_wipe_tower,10,Snapmaker ABS; Snapmaker ASA; Snapmaker PETG HF; Snapmaker PETG-CF; Snapmaker PLA Glow; Snapmaker PLA Matte; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA
+filament_wipe_distance,10,Snapmaker ASA; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker PLA Glow; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA; Snapmaker TPU 90A
+fan_min_speed,9,Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker Support For PLA; Snapmaker TPU; Snapmaker TPU 95A HF
+slow_down_layer_time,9,Generic TPU 95A HF; Snapmaker PEBA 90A; Snapmaker PETG-CF; Snapmaker PLA Rainbow; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker TPU; Snapmaker TPU 95A HF
+enable_pressure_advance,9,Snapmaker ABS; Snapmaker PETG Translucent; Snapmaker PETG-CF; Snapmaker PLA Glow; Snapmaker PLA Translucent; Snapmaker PLA Wood; Snapmaker PLA-CF; Snapmaker PVA; Snapmaker Support For PLA
+filament_density,8,Generic PETG; Generic TPU 95A HF; Snapmaker PLA Full Spectrum; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker Support For PLA
+fan_max_speed,8,Generic TPU 95A HF; Snapmaker ABS; Snapmaker ASA; Snapmaker PEBA 90A; Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker Support For PLA; Snapmaker TPU 95A HF
+additional_cooling_fan_speed,7,Snapmaker PETG HF; Snapmaker PETG Translucent; Snapmaker PLA Glow; Snapmaker PLA Silk; Snapmaker PLA Wood; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+filament_z_hop_types,7,Snapmaker PETG HF; Snapmaker PLA Full Spectrum; Snapmaker PLA Silk; Snapmaker PLA SnapSpeed; Snapmaker PLA Wood; Snapmaker PVA; Snapmaker TPU 90A
+filament_retraction_speed,6,Snapmaker PETG Translucent; Snapmaker PLA Glow; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+eng_plate_temp,5,Generic PLA High Speed; Generic PLA Silk; Snapmaker PETG HF; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+eng_plate_temp_initial_layer,5,Generic PLA High Speed; Generic PLA Silk; Snapmaker PETG HF; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+filament_retraction_minimum_travel,5,Snapmaker ASA; Snapmaker PETG Translucent; Snapmaker PLA Glow; Snapmaker PVA; Snapmaker Support For PLA
+filament_wipe,5,Snapmaker ASA; Snapmaker PETG HF; Snapmaker PLA Silk; Snapmaker PLA Translucent; Snapmaker TPU 90A
+nozzle_temperature_range_low,4,Generic PETG; Snapmaker PLA Translucent; Snapmaker PLA-CF; Snapmaker PVA
+filament_start_gcode,4,Generic PLA High Speed; Generic TPU; Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+fan_cooling_layer_time,4,Generic TPU 95A HF; Snapmaker PEBA 90A; Snapmaker TPU; Snapmaker TPU 95A HF
+filament_z_hop,4,Snapmaker ABS; Snapmaker PLA Glow; Snapmaker PLA SnapSpeed; Snapmaker PLA-CF
+filament_deretraction_speed,4,Snapmaker PLA Glow; Snapmaker PLA SnapSpeed; Snapmaker TPU 90A; Snapmaker TPU 95A HF
+overhang_fan_threshold,3,Generic TPU 95A HF; Snapmaker TPU; Snapmaker TPU 95A HF
+filament_loading_speed,3,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed; Snapmaker PLA Translucent
+filament_cooling_final_speed,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_cooling_initial_speed,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_cooling_moves,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_loading_speed_start,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_stamping_distance,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_stamping_loading_speed,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_unloading_speed,2,Snapmaker PLA Full Spectrum; Snapmaker PLA SnapSpeed
+filament_retract_before_wipe,2,Snapmaker PLA Glow; Snapmaker PLA Translucent
+graphic_effect_plate_temp,2,Snapmaker PLA Glow; Snapmaker Support For PLA
+graphic_effect_plate_temp_initial_layer,2,Snapmaker PLA Glow; Snapmaker Support For PLA
+cool_plate_temp,2,Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+cool_plate_temp_initial_layer,2,Snapmaker PLA Matte; Snapmaker PLA SnapSpeed
+during_print_exhaust_fan_speed,2,Snapmaker PLA Rainbow; Snapmaker TPU 90A
+nozzle_temperature_range_high,2,Snapmaker PVA; Snapmaker TPU 90A
+filament_long_retractions_when_cut,1,Generic PETG
+filament_retraction_distances_when_cut,1,Generic PETG
+filament_multitool_ramming,1,Generic PLA High Speed
+slow_down_min_speed,1,Snapmaker ABS
+filament_retract_when_changing_layer,1,Snapmaker PLA Glow
+filament_settings_id,1,Snapmaker PLA Matte
+textured_plate_temp,1,Snapmaker PLA Matte
+textured_plate_temp_initial_layer,1,Snapmaker PLA Matte
+dont_slow_down_outer_wall,1,Snapmaker PLA Silk
+hot_plate_temp,1,Snapmaker PLA SnapSpeed
+hot_plate_temp_initial_layer,1,Snapmaker PLA SnapSpeed
+filament_soluble,1,Snapmaker PVA
+complete_print_exhaust_fan_speed,1,Snapmaker TPU 90A

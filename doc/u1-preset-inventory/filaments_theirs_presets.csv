@@ -1,0 +1,153 @@
+family,size,preset,setting_id,filament_id,inherits,compatible_printers,nozzle_size_tag,columns,column_names,renamed_from,status_vs_ours
+Generic ABS,0.2,Generic ABS @U1 0.2 nozzle,GFSB99,,Generic ABS @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Generic ABS,0.4,Generic ABS @U1 0.4 nozzle,GFSB99,,Generic ABS @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic ABS,renamed (ours: Generic ABS)
+Generic ABS,0.6,Generic ABS @U1 0.6 nozzle,GFSB99,,Generic ABS @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Generic ABS,0.8,Generic ABS @U1 0.8 nozzle,GFSB99,,Generic ABS @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Generic ASA,0.2,Generic ASA @U1 0.2 nozzle,GFSB98,,Generic ASA @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,GFSB98,,Generic ASA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),,same name
+Generic ASA,0.6,Generic ASA @U1 0.6 nozzle,GFSB98,,Generic ASA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Generic ASA,0.8,Generic ASA @U1 0.8 nozzle,GFSB98,,Generic ASA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Generic BVOH,0.4,Generic BVOH @U1 0.4 nozzle,GFSS97_00,,Generic BVOH @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic BVOH,renamed (ours: Generic BVOH)
+Generic PA,0.4,Generic PA @U1 0.4 nozzle,GFSN98,GFN99,Generic PA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PA,renamed (ours: Generic PA)
+Generic PA,0.6,Generic PA @U1 0.6 nozzle,,,Generic PA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new size in existing family
+Generic PA,0.8,Generic PA @U1 0.8 nozzle,,,Generic PA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new size in existing family
+Generic PA-CF,0.4,Generic PA-CF @U1 0.4 nozzle,GFSN99,GFN98,Generic PA-CF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PA-CF,renamed (ours: Generic PA-CF)
+Generic PA-CF,0.6,Generic PA-CF @U1 0.6 nozzle,,,Generic PA-CF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new size in existing family
+Generic PA-CF,0.8,Generic PA-CF @U1 0.8 nozzle,,,Generic PA-CF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new size in existing family
+Generic PC,0.4,Generic PC @U1 0.4 nozzle,GFSC99,,Generic PC @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PC,renamed (ours: Generic PC)
+Generic PC,0.6,Generic PC @U1 0.6 nozzle,GFSC99,,Generic PC @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Generic PC,0.8,Generic PC @U1 0.8 nozzle,GFSC99,,Generic PC @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Generic PCTG,0.4,Generic PCTG @U1 0.4 nozzle,GFSG97_001,,Generic PCTG @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PCTG,renamed (ours: Generic PCTG)
+Generic PETG,0.2,Generic PETG @U1 0.2 nozzle,GFSG99_01,,Generic PETG @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG,0.4,Generic PETG @U1 0.4 nozzle,GFSG00_01,,Generic PETG @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PETG,renamed (ours: Generic PETG)
+Generic PETG,0.6,Generic PETG @U1 0.6 nozzle,GFSG99,,Generic PETG @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG,0.8,Generic PETG @U1 0.8 nozzle,GFSG99,,Generic PETG @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG HF,0.2,Generic PETG HF @U1 0.2 nozzle,GFSG96_01,,Generic PETG HF @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG HF,0.4,Generic PETG HF @U1 0.4 nozzle,GFSG02_001,,Generic PETG HF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PETG HF,renamed (ours: Generic PETG HF)
+Generic PETG HF,0.6,Generic PETG HF @U1 0.6 nozzle,GFSG96_25,,Generic PETG HF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG HF,0.8,Generic PETG HF @U1 0.8 nozzle,GFSG96_00,,Generic PETG HF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG-CF,0.4,Generic PETG-CF @U1 0.4 nozzle,GFSG50_021,,Generic PETG-CF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PETG-CF,renamed (ours: Generic PETG-CF)
+Generic PETG-CF,0.6,Generic PETG-CF @U1 0.6 nozzle,GFSG50,,Generic PETG-CF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG-CF,0.8,Generic PETG-CF @U1 0.8 nozzle,GFSG50,,Generic PETG-CF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG-GF,0.4,Generic PETG-GF @U1 0.4 nozzle,GFSG50_022,,Generic PETG-GF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PETG-GF,renamed (ours: Generic PETG-GF)
+Generic PETG-GF,0.6,Generic PETG-GF @U1 0.6 nozzle,GFSG50,,Generic PETG-GF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PETG-GF,0.8,Generic PETG-GF @U1 0.8 nozzle,GFSG50,,Generic PETG-GF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA,0.2,Generic PLA @U1 0.2 nozzle,GFSL99_00,,Generic PLA @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA,0.4,Generic PLA @U1 0.4 nozzle,GFSL991,,Generic PLA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PLA,renamed (ours: Generic PLA)
+Generic PLA,0.6,Generic PLA @U1 0.6 nozzle,GFSL99,,Generic PLA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA,0.8,Generic PLA @U1 0.8 nozzle,GFSL99,,Generic PLA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA High Speed,0.2,Generic PLA High Speed @U1 0.2 nozzle,GFSL95_01,,Generic PLA High Speed @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA High Speed,0.4,Generic PLA High Speed @U1 0.4 nozzle,GFSL95_0011,,Generic PLA High Speed @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PLA High Speed,renamed (ours: Generic PLA High Speed)
+Generic PLA High Speed,0.6,Generic PLA High Speed @U1 0.6 nozzle,GFSL95_00,,Generic PLA High Speed @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA High Speed,0.8,Generic PLA High Speed @U1 0.8 nozzle,GFSL95_00,,Generic PLA High Speed @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA Silk,0.2,Generic PLA Silk @U1 0.2 nozzle,GFSL99_0122,,Generic PLA Silk @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Generic PLA Silk,0.4,Generic PLA Silk @U1 0.4 nozzle,GFSL99_0122,,Generic PLA Silk @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PLA Silk,renamed (ours: Generic PLA Silk)
+Generic PLA Silk,0.6,Generic PLA Silk @U1 0.6 nozzle,GFSL99_01,,Generic PLA Silk @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA Silk,0.8,Generic PLA Silk @U1 0.8 nozzle,GFSL99_01,,Generic PLA Silk @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA-CF,0.4,Generic PLA-CF @U1 0.4 nozzle,GFSL9811,,Generic PLA-CF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PLA-CF,renamed (ours: Generic PLA-CF)
+Generic PLA-CF,0.6,Generic PLA-CF @U1 0.6 nozzle,GFSL98,,Generic PLA-CF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PLA-CF,0.8,Generic PLA-CF @U1 0.8 nozzle,GFSL98,,Generic PLA-CF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic PVA,0.4,Generic PVA @U1 0.4 nozzle,GFSS99,,Generic PVA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic PVA,renamed (ours: Generic PVA)
+Generic PVA,0.6,Generic PVA @U1 0.6 nozzle,,,Generic PVA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new size in existing family
+Generic PVA,0.8,Generic PVA @U1 0.8 nozzle,,,Generic PVA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new size in existing family
+Generic Support For PLA,0.2,Generic Support For PLA @U1 0.2 nozzle,GFSS00,,Generic Support For PLA @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Generic Support For PLA,0.4,Generic Support For PLA @U1 0.4 nozzle,GFSS00,,Generic Support For PLA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic Support For PLA,renamed (ours: Generic Support For PLA)
+Generic Support For PLA,0.6,Generic Support For PLA @U1 0.6 nozzle,GFSS00,,Generic Support For PLA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Generic Support For PLA,0.8,Generic Support For PLA @U1 0.8 nozzle,GFSS00,,Generic Support For PLA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Generic TPU,0.4,Generic TPU @U1 0.4 nozzle,GFSR99,GFU99,Generic TPU @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic TPU,renamed (ours: Generic TPU)
+Generic TPU,0.6,Generic TPU @U1 0.6 nozzle,GFSR99,,Generic TPU @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic TPU,0.8,Generic TPU @U1 0.8 nozzle,GFSR99,,Generic TPU @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic TPU 95A HF,0.4,Generic TPU 95A HF @U1 0.4 nozzle,GFSU00_00,,Generic TPU 95A HF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Generic TPU 95A HF,renamed (ours: Generic TPU 95A HF)
+Generic TPU 95A HF,0.6,Generic TPU 95A HF @U1 0.6 nozzle,GFSR99,,Generic TPU 95A HF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Generic TPU 95A HF,0.8,Generic TPU 95A HF @U1 0.8 nozzle,GFSR99,,Generic TPU 95A HF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Polymaker General PLA Family,0.4,Polymaker General PLA Family @U1 0.4 nozzle,POLY_GENERAL_PLA_U1_001,,Polymaker General PLA Family @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Polymaker General PLA Family @U1,renamed (ours: Polymaker General PLA Family @U1)
+Polymaker Silk PLA Family,0.4,Polymaker Silk PLA Family @U1 0.4 nozzle,POLY_SILK_PLA_U1_001,,Polymaker Silk PLA Family @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Polymaker Silk PLA Family @U1,renamed (ours: Polymaker Silk PLA Family @U1)
+Polymaker Tough PLA Family,0.4,Polymaker Tough PLA Family @U1 0.4 nozzle,POLY_TOUGH_PLA_U1_001,,Polymaker Tough PLA Family @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Polymaker Tough PLA Family @U1,renamed (ours: Polymaker Tough PLA Family @U1)
+Snapmaker ABS,0.2,Snapmaker ABS @U1 0.2 nozzle,937533070,,Snapmaker ABS @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,937533070,,Snapmaker ABS @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker ABS,0.6,Snapmaker ABS @U1 0.6 nozzle,937533070,,Snapmaker ABS @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker ABS,0.8,Snapmaker ABS @U1 0.8 nozzle,937533070,,Snapmaker ABS @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker ASA,0.2,Snapmaker ASA @U1 0.2 nozzle,25418661980,,Snapmaker ASA @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,25418661980,,Snapmaker ASA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker ASA,0.6,Snapmaker ASA @U1 0.6 nozzle,25418661980,,Snapmaker ASA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker ASA,0.8,Snapmaker ASA @U1 0.8 nozzle,25418661980,,Snapmaker ASA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker Nylon,0.4,Snapmaker Nylon @U1 0.4 nozzle,,,Snapmaker Nylon @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),,new family
+Snapmaker Nylon,0.6,Snapmaker Nylon @U1 0.6 nozzle,,,Snapmaker Nylon @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new family
+Snapmaker Nylon,0.8,Snapmaker Nylon @U1 0.8 nozzle,,,Snapmaker Nylon @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new family
+Snapmaker PEBA 90A,0.4,Snapmaker PEBA 90A @U1 0.4 nozzle,,SNPPEBA001,Snapmaker PEBA 90A @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PEBA 90A,0.6,Snapmaker PEBA 90A @U1 0.6 nozzle,,SNPPEBA001,Snapmaker PEBA 90A @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PEBA 90A,0.8,Snapmaker PEBA 90A @U1 0.8 nozzle,,SNPPEBA001,Snapmaker PEBA 90A @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PETG,0.2,Snapmaker PETG @U1 0.2 nozzle,,,Snapmaker PETG @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,new family
+Snapmaker PETG,0.4,Snapmaker PETG @U1 0.4 nozzle,,,Snapmaker PETG @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),,new family
+Snapmaker PETG,0.6,Snapmaker PETG @U1 0.6 nozzle,,,Snapmaker PETG @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,new family
+Snapmaker PETG,0.8,Snapmaker PETG @U1 0.8 nozzle,,,Snapmaker PETG @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,new family
+Snapmaker PETG HF,0.2,Snapmaker PETG HF @U1 0.2 nozzle,GFSG96_01,,Snapmaker PETG HF @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,Direct Drive Standard,,same name
+Snapmaker PETG HF,0.4,Snapmaker PETG HF @U1 0.4 nozzle,GFSG02_0012,,Snapmaker PETG HF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker PETG HF,renamed (ours: Snapmaker PETG HF)
+Snapmaker PETG HF,0.6,Snapmaker PETG HF @U1 0.6 nozzle,GFSG96_25,,Snapmaker PETG HF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,Direct Drive Standard,,same name
+Snapmaker PETG HF,0.8,Snapmaker PETG HF @U1 0.8 nozzle,GFSG96_00,,Snapmaker PETG HF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,Direct Drive Standard,,same name
+Snapmaker PETG Translucent,0.2,Snapmaker PETG Translucent @U1 0.2 nozzle,,,Snapmaker PETG Translucent @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,,,Snapmaker PETG Translucent @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PETG Translucent,0.6,Snapmaker PETG Translucent @U1 0.6 nozzle,,,Snapmaker PETG Translucent @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PETG Translucent,0.8,Snapmaker PETG Translucent @U1 0.8 nozzle,,,Snapmaker PETG Translucent @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,9504590820,,Snapmaker PETG-CF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PETG-CF,0.6,Snapmaker PETG-CF @U1 0.6 nozzle,9504590820,,Snapmaker PETG-CF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PETG-CF,0.8,Snapmaker PETG-CF @U1 0.8 nozzle,9504590820,,Snapmaker PETG-CF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Basic,0.4,Snapmaker PLA Basic @U1 0.4 nozzle,1195313935011,,Snapmaker PLA Basic @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),Snapmaker PLA Basic @U1,renamed (ours: Snapmaker PLA Basic @U1)
+Snapmaker PLA Full Spectrum,0.2,Snapmaker PLA Full Spectrum @U1 0.2 nozzle,1195313935011,,Snapmaker PLA Full Spectrum @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,1195313935011,,Snapmaker PLA Full Spectrum @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Full Spectrum,0.6,Snapmaker PLA Full Spectrum @U1 0.6 nozzle,1195313935011,,Snapmaker PLA Full Spectrum @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,,,Snapmaker PLA Glow @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Glow,0.6,Snapmaker PLA Glow @U1 0.6 nozzle,,,Snapmaker PLA Glow @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Glow,0.8,Snapmaker PLA Glow @U1 0.8 nozzle,,,Snapmaker PLA Glow @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Gradient,0.2,Snapmaker PLA Gradient @U1 0.2 nozzle,,,Snapmaker PLA Gradient @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Gradient,0.4,Snapmaker PLA Gradient @U1 0.4 nozzle,,,Snapmaker PLA Gradient @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,new family
+Snapmaker PLA Gradient,0.6,Snapmaker PLA Gradient @U1 0.6 nozzle,,,Snapmaker PLA Gradient @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Gradient,0.8,Snapmaker PLA Gradient @U1 0.8 nozzle,,,Snapmaker PLA Gradient @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Marble,0.4,Snapmaker PLA Marble @U1 0.4 nozzle,,,Snapmaker PLA Marble @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,new family
+Snapmaker PLA Marble,0.6,Snapmaker PLA Marble @U1 0.6 nozzle,,,Snapmaker PLA Marble @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Marble,0.8,Snapmaker PLA Marble @U1 0.8 nozzle,,,Snapmaker PLA Marble @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Matte,0.2,Snapmaker PLA Matte @U1 0.2 nozzle,119531393501,,Snapmaker PLA Matte @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1 0.4 nozzle,119531393501,,Snapmaker PLA Matte @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker PLA Matte @U1,renamed (ours: Snapmaker PLA Matte @U1)
+Snapmaker PLA Matte,0.6,Snapmaker PLA Matte @U1 0.6 nozzle,119531393501,,Snapmaker PLA Matte @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Matte,0.8,Snapmaker PLA Matte @U1 0.8 nozzle,119531393501,,Snapmaker PLA Matte @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Rainbow,0.2,Snapmaker PLA Rainbow @U1 0.2 nozzle,,SNPPRB001,Snapmaker PLA Rainbow @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Rainbow,0.4,Snapmaker PLA Rainbow @U1 0.4 nozzle,,SNPPRB001,Snapmaker PLA Rainbow @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Rainbow,0.6,Snapmaker PLA Rainbow @U1 0.6 nozzle,,SNPPRB001,Snapmaker PLA Rainbow @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Rainbow,0.8,Snapmaker PLA Rainbow @U1 0.8 nozzle,,SNPPRB001,Snapmaker PLA Rainbow @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Silk,0.2,Snapmaker PLA Silk @U1 0.2 nozzle,1195313935011,,Snapmaker PLA Silk @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1 0.4 nozzle,1195313935011,,Snapmaker PLA Silk @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker PLA Silk @U1,renamed (ours: Snapmaker PLA Silk @U1)
+Snapmaker PLA Silk,0.6,Snapmaker PLA Silk @U1 0.6 nozzle,1195313935011,,Snapmaker PLA Silk @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Silk,0.8,Snapmaker PLA Silk @U1 0.8 nozzle,1195313935011,,Snapmaker PLA Silk @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA SnapSpeed,0.2,Snapmaker PLA SnapSpeed @U1 0.2 nozzle,1195313935011,,Snapmaker PLA SnapSpeed @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1 0.4 nozzle,119531393501,,Snapmaker PLA SnapSpeed @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker PLA SnapSpeed @U1,renamed (ours: Snapmaker PLA SnapSpeed @U1)
+Snapmaker PLA SnapSpeed,0.6,Snapmaker PLA SnapSpeed @U1 0.6 nozzle,1195313935016,,Snapmaker PLA SnapSpeed @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA SnapSpeed,0.8,Snapmaker PLA SnapSpeed @U1 0.8 nozzle,1195313935018,,Snapmaker PLA SnapSpeed @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Starlight,0.4,Snapmaker PLA Starlight @U1 0.4 nozzle,,,Snapmaker PLA Starlight @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,new family
+Snapmaker PLA Starlight,0.6,Snapmaker PLA Starlight @U1 0.6 nozzle,,,Snapmaker PLA Starlight @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Starlight,0.8,Snapmaker PLA Starlight @U1 0.8 nozzle,,,Snapmaker PLA Starlight @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,new family
+Snapmaker PLA Translucent,0.2,Snapmaker PLA Translucent @U1 0.2 nozzle,,,Snapmaker PLA Translucent @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,,,Snapmaker PLA Translucent @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Translucent,0.6,Snapmaker PLA Translucent @U1 0.6 nozzle,,,Snapmaker PLA Translucent @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Translucent,0.8,Snapmaker PLA Translucent @U1 0.8 nozzle,,,Snapmaker PLA Translucent @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,GFSL991,,Snapmaker PLA Wood @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA Wood,0.6,Snapmaker PLA Wood @U1 0.6 nozzle,GFSL991,,Snapmaker PLA Wood @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA Wood,0.8,Snapmaker PLA Wood @U1 0.8 nozzle,GFSL991,,Snapmaker PLA Wood @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,GFSL9811,,Snapmaker PLA-CF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker PLA-CF,0.6,Snapmaker PLA-CF @U1 0.6 nozzle,GFSL9811,,Snapmaker PLA-CF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PLA-CF,0.8,Snapmaker PLA-CF @U1 0.8 nozzle,GFSL9811,,Snapmaker PLA-CF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker PVA,0.4,Snapmaker PVA @U1 0.4 nozzle,41452139080,,Snapmaker PVA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker PVA @U1,renamed (ours: Snapmaker PVA @U1)
+Snapmaker PVA,0.6,Snapmaker PVA @U1 0.6 nozzle,41452139080,,Snapmaker PVA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker PVA,0.8,Snapmaker PVA @U1 0.8 nozzle,41452139080,,Snapmaker PVA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker Support For PLA,0.2,Snapmaker Support For PLA @U1 0.2 nozzle,41460000000,,Snapmaker Support For PLA @U1 base,"[""Snapmaker U1 (0.2 nozzle)""]",,1,(none),,same name
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,41460000000,,Snapmaker Support For PLA @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker Support For PLA,0.6,Snapmaker Support For PLA @U1 0.6 nozzle,41460000000,,Snapmaker Support For PLA @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker Support For PLA,0.8,Snapmaker Support For PLA @U1 0.8 nozzle,41460000000,,Snapmaker Support For PLA @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker TPU,0.4,Snapmaker TPU @U1 0.4 nozzle,STPU001,,Snapmaker TPU @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,1,(none),,same name
+Snapmaker TPU,0.6,Snapmaker TPU @U1 0.6 nozzle,STPU001,,Snapmaker TPU @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker TPU,0.8,Snapmaker TPU @U1 0.8 nozzle,STPU001,,Snapmaker TPU @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker TPU 90A,0.4,Snapmaker TPU 90A @U1 0.4 nozzle,GFSR99,GFU99,Snapmaker TPU 90A @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),Snapmaker TPU 90A @U1,renamed (ours: Snapmaker TPU 90A @U1)
+Snapmaker TPU 90A,0.6,Snapmaker TPU 90A @U1 0.6 nozzle,GFSR99,GFU99,Snapmaker TPU 90A @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker TPU 90A,0.8,Snapmaker TPU 90A @U1 0.8 nozzle,GFSR99,GFU99,Snapmaker TPU 90A @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name
+Snapmaker TPU 95A HF,0.4,Snapmaker TPU 95A HF @U1 0.4 nozzle,GFSR99,GFU99,Snapmaker TPU 95A HF @U1 base,"[""Snapmaker U1 (0.4 nozzle)""]",,2,(flow_support:standard)|(flow_support:high_flow),,same name
+Snapmaker TPU 95A HF,0.6,Snapmaker TPU 95A HF @U1 0.6 nozzle,GFSR99,GFU99,Snapmaker TPU 95A HF @U1 base,"[""Snapmaker U1 (0.6 nozzle)""]",,1,(none),,same name
+Snapmaker TPU 95A HF,0.8,Snapmaker TPU 95A HF @U1 0.8 nozzle,GFSR99,GFU99,Snapmaker TPU 95A HF @U1 base,"[""Snapmaker U1 (0.8 nozzle)""]",,1,(none),,same name

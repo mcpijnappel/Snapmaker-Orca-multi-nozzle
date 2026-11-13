@@ -1,0 +1,223 @@
+preset,key,ours_raw,theirs_raw,note
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),bottom_color_penetration_layers,3,5,
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),initial_layer_line_width,125%,0.25,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),inner_wall_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),internal_solid_infill_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),max_bridge_length,0,,
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),outer_wall_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),raft_first_layer_expansion,-1,,
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),sparse_infill_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),support_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),top_color_penetration_layers,5,7,
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),top_surface_line_width,110%,0.22,(line widths compared in mm)
+0.08mm High Quality @Snapmaker U1 (0.2 nozzle),wall_generator,arachne,classic,
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),bottom_color_penetration_layers,3,6,
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),top_color_penetration_layers,5,8,
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.08mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),bottom_color_penetration_layers,3,6,
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),top_color_penetration_layers,5,8,
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.10mm Color Mixing @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),bottom_color_penetration_layers,3,5,
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),initial_layer_line_width,125%,0.25,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),inner_wall_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),internal_solid_infill_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),max_bridge_length,0,,
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),outer_wall_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),raft_first_layer_expansion,-1,,
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),sparse_infill_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),support_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),top_color_penetration_layers,5,7,
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),top_surface_line_width,110%,0.22,(line widths compared in mm)
+0.10mm High Quality @Snapmaker U1 (0.2 nozzle),wall_generator,arachne,classic,
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),bottom_color_penetration_layers,3,4,
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),initial_layer_line_width,125%,0.25,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),inner_wall_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),internal_solid_infill_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),max_bridge_length,0,,
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),outer_wall_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),raft_first_layer_expansion,-1,,
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),sparse_infill_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),support_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),top_color_penetration_layers,5,6,
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),top_surface_line_width,110%,0.22,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.2 nozzle),wall_generator,arachne,classic,
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),bottom_color_penetration_layers,3,6,
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),top_color_penetration_layers,5,8,
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.12mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),bottom_color_penetration_layers,3,4,
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),top_color_penetration_layers,5,6,
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.16mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),initial_layer_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),inner_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),internal_solid_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),max_bridge_length,0,,
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),outer_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),raft_first_layer_expansion,-1,,
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),sparse_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),support_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),top_color_penetration_layers,3,5,
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),top_surface_line_width,103.33%,0.62,(line widths compared in mm)
+0.18mm Standard @Snapmaker U1 (0.6 nozzle),wall_generator,arachne,classic,
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),internal_solid_infill_pattern,rectilinear,monotonicline,
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.20mm High Quality @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_pattern,rectilinear,monotonicline,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),print_extruder_id,"[""1"", ""1""]",,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),print_extruder_variant,"[""Direct Drive Standard"", ""Direct Drive High Flow""]",,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,105%,0.42,(line widths compared in mm)
+0.20mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,112.5%,0.45,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),initial_layer_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),inner_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),internal_solid_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),max_bridge_length,0,,
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),outer_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),raft_first_layer_expansion,-1,,
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),sparse_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),support_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),top_color_penetration_layers,3,4,
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),top_surface_line_width,103.33%,0.62,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.6 nozzle),wall_generator,arachne,classic,
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),initial_layer_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),inner_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),internal_solid_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),max_bridge_length,0,,
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),outer_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),raft_first_layer_expansion,-1,,
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),sparse_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),support_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),top_color_penetration_layers,3,4,
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),top_surface_line_width,102.5%,0.82,(line widths compared in mm)
+0.24mm Standard @Snapmaker U1 (0.8 nozzle),wall_generator,arachne,classic,
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),initial_layer_line_width,125%,0.5,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),inner_wall_line_width,112.5%,0.45,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),internal_solid_infill_line_width,105%,0.42,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),line_width,105%,0.42,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),max_bridge_length,0,,
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),outer_wall_line_width,105%,0.42,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),raft_first_layer_expansion,-1,,
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),sparse_infill_line_width,112.5%,0.45,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),support_line_width,105%,0.42,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),top_surface_line_width,112.5%,0.45,(line widths compared in mm)
+0.28mm Standard @Snapmaker U1 (0.4 nozzle),wall_generator,arachne,classic,
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),initial_layer_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),inner_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),internal_solid_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),max_bridge_length,0,,
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),outer_wall_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),raft_first_layer_expansion,-1,,
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),sparse_infill_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),support_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),top_color_penetration_layers,3,4,
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),top_surface_line_width,103.33%,0.62,(line widths compared in mm)
+0.30mm Standard @Snapmaker U1 (0.6 nozzle),wall_generator,arachne,classic,
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),initial_layer_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),inner_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),internal_solid_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),max_bridge_length,0,,
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),outer_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),raft_first_layer_expansion,-1,,
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),sparse_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),support_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),top_color_penetration_layers,3,4,
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),top_surface_line_width,102.5%,0.82,(line widths compared in mm)
+0.32mm Standard @Snapmaker U1 (0.8 nozzle),wall_generator,arachne,classic,
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),initial_layer_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),inner_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),internal_solid_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),max_bridge_length,0,,
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),outer_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),raft_first_layer_expansion,-1,,
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),sparse_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),support_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),top_surface_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Standard @Snapmaker U1 (0.8 nozzle),wall_generator,arachne,classic,
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),initial_layer_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),inner_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),internal_solid_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),max_bridge_length,0,,
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),outer_wall_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),raft_first_layer_expansion,-1,,
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),sparse_infill_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),support_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),top_color_penetration_layers,5,3,
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),top_surface_line_width,102.5%,0.82,(line widths compared in mm)
+0.40mm Strength @Snapmaker U1 (0.8 nozzle),wall_generator,arachne,classic,

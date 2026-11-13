@@ -1,0 +1,264 @@
+family,size,preset,key,standard_column,second_column_(high_flow)
+Generic ABS,0.4,Generic ABS,activate_air_filtration,0,1
+Generic ABS,0.4,Generic ABS,enable_pressure_advance,0,1
+Generic ABS,0.4,Generic ABS,fan_max_speed,80,60
+Generic ABS,0.4,Generic ABS,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic ABS,0.4,Generic ABS,filament_flow_support,standard,high_flow
+Generic ABS,0.4,Generic ABS,filament_max_volumetric_speed,15,19.8
+Generic ABS,0.4,Generic ABS,filament_multitool_ramming_flow,15,30
+Generic ABS,0.4,Generic ABS,filament_multitool_ramming_volume,0.5,5
+Generic ABS,0.4,Generic ABS,filament_retract_length_toolchange,10,5
+Generic ABS,0.4,Generic ABS,filament_retraction_length,nil,0.2
+Generic ABS,0.4,Generic ABS,filament_z_hop_types,nil,Slope Lift
+Generic ABS,0.4,Generic ABS,nozzle_temperature,270,280
+Generic ABS,0.4,Generic ABS,nozzle_temperature_initial_layer,270,280
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,activate_air_filtration,0,1
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,fan_max_speed,80,25
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_flow_ratio,0.95,0.94
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_max_volumetric_speed,13.5,19.8
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_multitool_ramming_flow,12,20
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_multitool_ramming_volume,0.5,10
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_retract_length_toolchange,10,5
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_retraction_length,nil,0.6
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,nozzle_temperature,260,280
+Generic ASA,0.4,Generic ASA @U1 0.4 nozzle,nozzle_temperature_initial_layer,260,280
+Generic PETG,0.4,Generic PETG,enable_pressure_advance,0,1
+Generic PETG,0.4,Generic PETG,fan_max_speed,90,60
+Generic PETG,0.4,Generic PETG,fan_min_speed,40,30
+Generic PETG,0.4,Generic PETG,filament_deretraction_speed,nil,40
+Generic PETG,0.4,Generic PETG,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PETG,0.4,Generic PETG,filament_flow_ratio,0.95,0.955
+Generic PETG,0.4,Generic PETG,filament_flow_support,standard,high_flow
+Generic PETG,0.4,Generic PETG,filament_long_retractions_when_cut,1,nil
+Generic PETG,0.4,Generic PETG,filament_max_volumetric_speed,13,19.5
+Generic PETG,0.4,Generic PETG,filament_minimal_purge_on_wipe_tower,15,50
+Generic PETG,0.4,Generic PETG,filament_multitool_ramming_flow,15,30
+Generic PETG,0.4,Generic PETG,filament_multitool_ramming_volume,0.5,8
+Generic PETG,0.4,Generic PETG,filament_retract_length_toolchange,10,8
+Generic PETG,0.4,Generic PETG,filament_retraction_distances_when_cut,18,nil
+Generic PETG,0.4,Generic PETG,filament_retraction_length,nil,0.8
+Generic PETG,0.4,Generic PETG,filament_retraction_speed,nil,40
+Generic PETG,0.4,Generic PETG,filament_wipe_distance,nil,1
+Generic PETG,0.4,Generic PETG,filament_z_hop_types,nil,Slope Lift
+Generic PETG,0.4,Generic PETG,nozzle_temperature,255,245
+Generic PETG,0.4,Generic PETG,nozzle_temperature_initial_layer,255,230
+Generic PETG,0.4,Generic PETG,pressure_advance,0.04,0.035
+Generic PETG HF,0.4,Generic PETG HF,enable_pressure_advance,0,1
+Generic PETG HF,0.4,Generic PETG HF,fan_max_speed,40,60
+Generic PETG HF,0.4,Generic PETG HF,fan_min_speed,20,30
+Generic PETG HF,0.4,Generic PETG HF,filament_deretraction_speed,nil,40
+Generic PETG HF,0.4,Generic PETG HF,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PETG HF,0.4,Generic PETG HF,filament_flow_ratio,0.95,0.955
+Generic PETG HF,0.4,Generic PETG HF,filament_flow_support,standard,high_flow
+Generic PETG HF,0.4,Generic PETG HF,filament_max_volumetric_speed,18,27
+Generic PETG HF,0.4,Generic PETG HF,filament_minimal_purge_on_wipe_tower,15,50
+Generic PETG HF,0.4,Generic PETG HF,filament_multitool_ramming_flow,20,30
+Generic PETG HF,0.4,Generic PETG HF,filament_multitool_ramming_volume,0.5,8
+Generic PETG HF,0.4,Generic PETG HF,filament_retract_length_toolchange,10,8
+Generic PETG HF,0.4,Generic PETG HF,filament_retraction_length,nil,0.8
+Generic PETG HF,0.4,Generic PETG HF,filament_retraction_speed,nil,40
+Generic PETG HF,0.4,Generic PETG HF,filament_wipe_distance,nil,1
+Generic PETG HF,0.4,Generic PETG HF,filament_z_hop_types,nil,Slope Lift
+Generic PETG HF,0.4,Generic PETG HF,nozzle_temperature,230,245
+Generic PETG HF,0.4,Generic PETG HF,pressure_advance,0.04,0.035
+Generic PETG-CF,0.4,Generic PETG-CF,additional_cooling_fan_speed,0,20
+Generic PETG-CF,0.4,Generic PETG-CF,enable_pressure_advance,0,1
+Generic PETG-CF,0.4,Generic PETG-CF,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PETG-CF,0.4,Generic PETG-CF,filament_flow_ratio,0.95,1.01
+Generic PETG-CF,0.4,Generic PETG-CF,filament_flow_support,standard,high_flow
+Generic PETG-CF,0.4,Generic PETG-CF,filament_max_volumetric_speed,11,16.2
+Generic PETG-CF,0.4,Generic PETG-CF,filament_minimal_purge_on_wipe_tower,15,30
+Generic PETG-CF,0.4,Generic PETG-CF,filament_retract_before_wipe,nil,5%
+Generic PETG-CF,0.4,Generic PETG-CF,filament_retract_length_toolchange,10,nil
+Generic PETG-CF,0.4,Generic PETG-CF,filament_retraction_length,nil,0.6
+Generic PETG-CF,0.4,Generic PETG-CF,nozzle_temperature,255,260
+Generic PETG-CF,0.4,Generic PETG-CF,nozzle_temperature_initial_layer,255,260
+Generic PETG-CF,0.4,Generic PETG-CF,pressure_advance,0.02,0.028
+Generic PLA,0.4,Generic PLA,enable_pressure_advance,0,1
+Generic PLA,0.4,Generic PLA,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PLA,0.4,Generic PLA,filament_flow_ratio,0.98,0.966
+Generic PLA,0.4,Generic PLA,filament_flow_support,standard,high_flow
+Generic PLA,0.4,Generic PLA,filament_max_volumetric_speed,18,36
+Generic PLA,0.4,Generic PLA,filament_multitool_ramming_flow,20,40
+Generic PLA,0.4,Generic PLA,filament_multitool_ramming_volume,0.5,5
+Generic PLA,0.4,Generic PLA,filament_retract_length_toolchange,10,5
+Generic PLA,0.4,Generic PLA,filament_retraction_length,nil,1.2
+Generic PLA,0.4,Generic PLA,filament_z_hop,nil,0.4
+Generic PLA,0.4,Generic PLA,filament_z_hop_types,nil,Slope Lift
+Generic PLA,0.4,Generic PLA,pressure_advance,0.02,0.024
+Generic PLA High Speed,0.4,Generic PLA High Speed,enable_pressure_advance,0,1
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_flow_ratio,0.98,0.966
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_flow_support,standard,high_flow
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_max_volumetric_speed,18,36
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_multitool_ramming_flow,25,40
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_retract_length_toolchange,10,5
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_retraction_length,nil,1.2
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_z_hop,nil,0.4
+Generic PLA High Speed,0.4,Generic PLA High Speed,filament_z_hop_types,nil,Slope Lift
+Generic PLA High Speed,0.4,Generic PLA High Speed,pressure_advance,0.02,0.024
+Generic PLA Silk,0.4,Generic PLA Silk,additional_cooling_fan_speed,70,80
+Generic PLA Silk,0.4,Generic PLA Silk,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PLA Silk,0.4,Generic PLA Silk,filament_flow_support,standard,high_flow
+Generic PLA Silk,0.4,Generic PLA Silk,filament_max_volumetric_speed,9,10.8
+Generic PLA Silk,0.4,Generic PLA Silk,filament_multitool_ramming_flow,10,25
+Generic PLA Silk,0.4,Generic PLA Silk,filament_multitool_ramming_volume,0.5,5
+Generic PLA Silk,0.4,Generic PLA Silk,filament_retract_length_toolchange,10,5
+Generic PLA Silk,0.4,Generic PLA Silk,filament_retraction_length,0.5,0.2
+Generic PLA Silk,0.4,Generic PLA Silk,filament_z_hop_types,nil,Slope Lift
+Generic PLA Silk,0.4,Generic PLA Silk,nozzle_temperature,220,230
+Generic PLA Silk,0.4,Generic PLA Silk,nozzle_temperature_initial_layer,220,230
+Generic PLA Silk,0.4,Generic PLA Silk,pressure_advance,0.02,0.015
+Generic PLA-CF,0.4,Generic PLA-CF,additional_cooling_fan_speed,0,100
+Generic PLA-CF,0.4,Generic PLA-CF,enable_pressure_advance,0,1
+Generic PLA-CF,0.4,Generic PLA-CF,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PLA-CF,0.4,Generic PLA-CF,filament_flow_ratio,0.95,0.98
+Generic PLA-CF,0.4,Generic PLA-CF,filament_flow_support,standard,high_flow
+Generic PLA-CF,0.4,Generic PLA-CF,filament_max_volumetric_speed,13.5,18
+Generic PLA-CF,0.4,Generic PLA-CF,filament_minimal_purge_on_wipe_tower,15,50
+Generic PLA-CF,0.4,Generic PLA-CF,filament_multitool_ramming_flow,20,30
+Generic PLA-CF,0.4,Generic PLA-CF,filament_multitool_ramming_volume,0.5,5
+Generic PLA-CF,0.4,Generic PLA-CF,filament_retract_length_toolchange,10,15
+Generic PLA-CF,0.4,Generic PLA-CF,filament_retraction_length,nil,0.8
+Generic PLA-CF,0.4,Generic PLA-CF,filament_z_hop,nil,0.4
+Generic PLA-CF,0.4,Generic PLA-CF,filament_z_hop_types,nil,Slope Lift
+Generic PLA-CF,0.4,Generic PLA-CF,nozzle_temperature,220,230
+Generic PLA-CF,0.4,Generic PLA-CF,nozzle_temperature_initial_layer,220,230
+Generic PVA,0.4,Generic PVA,enable_pressure_advance,0,1
+Generic PVA,0.4,Generic PVA,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic PVA,0.4,Generic PVA,filament_flow_ratio,0.95,0.97
+Generic PVA,0.4,Generic PVA,filament_flow_support,standard,high_flow
+Generic PVA,0.4,Generic PVA,filament_minimal_purge_on_wipe_tower,15,20
+Generic PVA,0.4,Generic PVA,filament_multitool_ramming_flow,6,10
+Generic PVA,0.4,Generic PVA,filament_retract_length_toolchange,3,4
+Generic PVA,0.4,Generic PVA,filament_retraction_length,nil,0.6
+Generic PVA,0.4,Generic PVA,filament_z_hop_types,nil,Slope Lift
+Generic PVA,0.4,Generic PVA,pressure_advance,0.028,0.03
+Generic Support For PLA,0.4,Generic Support For PLA,enable_pressure_advance,0,1
+Generic Support For PLA,0.4,Generic Support For PLA,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Generic Support For PLA,0.4,Generic Support For PLA,filament_flow_ratio,1,0.95
+Generic Support For PLA,0.4,Generic Support For PLA,filament_flow_support,standard,high_flow
+Generic Support For PLA,0.4,Generic Support For PLA,filament_max_volumetric_speed,12,16.2
+Generic Support For PLA,0.4,Generic Support For PLA,filament_minimal_purge_on_wipe_tower,15,20
+Generic Support For PLA,0.4,Generic Support For PLA,filament_multitool_ramming_flow,15,20
+Generic Support For PLA,0.4,Generic Support For PLA,filament_retract_length_toolchange,10,5
+Generic Support For PLA,0.4,Generic Support For PLA,filament_retraction_length,nil,1
+Generic Support For PLA,0.4,Generic Support For PLA,nozzle_temperature,230,210
+Generic Support For PLA,0.4,Generic Support For PLA,nozzle_temperature_initial_layer,230,210
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,fan_max_speed,50,60
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_max_volumetric_speed,15,22
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_minimal_purge_on_wipe_tower,30,15
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_multitool_ramming_flow,20,30
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_multitool_ramming_volume,10,5
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,filament_retraction_length,0.4,0.2
+Snapmaker ABS,0.4,Snapmaker ABS @U1 0.4 nozzle,nozzle_temperature,265,280
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,fan_max_speed,30,25
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_flow_ratio,0.95,0.94
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_max_volumetric_speed,15,22
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_minimal_purge_on_wipe_tower,50,15
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,filament_retraction_length,0.2,0.6
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,nozzle_temperature,270,280
+Snapmaker ASA,0.4,Snapmaker ASA @U1 0.4 nozzle,nozzle_temperature_initial_layer,270,280
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,additional_cooling_fan_speed,10,0
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,enable_pressure_advance,0,1
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,fan_max_speed,40,60
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,fan_min_speed,20,30
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_deretraction_speed,nil,40
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_flow_ratio,0.95,0.955
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_flow_support,standard,high_flow
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_max_volumetric_speed,20,30
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_multitool_ramming_flow,20,30
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_multitool_ramming_volume,5,8
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_retract_length_toolchange,5,8
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_retraction_length,nil,0.8
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_retraction_speed,nil,40
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_wipe_distance,nil,1
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,filament_z_hop_types,nil,Slope Lift
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,nozzle_temperature_initial_layer,245,230
+Snapmaker PETG HF,0.4,Snapmaker PETG HF,pressure_advance,0.02,0.035
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PETG Translucent,0.4,Snapmaker PETG Translucent @U1 0.4 nozzle,pressure_advance,0.04,0.05
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,additional_cooling_fan_speed,0,20
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_flow_ratio,0.95,1.01
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_max_volumetric_speed,12,18
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_multitool_ramming_flow,10,13
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_multitool_ramming_volume,5,0.5
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,filament_retraction_length,nil,0.6
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,nozzle_temperature,255,260
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,nozzle_temperature_initial_layer,255,260
+Snapmaker PETG-CF,0.4,Snapmaker PETG-CF @U1 0.4 nozzle,pressure_advance,0.02,0.028
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,enable_pressure_advance,0,1
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_retract_length_toolchange,10,5
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_retraction_length,nil,0.5
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA Full Spectrum,0.4,Snapmaker PLA Full Spectrum @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,additional_cooling_fan_speed,80,100
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_flow_ratio,0.97,0.98
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,filament_max_volumetric_speed,16,18
+Snapmaker PLA Glow,0.4,Snapmaker PLA Glow @U1 0.4 nozzle,pressure_advance,0.02,0.023
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,additional_cooling_fan_speed,80,100
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,enable_pressure_advance,0,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_flow_ratio,1,0.99
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_flow_support,standard,high_flow
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_max_volumetric_speed,22,40
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_retraction_length,nil,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_wipe_distance,nil,1
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,nozzle_temperature,215,220
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,nozzle_temperature_initial_layer,215,220
+Snapmaker PLA Matte,0.4,Snapmaker PLA Matte @U1,pressure_advance,0.02,0.024
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1,additional_cooling_fan_speed,70,80
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1,filament_flow_support,standard,high_flow
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1,filament_max_volumetric_speed,10,12
+Snapmaker PLA Silk,0.4,Snapmaker PLA Silk @U1,filament_z_hop_types,nil,Slope Lift
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,enable_pressure_advance,0,1
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,filament_flow_support,standard,high_flow
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,filament_max_volumetric_speed,20,40
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,filament_multitool_ramming_flow,30,40
+Snapmaker PLA SnapSpeed,0.4,Snapmaker PLA SnapSpeed @U1,pressure_advance,0.02,0.024
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Translucent,0.4,Snapmaker PLA Translucent @U1 0.4 nozzle,pressure_advance,0.02,0.024
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_max_volumetric_speed,18,20
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_retract_length_toolchange,5,6
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,filament_z_hop_types,nil,Auto Lift
+Snapmaker PLA Wood,0.4,Snapmaker PLA Wood @U1 0.4 nozzle,pressure_advance,0.025,0.024
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,additional_cooling_fan_speed,0,100
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_max_volumetric_speed,15,20
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_multitool_ramming_flow,20,30
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_retract_length_toolchange,5,15
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,filament_retraction_length,1,0.8
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,nozzle_temperature,240,230
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,nozzle_temperature_initial_layer,240,230
+Snapmaker PLA-CF,0.4,Snapmaker PLA-CF @U1 0.4 nozzle,pressure_advance,0.01,0.02
+Snapmaker PVA,0.4,Snapmaker PVA @U1,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker PVA,0.4,Snapmaker PVA @U1,filament_flow_ratio,1,0.97
+Snapmaker PVA,0.4,Snapmaker PVA @U1,filament_flow_support,standard,high_flow
+Snapmaker PVA,0.4,Snapmaker PVA @U1,filament_max_volumetric_speed,5,6
+Snapmaker PVA,0.4,Snapmaker PVA @U1,filament_retraction_length,0.4,0.6
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_extruder_variant,Direct Drive Standard,Direct Drive High Flow
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_flow_ratio,1,0.95
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_flow_support,standard,high_flow
+Snapmaker Support For PLA,0.4,Snapmaker Support For PLA @U1 0.4 nozzle,filament_max_volumetric_speed,12,18
