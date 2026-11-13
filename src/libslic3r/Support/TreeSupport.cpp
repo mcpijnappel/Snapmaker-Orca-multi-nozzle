@@ -3736,7 +3736,7 @@ std::vector<LayerHeightData> TreeSupport::plan_layer_heights()
         coordf_t       max_layer_height = std::max({m_slicing_params.max_suport_layer_height, m_object->config().layer_height.value / height_step, min_layer_height});
         const size_t   n = m_object->layer_count();
         // Snapmaker Orca Max ("preferred" step): pieces of the support nozzle's preferred height,
-        // starting on the rungs of the parts' ladder (rows first_combined_layer_idx + k * pitch).
+        // starting on the rungs of the parts' ladder (PrintObject::ladder_rows_below()).
         const size_t   pitch = m_support_params.support_pitch;
         if (pitch > 1)
             max_layer_height = std::min(max_layer_height, double(pitch) * m_object->config().layer_height.value + EPSILON);
@@ -3773,8 +3773,9 @@ std::vector<LayerHeightData> TreeSupport::plan_layer_heights()
         std::vector<coordf_t> forced_close_zs; // exact support tops between object layers
         std::vector<coordf_t> layer_subs;
         if (pitch > 1)
-            for (size_t row = PrintObject::first_combined_layer_idx + pitch; row < n; row += pitch)
-                boundary[row] = 1;
+            for (size_t row = PrintObject::first_combined_layer_idx + 1; row < n; ++ row)
+                if (m_object->ladder_rows_below(row) % pitch == 0)
+                    boundary[row] = 1;
         // With maximum height priority the pieces run through the contact layers: each contact
         // is re-assigned to the nearest planned layer (see the redistribution at the end) and its
         // gap becomes a whole number of support layers - within half a layer of the configured

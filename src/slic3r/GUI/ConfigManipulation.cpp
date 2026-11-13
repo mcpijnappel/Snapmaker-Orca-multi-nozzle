@@ -12,6 +12,7 @@
 #include "libslic3r/Slicing.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/PerHeadProcess.hpp"
 #include "libslic3r/FilamentFlowColumns.hpp"
 #include "libslic3r/MaterialType.hpp"
 #include "MsgDialog.hpp"
@@ -411,13 +412,34 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         is_msg_dlg_already_exist = false;
     }
 
-    // Snapmaker Orca Max: with a multi-nozzle strategy the layer height is the strategy's grid.
+    // Snapmaker Orca Max: with a multi-nozzle strategy the layer height is the strategy's grid, and the first
+    // layer is the bed row: the first layer of the finest tool head on the printer (every head lays its own
+    // first layer from the bed, Slicing.hpp effective_extruder_layer_heights()).
     if (config->has("multi_nozzle_layer_heights")) {
         const double grid = multi_nozzle_strategy_grid(config->option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights")->value);
         if (grid > EPSILON && std::abs(config->opt_float("layer_height") - grid) > EPSILON) {
             DynamicPrintConfig new_conf = *config;
             new_conf.set_key_value("layer_height", new ConfigOptionFloat(grid));
             apply(config, &new_conf);
+        }
+        if (PresetBundle *bundle = wxGetApp().preset_bundle; grid > EPSILON && bundle != nullptr && config->has("initial_layer_print_height")) {
+            const DynamicPrintConfig &printer = bundle->printers.get_edited_preset().config;
+            DynamicPrintConfig        inputs;
+            for (const char *key : { "nozzle_diameter", "min_layer_height", "max_layer_height" })
+                if (const ConfigOption *option = printer.option(key); option != nullptr)
+                    inputs.set_key_value(key, option->clone());
+            for (const char *key : { "layer_height", "multi_nozzle_layer_heights" })
+                inputs.set_key_value(key, config->option(key)->clone());
+            // A height chosen for a tool head (the per-extruder picker) is its height.
+            const std::vector<double> chosen = PerHeadProcess::chosen_layer_heights(*bundle, PerHeadProcess::head_sources(*bundle));
+            if (std::any_of(chosen.begin(), chosen.end(), [](double height) { return height > 0.; }))
+                inputs.set_key_value("extruder_layer_height", new ConfigOptionFloats(chosen));
+            const double bed_row = effective_extruder_layer_heights(inputs).bed_row;
+            if (bed_row > EPSILON && std::abs(config->opt_float("initial_layer_print_height") - bed_row) > EPSILON) {
+                DynamicPrintConfig new_conf = *config;
+                new_conf.set_key_value("initial_layer_print_height", new ConfigOptionFloat(bed_row));
+                apply(config, &new_conf);
+            }
         }
     }
 

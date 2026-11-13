@@ -415,7 +415,8 @@ private:
     std::string generate_object_brim(const Print &print,
         const PrintObject &object,
         size_t instance_id,
-        bool first_layer);
+        bool first_layer,
+        double print_z);
 
     LayerResult process_layer(
         const Print                     &print,
@@ -778,6 +779,13 @@ private:
     bool                                m_brim_done;
     // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
     bool                                m_second_layer_things_done;
+    // Snapmaker Orca Max: per-head first layers, the top (print_z) of each head's first layer by 0-based
+    // filament (a head of this printer); empty without them. Heads past it got their normal temperature,
+    // and the bed once every head was.
+    std::vector<double>                 m_head_first_layer_top;
+    std::vector<char>                   m_head_temperature_done;
+    bool                                m_bed_temperature_done = false;
+    std::string leave_first_layer_temperatures(const Print &print, double print_z, unsigned int first_extruder_id);
     // Index of a last object copy extruded.
     std::pair<const PrintObject*, Point> m_last_obj_copy;
 
@@ -835,6 +843,14 @@ private:
     // On the first printing layer. This flag triggers first layer speeds.
     //BBS
     bool    on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0 && abs(m_layer->bottom_z()) < EPSILON; }
+    // Snapmaker Orca Max: per-head first layers (PrintObject::per_head_first_layers()). Is 0-based filament
+    // `filament` (its head) at `print_z` still on its first layer? A head lays its first layer as one run from
+    // the bed, topping above the first print layer.
+    bool    filament_first_layer_at(unsigned int filament, double print_z) const;
+    // The first print layer, or the current layer for that filament's head.
+    bool    filament_on_first_layer(unsigned int filament) const;
+    // The same for the filament printing now: first layer speeds, accelerations, flow and patterns.
+    bool    on_head_first_layer() const;
     int layer_id() const {
         if (m_layer == nullptr)
             return -1;

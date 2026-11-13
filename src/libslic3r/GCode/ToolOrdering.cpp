@@ -910,12 +910,73 @@ static void apply_first_layer_order(const DynamicPrintConfig* config, std::vecto
     }
 }
 
+// Snapmaker Orca Max: the nozzle a 1-based filament prints through (its tool head; a mixed-colour slot
+// through its finest component).
+static double filament_nozzle_of(const PrintConfig &config, const MixedFilamentManager *mixed_mgr, unsigned int filament_1based)
+{
+    const size_t num_heads = config.nozzle_diameter.values.size();
+    if (filament_1based >= 1 && filament_1based <= num_heads)
+        return config.nozzle_diameter.get_at(filament_1based - 1);
+    if (mixed_mgr != nullptr)
+        if (const MixedFilament *mixed = mixed_mgr->mixed_filament_from_id(filament_1based, config.filament_diameter.values.size())) {
+            double finest = 0.;
+            for (const unsigned int component : { mixed->component_a, mixed->component_b })
+                if (component >= 1 && component <= num_heads) {
+                    const double nozzle = config.nozzle_diameter.get_at(component - 1);
+                    finest = finest <= 0. ? nozzle : std::min(finest, nozzle);
+                }
+            if (finest > 0.)
+                return finest;
+        }
+    return config.nozzle_diameter.get_at(0);
+}
+
+// Snapmaker Orca Max: do the filaments printing these objects' first layers go through nozzles of different
+// sizes? The finest nozzle then prints first on the first layer, and each filament's islands are measured
+// against its own head's line width.
+static bool first_layer_nozzles_mixed(const PrintConfig &config, const MixedFilamentManager *mixed_mgr, const std::vector<const PrintObject*> &objects)
+{
+    double first = 0.;
+    for (const PrintObject *object : objects) {
+        if (object->layers().empty())
+            continue;
+        for (const LayerRegion *layerm : object->layers().front()->regions()) {
+            if (layerm->raw_slices.empty())
+                continue;
+            const double nozzle = filament_nozzle_of(config, mixed_mgr, (unsigned int)layerm->region().config().option("outer_wall_filament_id")->getInt());
+            if (first <= 0.)
+                first = nozzle;
+            else if (std::abs(nozzle - first) > EPSILON)
+                return true;
+        }
+    }
+    return false;
+}
+
+// Snapmaker Orca Max: with mixed nozzle sizes the finest nozzle prints first on the first layer; the island
+// order stays between heads of one size. A custom first layer sequence is applied after this and wins.
+static void finest_nozzle_first(const PrintConfig &config, const MixedFilamentManager *mixed_mgr, std::vector<unsigned int> &tool_order)
+{
+    std::stable_sort(tool_order.begin(), tool_order.end(), [&](unsigned int lhs, unsigned int rhs) {
+        return filament_nozzle_of(config, mixed_mgr, lhs) < filament_nozzle_of(config, mixed_mgr, rhs) - EPSILON;
+    });
+}
+
 // BBS
 std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Print& print)
 {
     std::vector<unsigned int> tool_order;
     int initial_extruder_id = -1;
     std::map<int, double> min_areas_per_extruder;
+    const PrintConfig &print_config  = print.config();
+    const bool         mixed_nozzles = first_layer_nozzles_mixed(print_config, m_mixed_mgr, { print.objects().begin(), print.objects().end() });
+    // Too thin to print on the first layer: narrower than the head's own first layer width with mixed sizes,
+    // else the stock reads (the first head, column 0).
+    auto initial_width = [&](int filament_1based) {
+        const unsigned int filament = (unsigned int)std::max(1, filament_1based);
+        const size_t       column   = print.width_slot(filament);
+        return print.config().get_abs_value_at("initial_layer_line_width", column, filament_nozzle_of(print.config(), m_mixed_mgr, filament));
+    };
 
     for (auto object : print.objects()) {
         const Layer* target_layer = nullptr;
@@ -924,7 +985,9 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
                 for(auto& expoly : layerm->raw_slices){
                     // Snapmaker Orca: the width is a column per tool head; the first column's number,
                     // as the scalar read (a percent read as a number, the pre-existing quirk).
-                    if (!offset_ex(expoly, -0.2 * scale_(Flow::width_at(print.config().initial_layer_line_width, 0).value)).empty()) {
+                    const double width = mixed_nozzles ? initial_width(layerm->region().config().option("outer_wall_filament_id")->getInt()) :
+                                                         Flow::width_at(print.config().initial_layer_line_width, 0).value;
+                    if (!offset_ex(expoly, -0.2 * scale_(width)).empty()) {
                         target_layer = layer;
                         break;
                     }
@@ -944,7 +1007,8 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
 
             for (auto expoly : layerm->raw_slices) {
                 const double nozzle_diameter = print.config().nozzle_diameter.get_at(0);
-                const coordf_t initial_layer_line_width = print.config().get_abs_value_at("initial_layer_line_width", 0, nozzle_diameter);
+                const coordf_t initial_layer_line_width = mixed_nozzles ? initial_width(extruder_id) :
+                                                                          print.config().get_abs_value_at("initial_layer_line_width", 0, nozzle_diameter);
 
                 if (offset_ex(expoly, -0.2 * scale_(initial_layer_line_width)).empty())
                     continue;
@@ -974,6 +1038,8 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
         tool_order.insert(iter, ape.first);
     }
 
+    if (mixed_nozzles)
+        finest_nozzle_first(print_config, m_mixed_mgr, tool_order);
     apply_first_layer_order(m_print_full_config, tool_order);
 
     return tool_order;
@@ -984,13 +1050,23 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
     std::vector<unsigned int> tool_order;
     int initial_extruder_id = -1;
     std::map<int, double> min_areas_per_extruder;
+    const PrintConfig &print_config  = object.print()->config();
+    const bool         mixed_nozzles = first_layer_nozzles_mixed(print_config, m_mixed_mgr, { &object });
+    // Too thin to print: narrower than the head's own line width with mixed sizes, else the stock reads.
+    auto own_width = [&](int filament_1based) {
+        const unsigned int filament = (unsigned int)std::max(1, filament_1based);
+        const size_t       column   = object.print()->width_slot(filament);
+        return object.config().get_abs_value_at("line_width", column, filament_nozzle_of(print_config, m_mixed_mgr, filament));
+    };
     const Layer* target_layer = nullptr;
     for(auto layer : object.layers()){
         for(auto layerm : layer->regions()){
             for(auto& expoly : layerm->raw_slices){
                 // Snapmaker Orca: the width is a column per tool head; the first column's number, as
                 // the scalar read (a percent read as a number, the pre-existing quirk).
-                if (!offset_ex(expoly, -0.2 * scale_(Flow::width_at(object.config().line_width, 0).value)).empty()) {
+                const double width = mixed_nozzles ? own_width(layerm->region().config().option("outer_wall_filament_id")->getInt()) :
+                                                     Flow::width_at(object.config().line_width, 0).value;
+                if (!offset_ex(expoly, -0.2 * scale_(width)).empty()) {
                     target_layer = layer;
                     break;
                 }
@@ -1009,7 +1085,7 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
         int extruder_id = layerm->region().config().option("outer_wall_filament_id")->getInt();
         for (auto expoly : layerm->raw_slices) {
             const double nozzle_diameter = object.print()->config().nozzle_diameter.get_at(0);
-            const coordf_t line_width = object.config().get_abs_value_at("line_width", 0, nozzle_diameter);
+            const coordf_t line_width = mixed_nozzles ? own_width(extruder_id) : object.config().get_abs_value_at("line_width", 0, nozzle_diameter);
 
             if (offset_ex(expoly, -0.2 * scale_(line_width)).empty())
                 continue;
@@ -1038,6 +1114,8 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
         tool_order.insert(iter, ape.first);
     }
 
+    if (mixed_nozzles)
+        finest_nozzle_first(print_config, m_mixed_mgr, tool_order);
     apply_first_layer_order(m_print_full_config, tool_order);
 
     return tool_order;
@@ -1164,6 +1242,8 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
                 layer_tools.has_run_top = true;
             // Snapmaker Orca Max: the filaments this region adds print the object (1 based, 0 = don't care).
             const size_t region_snapshot = layer_tools.extruders.size();
+            // The region's walls stand on the bed here: the first layer, or a run from the bed (per-head first layers).
+            const bool walls_on_bed = layerCount == 0 || layerm->first_layer_flow(frExternalPerimeter);
 
             if (! layerm->perimeters.entities.empty()) {
                 bool something_nonoverriddable = true;
@@ -1195,7 +1275,7 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
                                     layer_tools.preserve_extruder_order = true;
                                 for (unsigned int extruder_id : ordered) {
                                     layer_tools.extruders.emplace_back(extruder_id);
-                                    if (first_layer_candidate && layerCount == 0 &&
+                                    if (first_layer_candidate && walls_on_bed &&
                                         std::find(firstLayerExtruders.begin(), firstLayerExtruders.end(), int(extruder_id)) == firstLayerExtruders.end())
                                         firstLayerExtruders.emplace_back(int(extruder_id));
                                 }
@@ -1203,7 +1283,8 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
                             }
                         }
                         layer_tools.extruders.emplace_back(wall_ext);
-                        if (first_layer_candidate && layerCount == 0)
+                        if (first_layer_candidate && walls_on_bed &&
+                            std::find(firstLayerExtruders.begin(), firstLayerExtruders.end(), int(wall_ext)) == firstLayerExtruders.end())
                             firstLayerExtruders.emplace_back(wall_ext);
                     };
                     emplace_wall_filament((extruder_override == 0) ? region.config().outer_wall_filament_id.value : extruder_override, true);

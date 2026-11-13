@@ -104,13 +104,13 @@ Flow LayerRegion::flow(FlowRole role) const
 
 Flow LayerRegion::flow(FlowRole role, double layer_height) const
 {
-    return this->flow(role, layer_height, m_layer->id() == 0);
+    return this->flow(role, layer_height, this->first_layer_flow(role));
 }
 
 // filament_id: 1-based filament actually printing this flow when it differs from the role's default mapping (e.g. top/bottom surface fills, external bridges), 0 to resolve from the role.
 Flow LayerRegion::flow(FlowRole role, double layer_height, unsigned int filament_id) const
 {
-    return this->flow(role, layer_height, m_layer->id() == 0, filament_id);
+    return this->flow(role, layer_height, this->first_layer_flow(role), filament_id);
 }
 
 Flow LayerRegion::flow(FlowRole role, double layer_height, bool use_initial_layer_width, unsigned int filament_id) const
@@ -293,7 +293,9 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, const LayerRe
             g.upper_slices_same_region = &this->layer()->upper_layer->get_region(region_id)->slices;
         }
 
-        g.layer_id              = (int)this->layer()->id();
+        // Snapmaker Orca Max: walls of a run from the bed (per-head first layers) are the head's first layer:
+        // generated as the first layer (no overhangs over the bed, first layer wall rules).
+        g.layer_id              = this->first_layer_flow(frPerimeter) ? 0 : (int)this->layer()->id();
         g.ext_perimeter_flow    = this->flow(frExternalPerimeter, height);
         g.overhang_flow         = this->bridging_flow(frPerimeter, object_config.thick_bridges, 0, height);
         // Overhangs of external / fully overhanging loops dispatch to the outer wall filament (GCode::process_layer() splits mixed perimeters); resolve their width against its nozzle.

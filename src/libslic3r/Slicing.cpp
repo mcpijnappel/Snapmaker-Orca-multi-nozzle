@@ -1114,6 +1114,35 @@ double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, 
     return stepped_nozzle_layer_height(multi_nozzle_strategy_fraction(strategy) * nozzle, 0, grid, nozzle, min_lh, max_lh);
 }
 
+int multi_nozzle_first_layer_factor(int strategy)
+{
+    const double fraction = multi_nozzle_strategy_fraction(strategy);
+    return fraction <= 0. ? 1 : std::max(1, int(std::ceil(0.4 / fraction - 1e-9)));
+}
+
+double multi_nozzle_first_layer_height(int strategy, double height, double nozzle, double max_lh)
+{
+    if (height <= EPSILON)
+        return height;
+    double top = nozzle > EPSILON ? nozzle : std::numeric_limits<double>::max();
+    if (max_lh > EPSILON)
+        top = std::min(top, max_lh);
+    int factor = multi_nozzle_first_layer_factor(strategy);
+    while (factor > 1 && factor * height > top + EPSILON)
+        -- factor;
+    return std::round(factor * height * 1e6) / 1e6;
+}
+
+std::vector<double> multi_nozzle_first_layer_tops(const PrintConfig &config)
+{
+    std::vector<double> tops;
+    const int strategy = int(config.multi_nozzle_layer_heights.value);
+    for (size_t head = 0; head < config.nozzle_diameter.values.size(); ++ head)
+        tops.push_back(multi_nozzle_first_layer_height(strategy, config.extruder_layer_height.get_at(head),
+                                                       config.nozzle_diameter.get_at(head), config.max_layer_height.get_at(head)));
+    return tops;
+}
+
 double conforming_object_layer_height(const std::vector<double> &heights, double base, bool include_base, double max_height)
 {
     auto quanta = [](double height) { return std::lround(height / 0.005); };
@@ -1212,6 +1241,13 @@ ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfi
             chosen <= nozzles[j] + EPSILON && chosen >= value_at(min_lh, j) - EPSILON && (max_j <= EPSILON || chosen <= max_j + EPSILON))
             effective.heights[j] = chosen;
     }
+    // Every head prints its first layer as one run from the bed; the finest one's is the bed row.
+    effective.first_layers.assign(nozzles.size(), 0.);
+    for (size_t j = 0; j < nozzles.size(); ++ j) {
+        effective.first_layers[j] = multi_nozzle_first_layer_height(strategy, effective.heights[j], nozzles[j], value_at(max_lh, j));
+        if (effective.first_layers[j] > EPSILON && (effective.bed_row <= 0. || effective.first_layers[j] < effective.bed_row))
+            effective.bed_row = effective.first_layers[j];
+    }
     return effective;
 }
 
@@ -1243,6 +1279,12 @@ bool apply_extruder_layer_height_plan(DynamicPrintConfig &config)
     if (effective.heights != stored) {
         config.set_key_value("extruder_layer_height", new ConfigOptionFloats(effective.heights));
         changed = true;
+    }
+    // Snapmaker Orca Max: the first layer is the bed row under a strategy (as the GUI shows it).
+    if (auto *first = config.option<ConfigOptionFloat>("initial_layer_print_height"); first != nullptr && effective.bed_row > EPSILON &&
+                                                                                       std::abs(first->value - effective.bed_row) > 1e-9) {
+        first->value = effective.bed_row;
+        changed      = true;
     }
     return changed;
 }

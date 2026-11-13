@@ -4317,8 +4317,13 @@ void TabPrint::update_speed_source_picker()
             format_wxstr(_L("outer wall %1%, sparse %2%, accel %3%"), preset_value_for_head(*values_from, size_t(head), flow, "outer_wall_speed", printer),
                          preset_value_for_head(*values_from, size_t(head), flow, "sparse_infill_speed", printer),
                          preset_value_for_head(*values_from, size_t(head), flow, "default_acceleration", printer));
-        // TRN The line under the per-extruder picker. %1% a layer height in mm, %2% the values the extruder prints with
-        m_speed_source_note->SetText(format_wxstr(_L("%1% mm layers \u00b7 %2%"), from_u8(float_to_string_decimal_point(printing, 2)), values));
+        // Snapmaker Orca Max: the head's first layer, one run from the bed (multi_nozzle_first_layer_height()).
+        const auto  *max_heights = printer.option<ConfigOptionFloats>("max_layer_height");
+        const double first_layer = multi_nozzle_first_layer_height(int(strategy_opt->value), printing, nozzle,
+                                                                   max_heights == nullptr || max_heights->values.empty() ? 0. : max_heights->get_at(size_t(head)));
+        // TRN The line under the per-extruder picker. %1% a layer height in mm, %2% the height of the extruder's first layer in mm, %3% the values the extruder prints with
+        m_speed_source_note->SetText(format_wxstr(_L("%1% mm layers, first layer %2% mm \u00b7 %3%"), from_u8(float_to_string_decimal_point(printing, 2)),
+                                                  from_u8(float_to_string_decimal_point(first_layer, 2)), values));
     }
     // The closed text of an item the list holds under another name: the automatic and the disabled entries carry their own.
     m_speed_source_combo->SetLabel(m_speed_source_combo->GetString(unsigned(selection)));

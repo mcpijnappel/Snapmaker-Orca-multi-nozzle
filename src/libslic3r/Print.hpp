@@ -523,6 +523,26 @@ public:
     // printed layer keeps its own height for bed adhesion, runs may start at this one, and every
     // region's run boundaries lie at multiples of its pitch above it.
     static constexpr size_t first_combined_layer_idx = 1;
+    // Snapmaker Orca Max: per-head first layers. Under a multi-nozzle strategy with no raft in the print,
+    // every head prints its first layer as one run from the bed (its own layer height, see
+    // multi_nozzle_first_layer_height()): the first layer is the bed row (the finest head's first
+    // layer), runs may start on it, and the ladder counts from the bed instead of from the top of the
+    // first layer. Grid rows the bed row spans; 0 without per-head first layers (stock ladder).
+    size_t       ladder_base() const;
+    bool         per_head_first_layers() const { return this->ladder_base() > 0; }
+    // The first layer index a run may start on: 0 with per-head first layers, else first_combined_layer_idx.
+    size_t       first_run_layer_idx() const { return this->per_head_first_layers() ? 0 : first_combined_layer_idx; }
+    // Grid rows between the bed (per-head first layers) or the top of the first layer and the bottom
+    // of layer `idx` (idx >= first_run_layer_idx()).
+    size_t       ladder_rows_below(size_t idx) const { return idx == 0 ? 0 : this->ladder_base() + idx - 1; }
+    // Layers from `idx` up to and including the next run top of `pitch`: 1..pitch above the bed row,
+    // the first run's layers (first_run_layers()) on it.
+    size_t       layers_to_rung(size_t idx, size_t pitch) const;
+    // Does layer `idx` end on a rung of `pitch` (a run top of that pitch)?
+    bool         ends_on_rung(size_t idx, size_t pitch) const { return pitch <= 1 || (this->ladder_rows_below(idx) + (idx == 0 ? this->ladder_base() : 1)) % pitch == 0; }
+    // Layers of a first run of `pitch` from the bed: up to the head's first layer (the strategy's
+    // first-layer factor times the pitch, fewer pitches above `max_height` mm), at least the bed row.
+    size_t       first_run_layers(size_t pitch, double max_height = 0.) const;
     // Preferred layer height (mm) of the extruder printing the given 1-based filament id; 0 when unset or not reliably resolvable.
     // With `region`, its nozzle_layer_height_steps apply (whole grid steps within the nozzle's limits).
     double       extruder_preferred_layer_height(unsigned int filament_id, const PrintRegionConfig *region = nullptr) const;
@@ -603,6 +623,10 @@ public:
 
     // BBS: returns 1-based indices of extruders used to print the first layer wall of objects
     std::vector<int>            object_first_layer_wall_extruders;
+    // The 1-based filament printing the object's brim (0 = unknown): the first of
+    // object_first_layer_wall_extruders; with per-head first layers the one with the largest nozzle, whose
+    // head prints the brim with its own first layer (the thickest, see per_head_first_layers()).
+    int                         brim_filament() const;
 
     // SoftFever
     size_t get_id() const { return m_id; }

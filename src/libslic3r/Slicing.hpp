@@ -216,6 +216,11 @@ struct ExtruderLayerHeightPlan
 {
     double              grid = 0.;             // object layer height (0 = nothing to derive)
     std::vector<double> heights;               // per-extruder heights (0 = the object layer height)
+    // Snapmaker Orca Max, under a strategy only (else empty / 0): each head's first layer, printed as
+    // one run from the bed (multi_nozzle_first_layer_height()), and the bed row: the first layer of
+    // the finest head, the height of the object's first layer.
+    std::vector<double> first_layers;
+    double              bed_row = 0.;
 };
 
 // Snapmaker Orca Max: multi-nozzle layer height strategies (MultiNozzleLayerHeights, as int).
@@ -228,6 +233,17 @@ double multi_nozzle_strategy_grid(int strategy);
 double stepped_nozzle_layer_height(double height, int steps, double grid, double nozzle, double min_lh, double max_lh);
 // The strategy's height for a nozzle: its share of the diameter on the grid, within the limits.
 double multi_nozzle_strategy_height(int strategy, double nozzle, double min_lh, double max_lh);
+// Snapmaker Orca Max: how many of a head's own layer heights its first layer spans under `strategy`:
+// 2 where one is below 40% of the nozzle (Ultra fine), else 1. Snapmaker lays first layers at about
+// half the nozzle; a quarter is too thin to grip the bed.
+int multi_nozzle_first_layer_factor(int strategy);
+// A head's first layer under a strategy: its layer height `height` times the factor, down to fewer of
+// its heights where that exceeds the nozzle's max layer height (max_lh <= 0: no max) or bore.
+double multi_nozzle_first_layer_height(int strategy, double height, double nozzle, double max_lh);
+// Snapmaker Orca Max: the top of each head's first layer under per-head first layers
+// (PrintObject::per_head_first_layers()) from a print config whose per-extruder heights are planned; one
+// entry per nozzle.
+std::vector<double> multi_nozzle_first_layer_tops(const PrintConfig &config);
 // The layer height a part on extruder `extruder_idx` prints with `steps` grid steps, from a full
 // config; 0 when the extruder prints the object layer height (Off).
 double nozzle_layer_height_for(const DynamicPrintConfig &full_config, size_t extruder_idx, int steps);
@@ -252,7 +268,8 @@ extern const char *const extruder_layer_height_planned_key;
 // prints the extruder_layer_height it holds.
 ExtruderLayerHeightPlan effective_extruder_layer_heights(const DynamicPrintConfig &config);
 
-// Writes the effective grid and heights into `config` and sets the marker under a strategy (and under
+// Writes the effective grid and heights into `config` (under a strategy also the bed row into
+// initial_layer_print_height) and sets the marker under a strategy (and under
 // Off when stale heights are present, which it clears). Idempotent. Returns true when layer_height or
 // extruder_layer_height changed.
 bool apply_extruder_layer_height_plan(DynamicPrintConfig &config);

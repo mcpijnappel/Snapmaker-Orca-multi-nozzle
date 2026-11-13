@@ -126,6 +126,10 @@ public:
     // Layer right below the covered group; replaces Layer::lower_layer for overhang / bridge
     // detection of combined regions. May be nullptr.
     const Layer* combined_lower_layer() const;
+    // Snapmaker Orca Max: does this region's `role` extrusion stand on the bed here: the first print layer,
+    // or a run from it (per-head first layers, PrintObject::ladder_base())? It then prints with the
+    // first-layer line width.
+    bool    first_layer_flow(FlowRole role) const;
     // Shape of this layer that its combined group does not print; classifies exposed step faces.
     const ExPolygons& combined_away_exposed() const { return m_combined_away_exposed; }
     const ExPolygons& void_fill() const { return m_void_fill; }

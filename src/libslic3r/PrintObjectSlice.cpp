@@ -1026,7 +1026,11 @@ void PrintObject::absorb_thin_region_pieces(size_t region_id, size_t mult, size_
             if (layerm->combined_layer_count() == 0 || layerm->slices.empty())
                 continue;
             const size_t n = std::max<size_t>(1, layerm->combined_layer_count());
-            out.push_back({ row + 1 - std::min(n, row + 1), row });
+            // Snapmaker Orca Max: a first run from the bed (per-head first layers) is the head's first
+            // layer; it is never merged or shared (the bed row is no grid row either).
+            if (row + 1 <= n)
+                continue;
+            out.push_back({ row + 1 - n, row });
         }
         return out;
     };
@@ -1192,10 +1196,15 @@ void PrintObject::apply_extruder_layer_heights()
 
     // Never combine the first printed layer: it keeps its own height for bed adhesion (mirrors the
     // id() == 0 exclusion in PrintObject::combine_infill()), and with a raft detect_surfaces_type()
-    // needs its slices to seed the object's bottom surfaces.
-    const size_t first_idx = first_combined_layer_idx;
+    // needs its slices to seed the object's bottom surfaces. Snapmaker Orca Max: with per-head first
+    // layers (ladder_base()) a run may start on the bed row instead: a coarse head's first layer is one
+    // run from the bed up to its own first-layer height (first_run_layers()), and the ladder counts
+    // from the bed.
+    const size_t first_idx = this->first_run_layer_idx();
     if (m_layers.size() <= first_idx + 1)
         return;
+    // Height of the grid rows (the bed row may be taller).
+    const double grid_row_height = m_layers[std::max<size_t>(first_idx, 1)]->height;
 
     // Snapmaker Orca Max ("align_bottoms_to_coarse_layers"): the object is sliced on the finest grid,
     // so a bottom face (a part starting on support or over air) can lie between two rungs of a coarse
@@ -1211,7 +1220,7 @@ void PrintObject::apply_extruder_layer_heights()
         std::vector<char> touched(m_layers.size(), 0);
         for (size_t b = first_idx + 1; b < m_layers.size(); ++ b) {
             m_print->throw_if_canceled();
-            if (std::abs(m_layers[b]->height - m_layers[first_idx]->height) > EPSILON)
+            if (std::abs(m_layers[b]->height - grid_row_height) > EPSILON)
                 continue; // uniform heights only (Print::validate() rejects the rest)
             const ExPolygons below = m_layers[b - 1]->lslices;
             struct Piece { size_t region; ExPolygon area; };
@@ -1250,7 +1259,7 @@ void PrintObject::apply_extruder_layer_heights()
                     }
                 if (pitch <= 1)
                     continue;
-                const size_t off = (b - first_idx) % pitch;
+                const size_t off = this->ladder_rows_below(b) % pitch;
                 if (off == 0)
                     continue;
                 const size_t k = pitch - off;
@@ -1404,10 +1413,12 @@ void PrintObject::apply_extruder_layer_heights()
             }
             return false;
         };
-        if (! walls_only) {
+        if (! walls_only && first_idx > 0) {
             original[first_idx - 1] = to_expolygons(m_layers[first_idx - 1]->regions()[region_id]->slices.surfaces);
             visited = first_idx - 1;
         }
+        // Layers of a first run from the bed (per-head first layers; 1 = none).
+        const size_t first_run = first_idx == 0 ? this->first_run_layers(mult, max_run_height) : 1;
         // With a fine multiplier of 1 (split with the finer wall at the object layer height)
         // there are no fine runs to walk; only the coarse pass below applies.
         size_t idx = mult > 1 ? first_idx : m_layers.size();
@@ -1432,9 +1443,9 @@ void PrintObject::apply_extruder_layer_heights()
             // Snapmaker Orca Max: a run starting one row off the ladder (pitch 2, after a break that is no
             // column start) can never step back with runs of at least two rows: let it grow one pitch
             // further (three rows, within the nozzle's maximum) so it ends on a rung again.
-            size_t grow_limit = mult;
+            size_t grow_limit = idx == 0 ? first_run : mult;
             if (! walls_only && mult > 1 && idx > first_idx) {
-                const size_t rung_len     = mult - (idx - first_idx) % mult;
+                const size_t rung_len     = this->layers_to_rung(idx, mult);
                 const bool   column_start = m_layers[idx - 1]->regions()[region_id]->slices.empty() &&
                                             m_layers[idx - 1]->regions()[region_id]->combined_layer_count() != 0;
                 if (rung_len < mult && rung_len < std::max<size_t>(min_run, 2) && std::max<size_t>(min_run, 2) >= mult &&
@@ -1444,7 +1455,7 @@ void PrintObject::apply_extruder_layer_heights()
             }
             while (top_idx + 1 < m_layers.size() && top_idx + 1 - idx < grow_limit) {
                 const size_t next = top_idx + 1;
-                if (std::abs(m_layers[next]->height - m_layers[idx]->height) > EPSILON)
+                if (std::abs(m_layers[next]->height - (idx == 0 ? grid_row_height : m_layers[idx]->height)) > EPSILON)
                     break;
                 const ExPolygons expolys = to_expolygons(m_layers[next]->regions()[region_id]->slices.surfaces);
                 if (! walls_only) {
@@ -1490,7 +1501,7 @@ void PrintObject::apply_extruder_layer_heights()
             // below two layers or the extruders' minimum; where the rung is nearer than that,
             // a minimum-length run steps towards it and the following run reaches it.
             if (! walls_only && commit_length >= 2) {
-                const size_t rung_len = mult - (idx - first_idx) % mult;   // rows to the next rung, 1..mult
+                const size_t rung_len = idx == 0 ? first_run : this->layers_to_rung(idx, mult); // rows to the next rung
                 // Nothing of the region right below (not even rows combined into a run above them).
                 const bool column_start = idx == first_idx ||
                     (m_layers[idx - 1]->regions()[region_id]->slices.empty() && m_layers[idx - 1]->regions()[region_id]->combined_layer_count() != 0);
@@ -1583,7 +1594,11 @@ void PrintObject::apply_extruder_layer_heights()
         if (split) {
             const size_t coarse = split_coarses[region_id];
             const size_t fine   = std::max<size_t>(1, mult);
-            size_t bottom = first_idx;
+            // The first layer above the bed row on the coarse class's ladder (layer 1 without per-head
+            // first layers): the bed row prints both wall classes at its own height.
+            size_t bottom = first_combined_layer_idx;
+            while (bottom < m_layers.size() && this->ladder_rows_below(bottom) % coarse != 0)
+                ++ bottom;
             while (bottom + coarse <= m_layers.size()) {
                 m_print->throw_if_canceled();
                 // When the fine class combines, a coarse run must span whole fine runs so both
@@ -1799,7 +1814,7 @@ void PrintObject::apply_extruder_layer_heights()
         auto abuts = [&](size_t f, size_t t, const ExPolygons &area) {
             return ! intersection_ex(offset_ex(area, beads[f]), shape_at(t, f)).empty();
         };
-        for (size_t row = first_idx; row < n_layers; ++ row) {
+        for (size_t row = std::max<size_t>(first_idx, 1); row < n_layers; ++ row) {
             if (voids[row].empty())
                 continue;
             m_print->throw_if_canceled();
@@ -2072,7 +2087,7 @@ void PrintObject::apply_extruder_layer_heights()
     };
     // Extruders (1-based) whose part bottoms were dropped or filled with nothing under them.
     std::set<unsigned int> unsupported_bottom_extruders;
-    for (size_t idx = first_idx; idx < m_layers.size(); ++ idx) {
+    for (size_t idx = std::max<size_t>(first_idx, 1); idx < m_layers.size(); ++ idx) {
         m_print->throw_if_canceled();
         // Only layers around active combining can need work.
         bool combining_nearby = false;
@@ -6712,24 +6727,40 @@ void PrintObject::slice_volumes()
                             // Apply the negative XY compensation. (the ones that is <0)
                             ExPolygons trimming;
                             static const float eps = float(scale_(m_config.slice_closing_radius.value) * 1.5);
+                            // Snapmaker Orca Max: regions printing with different outer wall widths (tool heads of
+                            // different nozzle sizes) are each compensated with their own flow.
+                            std::vector<ExPolygons> region_trimming;
                             if (elfoot > 0.f) {
                                 ExPolygons expolygons_to_compensate = offset_ex(layer->merged(eps), -eps);
                                 lslices_elfoot_uncompensated[layer_id] = expolygons_to_compensate;
-                                trimming = Slic3r::elephant_foot_compensation(expolygons_to_compensate,
-                                    layer->m_regions.front()->flow(frExternalPerimeter), unscale<double>(elfoot));
+                                const Flow front_flow = layer->m_regions.front()->flow(frExternalPerimeter);
+                                bool       same_flow  = true;
+                                for (const LayerRegion *layerm : layer->m_regions)
+                                    same_flow &= std::abs(layerm->flow(frExternalPerimeter).width() - front_flow.width()) < EPSILON;
+                                trimming = Slic3r::elephant_foot_compensation(expolygons_to_compensate, front_flow, unscale<double>(elfoot));
+                                if (! same_flow)
+                                    for (const LayerRegion *layerm : layer->m_regions)
+                                        region_trimming.emplace_back(Slic3r::elephant_foot_compensation(expolygons_to_compensate,
+                                            layerm->flow(frExternalPerimeter), unscale<double>(elfoot)));
                             } else {
                                 trimming = layer->merged(float(SCALED_EPSILON));
                             }
-                            if (min_growth < 0.0f)
-                                trimming = _shrink_contour_holes(std::min(0.f, xy_contour_scaled),
+                            auto shrink = [&](ExPolygons &area) {
+                                if (min_growth < 0.0f)
+                                    area = _shrink_contour_holes(std::min(0.f, xy_contour_scaled),
                                                                  std::min(0.f, xy_hole_scaled),
-                                                                 trimming);
+                                                                 area);
+                            };
+                            shrink(trimming);
+                            for (ExPolygons &area : region_trimming)
+                                shrink(area);
                             //BBS: trim surfaces
                             for (size_t region_id = 0; region_id < layer->regions().size(); ++region_id) {
                                 // BBS: split trimming result by region
                                 ExPolygons contour_exp = to_expolygons(std::move(layer->regions()[region_id]->slices.surfaces));
 
-                                layer->regions()[region_id]->slices.set(intersection_ex(contour_exp, to_polygons(trimming)), stInternal);
+                                layer->regions()[region_id]->slices.set(intersection_ex(contour_exp,
+                                    to_polygons(region_trimming.empty() ? trimming : region_trimming[region_id])), stInternal);
                             }
                         }
 	                }

@@ -27,6 +27,9 @@ public:
     void        reset(const Vec3d &position);
     void        set_current_extruder(unsigned int extruder_id, unsigned int nozzle_id) { m_current_extruder = extruder_id; m_current_nozzle = nozzle_id; }
     std::string process_layer(std::string &&gcode, size_t layer_id, bool flush);
+    // Snapmaker Orca Max: per 0-based extruder, whether it is still on its first layer on the layer processed
+    // next (per-head first layers; empty otherwise).
+    void        set_first_layer_extruders(std::vector<char> first_layer) { m_first_layer_extruders = std::move(first_layer); }
 
 private:
 	CoolingBuffer& operator=(const CoolingBuffer&) = delete;
@@ -56,6 +59,7 @@ private:
     const PrintConfig          &m_config;
     unsigned int                m_current_extruder;
     unsigned int                m_current_nozzle;
+    std::vector<char>           m_first_layer_extruders;
     //BBS: current fan speed
     int                         m_current_fan_speed;
 };

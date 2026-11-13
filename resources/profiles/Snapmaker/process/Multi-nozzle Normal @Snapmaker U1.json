@@ -8,7 +8,7 @@
 	"description": "Mixed nozzle sizes: each prints 50% of its diameter (0.2: 0.10, 0.4: 0.20, 0.6: 0.30, 0.8: 0.40 mm).",
 	"multi_nozzle_layer_heights": "normal",
 	"layer_height": "0.1",
-	"initial_layer_print_height": "0.2",
+	"initial_layer_print_height": "0.1",
 	"compatible_printers": [
 		"Snapmaker U1"
 	]

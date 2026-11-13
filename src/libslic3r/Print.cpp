@@ -2705,6 +2705,8 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
         bool warned_unhonored_heights = false, warned_support_mixed_nozzles = false,
              warned_below_min_heights = false, warned_pitch_fallbacks = false,
              warned_above_max_heights = false, warned_ignored_feature_prefs = false;
+        // Snapmaker Orca Max: the first layer outside a printing head's layer height limits, warned once.
+        bool warned_first_layer_above_max = false, warned_first_layer_below_min = false;
         for (PrintObject *object : m_objects) {
             if (object->has_support_material()) {
                 // BBS: remove useless logics and L()
@@ -2838,6 +2840,55 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             }
             if (initial_layer_print_height > first_layer_min_nozzle_diameter)
                 return {L("Layer height cannot exceed nozzle diameter."), object, "initial_layer_print_height"};
+
+            // Snapmaker Orca Max: one first layer for every tool head (no per-head first layers, see
+            // PrintObject::per_head_first_layers()): warn where it lies above the maximum or below the
+            // minimum layer height of a head printing it.
+            if (! object->per_head_first_layers()) {
+                const size_t        num_heads = m_config.nozzle_diameter.values.size();
+                std::vector<size_t> heads;
+                auto add_heads = [&](unsigned int filament) {
+                    if (filament < num_heads) {
+                        heads.push_back(this->extruder_index_of(filament));
+                    } else if (const MixedFilament *mixed = m_mixed_filament_mgr.mixed_filament_from_id(filament + 1, m_config.filament_diameter.values.size())) {
+                        // A mixed-colour slot prints through its component filaments.
+                        for (const unsigned int component : { mixed->component_a, mixed->component_b })
+                            if (component >= 1 && component <= num_heads)
+                                heads.push_back(this->extruder_index_of(component - 1));
+                    }
+                };
+                if (object->has_raft()) {
+                    const int raft_filament = object->config().raft_layers == 1 ? object->config().support_interface_filament.value :
+                                                                                  object->config().support_filament.value;
+                    if (raft_filament > 0)
+                        add_heads(unsigned(raft_filament - 1));
+                } else {
+                    for (const unsigned int filament : object->object_extruders())
+                        add_heads(filament);
+                }
+                sort_remove_duplicates(heads);
+                for (const size_t head : heads) {
+                    const double nozzle = m_config.nozzle_diameter.get_at(head);
+                    double       max_lh = m_config.max_layer_height.get_at(head);
+                    if (max_lh <= 0.)
+                        max_lh = 0.75 * nozzle;
+                    const double min_lh = m_config.min_layer_height.get_at(head);
+                    if (! warned_first_layer_above_max && initial_layer_print_height > max_lh + EPSILON) {
+                        warned_first_layer_above_max = true;
+                        warn(Slic3r::format(_u8L("The first layer is %1% mm high, above the %2% mm maximum layer height of tool head %3% "
+                                                 "(%4% mm nozzle). Lower the first layer height to %2% mm or less."),
+                                            initial_layer_print_height, max_lh, head + 1, nozzle),
+                             "initial_layer_print_height", object);
+                    }
+                    if (! warned_first_layer_below_min && min_lh > 0. && initial_layer_print_height < min_lh - EPSILON) {
+                        warned_first_layer_below_min = true;
+                        warn(Slic3r::format(_u8L("The first layer is %1% mm high, below the %2% mm minimum layer height of tool head %3% "
+                                                 "(%4% mm nozzle)."),
+                                            initial_layer_print_height, min_lh, head + 1, nozzle),
+                             "initial_layer_print_height", object);
+                    }
+                }
+            }
 
             // validate layer_height
             double layer_height = object->config().layer_height.value;
@@ -4032,7 +4083,7 @@ std::map<ObjectID, unsigned int> getObjectExtruderMap(const Print& print) {
             objectExtruderMap.insert(std::make_pair(object->id(), objectFirstLayerFirstExtruder));
         }
         else {
-            objectExtruderMap.insert(std::make_pair(object->id(), object->object_first_layer_wall_extruders.front()));
+            objectExtruderMap.insert(std::make_pair(object->id(), object->brim_filament()));
         }
     }
     return objectExtruderMap;
@@ -4585,6 +4636,13 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                 }
             }
         }
+        // Snapmaker Orca Max: with per-head first layers an object's brim head may lay its first layer as a run
+        // from the bed, topping above the first print layer: its brim is generated all the same (and printed with
+        // that run, GCode::generate_object_brim()).
+        if (! m_objects.empty() && m_objects.front()->per_head_first_layers())
+            for (const auto &[obj_id, ext_1based] : objectExtruderMap)
+                if (ext_1based > 0 && std::find(printExtruders.begin(), printExtruders.end(), ext_1based - 1) == printExtruders.end())
+                    printExtruders.push_back(ext_1based - 1);
         std::vector<std::pair<ObjectID, unsigned int>> objPrintVec;
         for (const PrintInstance* instance : print_object_instances_ordering) {
             const ObjectID& print_object_ID = instance->print_object->id();
@@ -6166,6 +6224,9 @@ void Print::_make_wipe_tower()
         }
         for (size_t i = 0; i < number_of_extruders; ++i)
             wipe_tower.set_extruder(i, m_config);
+        // Snapmaker Orca Max: heads keep their first layer temperatures up to their own first layer top.
+        if (! m_objects.empty() && m_objects.front()->per_head_first_layers())
+            wipe_tower.set_first_layer_tops(multi_nozzle_first_layer_tops(m_config));
 
         m_wipe_tower_data.priming = Slic3r::make_unique<std::vector<WipeTower::ToolChangeResult>>(
             wipe_tower.prime((float)this->skirt_first_layer_height(), m_wipe_tower_data.tool_ordering.all_extruders(), false));

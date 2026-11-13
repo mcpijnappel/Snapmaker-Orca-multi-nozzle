@@ -95,6 +95,23 @@ const Layer* LayerRegion::combined_lower_layer() const
     return nth_lower_layer(m_layer, std::max<unsigned short>(m_combined_layer_count, 1));
 }
 
+bool LayerRegion::first_layer_flow(FlowRole role) const
+{
+    if (m_layer->id() == 0)
+        return true;
+    // A walls-only run marks its layers below the top with count 0: the run is the one topping above.
+    const bool walls = role == frExternalPerimeter || role == frPerimeter;
+    if (walls && m_wall_combined_count == 0 && m_wall_combined_height > 0.) {
+        const Layer *top = m_layer;
+        const int    region_id = this->region().print_object_region_id();
+        while (top != nullptr && top->get_region(region_id)->m_wall_combined_count == 0)
+            top = top->upper_layer;
+        return top != nullptr && top->id() + 1 == top->get_region(region_id)->m_wall_combined_count;
+    }
+    const unsigned short count = walls ? std::max(m_wall_combined_count, m_combined_layer_count) : m_combined_layer_count;
+    return count > 1 && m_layer->id() + 1 == count;
+}
+
 // ORCA: walls-only pitch, see PrintObject::wall_layer_height_multiplier().
 double LayerRegion::wall_combined_height() const
 {

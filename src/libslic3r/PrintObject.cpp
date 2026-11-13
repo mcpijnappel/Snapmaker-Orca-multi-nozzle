@@ -1807,6 +1807,10 @@ void PrintObject::detect_surfaces_type()
                     // unless internal shells are requested
                     Layer       *upper_layer = (idx_layer + 1 < this->layer_count()) ? m_layers[idx_layer + 1] : nullptr;
                     Layer       *lower_layer = (idx_layer > 0) ? m_layers[idx_layer - 1] : nullptr;
+                    // Snapmaker Orca Max: a run reaching down to the bed (a head's first layer with per-head
+                    // first layers) stands on the bed like the first layer: all of it is bottom.
+                    if (const unsigned short count = layerm->combined_layer_count(); count > 1 && idx_layer + 1 == size_t(count))
+                        lower_layer = nullptr;
                     // collapse very narrow parts (using the safety offset in the diff is not enough)
                     const float offset = layerm->flow(frExternalPerimeter).scaled_width() / 10.f;
 
@@ -4228,6 +4232,67 @@ double PrintObject::extruder_preferred_layer_height(unsigned int filament_id, co
 
 // Returns the number of object layers a region printing with the given 1-based filament id combines into one extrusion (1 = no combining).
 // The configured height must be a (near) integer multiple of the object layer height, otherwise it is ignored here and rejected by Print::validate().
+int PrintObject::brim_filament() const
+{
+    if (object_first_layer_wall_extruders.empty())
+        return 0;
+    if (! this->per_head_first_layers())
+        return object_first_layer_wall_extruders.front();
+    const PrintConfig &config = m_print->config();
+    int    best        = object_first_layer_wall_extruders.front();
+    double best_nozzle = 0.;
+    for (const int filament : object_first_layer_wall_extruders)
+        if (filament >= 1 && size_t(filament) <= config.nozzle_diameter.values.size()) {
+            const double nozzle = config.nozzle_diameter.get_at(size_t(filament - 1));
+            if (nozzle > best_nozzle + EPSILON) {
+                best        = filament;
+                best_nozzle = nozzle;
+            }
+        }
+    return best;
+}
+
+size_t PrintObject::ladder_base() const
+{
+    const PrintConfig &print_config = m_print->config();
+    if (multi_nozzle_strategy_fraction(int(print_config.multi_nozzle_layer_heights.value)) <= 0.)
+        return 0;
+    // A raft anywhere keeps the shared first layer: by layer, every object's first layer settings
+    // follow one height then (and the prime tower needs equal rafts anyway).
+    for (const PrintObject *object : m_print->objects())
+        if (object->has_raft())
+            return 0;
+    const SlicingParameters &params = this->slicing_parameters();
+    const double             grid   = params.layer_height;
+    if (grid <= EPSILON || ! params.first_object_layer_height_fixed())
+        return 0;
+    const long rows = std::lround(params.first_object_layer_height / grid);
+    // The bed row must lie on the grid (apply_extruder_layer_height_plan() puts it there).
+    return rows >= 1 && std::abs(params.first_object_layer_height - rows * grid) < EPSILON ? size_t(rows) : 0;
+}
+
+size_t PrintObject::first_run_layers(size_t pitch, double max_height) const
+{
+    const size_t base = this->ladder_base();
+    if (base == 0 || pitch <= 1)
+        return 1;
+    const double grid   = this->slicing_parameters().layer_height;
+    size_t       factor = size_t(multi_nozzle_first_layer_factor(int(m_print->config().multi_nozzle_layer_heights.value)));
+    while (factor > 1 && max_height > EPSILON && double(factor * pitch) * grid > max_height + EPSILON)
+        -- factor;
+    const size_t units = factor * pitch;
+    return units > base ? units - base + 1 : 1;
+}
+
+size_t PrintObject::layers_to_rung(size_t idx, size_t pitch) const
+{
+    if (pitch <= 1)
+        return 1;
+    if (idx == 0 && this->per_head_first_layers())
+        return this->first_run_layers(pitch);
+    return pitch - this->ladder_rows_below(idx) % pitch;
+}
+
 unsigned int PrintObject::layer_height_multiplier_for_filament(unsigned int filament_id, const PrintRegionConfig *region) const
 {
     const double extruder_height = this->extruder_preferred_layer_height(filament_id, region);
@@ -5623,7 +5688,7 @@ void PrintObject::combine_surface_runs(size_t region_id, SurfaceType surface_typ
             m_print->throw_if_canceled();
             if (layer_idx + 1 < m)
                 break;
-            if (aligned && layer_idx % m != 0)
+            if (aligned && ! this->ends_on_rung(layer_idx, m))
                 continue;
             // Never absorb the first print layer: it keeps its own height for bed adhesion.
             if (m_layers[layer_idx - m + 1]->id() == 0)

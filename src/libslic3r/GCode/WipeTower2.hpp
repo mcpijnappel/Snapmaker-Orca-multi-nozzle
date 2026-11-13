@@ -95,6 +95,12 @@ public:
 
 	// Set the extruder properties.
     void set_extruder(size_t idx, const PrintConfig& config);
+    // Snapmaker Orca Max: per-head first layers, the top of each tool's first layer (multi_nozzle_first_layer_tops()).
+    void set_first_layer_tops(const std::vector<double> &tops)
+    {
+        for (size_t idx = 0; idx < m_filpar.size() && idx < tops.size(); ++ idx)
+            m_filpar[idx].first_layer_top = float(tops[idx]);
+    }
     // Snapmaker Orca: per filament, the slot of the process table its travel, first layer, infill
     // and perimeter speeds are read at (Print::process_slot_of_filament); set before set_extruder().
     // Without it set_extruder() reads the filament's tool head.
@@ -214,6 +220,8 @@ public:
         bool                is_support = false;
         int  			    temperature = 0;
         int  			    first_layer_temperature = 0;
+        // Snapmaker Orca Max: top of the head's first layer with per-head first layers (0 = the tower's first layer).
+        float               first_layer_top = 0.f;
         int                 interface_print_temperature = 0;
         float               loading_speed = 0.f;
         float               loading_speed_start = 0.f;
@@ -387,6 +395,12 @@ private:
     float           m_local_z_wipe_tower_purge_lines = 3.f;
 
     bool is_first_layer() const { return size_t(m_layer_info - m_plan.begin()) == m_first_layer_idx; }
+    // Snapmaker Orca Max: is `tool` on its first layer here (its temperatures)? With per-head first layers a
+    // head stays on it up to its own first layer top.
+    bool tool_first_layer(size_t tool) const
+    {
+        return is_first_layer() || (tool < m_filpar.size() && m_filpar[tool].first_layer_top > 0.f && m_z_pos <= m_filpar[tool].first_layer_top + 1e-4f);
+    }
 
     // Purge row lattice of toolchange_Wipe() for the purging tool: row pitch and extrusion width. Both
     // follow the tool's own line width, so a thin head's purge stays dense and the tower is sized for it.

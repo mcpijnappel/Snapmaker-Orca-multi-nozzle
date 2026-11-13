@@ -12007,6 +12007,7 @@ void Sidebar::update_nozzle_process_hints()
     // Snapmaker Orca Max: the layer height each head prints (the multi-nozzle strategy's, else the
     // plate's) and the max volumetric speed of the filaments it prints, in the column of its flow.
     std::vector<double> head_heights;
+    std::vector<double> head_first_layers; // under a strategy only
     if (bundle != nullptr && process != nullptr && printer != nullptr) {
         DynamicPrintConfig inputs;
         for (const char *key : { "nozzle_diameter", "min_layer_height", "max_layer_height" })
@@ -12023,6 +12024,16 @@ void Sidebar::update_nozzle_process_hints()
         for (size_t head = 0; head < chosen.size() && head < head_heights.size(); ++head)
             if (chosen[head] > 0.)
                 head_heights[head] = chosen[head];
+        // Snapmaker Orca Max: each head's first layer, one run from the bed (multi_nozzle_first_layer_height()).
+        if (const auto *strategy = process->option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
+            strategy != nullptr && multi_nozzle_strategy_fraction(int(strategy->value)) > 0.) {
+            const auto *nozzles = printer->option<ConfigOptionFloats>("nozzle_diameter");
+            const auto *maxima  = printer->option<ConfigOptionFloats>("max_layer_height");
+            for (size_t head = 0; head < head_heights.size(); ++head)
+                head_first_layers.push_back(multi_nozzle_first_layer_height(int(strategy->value), head_heights[head],
+                    nozzles == nullptr || nozzles->values.empty() ? 0. : nozzles->get_at(head),
+                    maxima == nullptr || maxima->values.empty() ? 0. : maxima->get_at(head)));
+        }
     }
     auto head_max_flow = [&](size_t head) {
         double lowest = 0.;
@@ -12096,6 +12107,9 @@ void Sidebar::update_nozzle_process_hints()
             if (const std::vector<std::string> keys = PerHeadProcess::head_override_keys(*process, i); !keys.empty())
                 // TRN Tooltip of the line under a nozzle. %1% the number of values set for the tool head on the Process tab
                 tip += "\n" + format_wxstr(_L("%1% values set for this extruder."), keys.size());
+        if (i < head_first_layers.size() && head_first_layers[i] > EPSILON)
+            // TRN Tooltip of the line under a nozzle. %1% the height in mm of the first layer the tool head lays from the bed
+            tip += "\n" + format_wxstr(_L("First layer: %1% mm"), from_u8(float_to_string_decimal_point(head_first_layers[i], 2)));
         tip += "\n" + _L("Click to choose its layer height and speeds.");
         info->SetToolTip(tip);
     }

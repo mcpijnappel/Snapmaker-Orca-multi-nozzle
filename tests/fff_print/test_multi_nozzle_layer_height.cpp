@@ -3652,7 +3652,9 @@ TEST_CASE("A coarse tool purges on the prime tower at its own step", "[MultiNozz
     apply_extruder_layer_height_plan(config);
     Print print;
     Model model;
-    ModelObject *object = add_inlaid_plate(model, 0.f);
+    // The plate starts at 0.90 mm, on the 0.6 nozzle's steps counted from the bed (0.30, 0.60, 0.90: every
+    // head lays its first layer from the bed, PrintObject::ladder_base()).
+    ModelObject *object = add_inlaid_plate(model, 0.1f);
     object->volumes[0]->config.set("extruder", 3);       // the plate, 0.6 mm
     object->volumes[1]->config.set("extruder", 4);       // the insert, 0.2 mm
     object->volumes[2]->config.set("extruder", 1);       // the leg, 0.4 mm
@@ -3715,4 +3717,343 @@ TEST_CASE("Support layers keep the support nozzle's minimum on a fine grid", "[M
             thin += std::to_string(layer->print_z) + ":" + std::to_string(layer->height) + " ";
     CAPTURE(lift, thin);
     CHECK(thin.empty());
+}
+
+// ---- Snapmaker Orca Max: the first layer with tool heads of different nozzle sizes ----
+
+// A Snapmaker U1 with the given nozzle sizes and the limits of its nozzle size table.
+static DynamicPrintConfig u1_nozzle_config(const std::vector<double> &nozzles)
+{
+    DynamicPrintConfig  config = four_nozzle_config();
+    std::vector<double> min_lh, max_lh;
+    for (double d : nozzles) {
+        min_lh.push_back(d < 0.3 ? 0.04 : d < 0.5 ? 0.08 : d < 0.7 ? 0.12 : 0.16);
+        max_lh.push_back(d < 0.3 ? 0.14 : d < 0.5 ? 0.32 : d < 0.7 ? 0.42 : 0.56);
+    }
+    config.set_key_value("nozzle_diameter",            new ConfigOptionFloats(nozzles));
+    config.set_key_value("min_layer_height",           new ConfigOptionFloats(min_lh));
+    config.set_key_value("max_layer_height",           new ConfigOptionFloats(max_lh));
+    config.set_key_value("extruder_layer_height",      new ConfigOptionFloats(std::vector<double>(nozzles.size(), 0.)));
+    config.set_key_value("layer_height",               new ConfigOptionFloat(0.1));
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.2));
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhOff));
+    // A tool changer: one nozzle per filament.
+    config.set_key_value("single_extruder_multi_material", new ConfigOptionBool(false));
+    return config;
+}
+
+// A 20 x 20 x 2 mm plate on `plate_filament` and a 4 x 4 x 2 mm detail beside it on `detail_filament`
+// (the user's plates with digit inlays: the detail has the smaller first layer island).
+static void init_plate_and_detail(Print &print, Model &model, const DynamicPrintConfig &config, int plate_filament = 3, int detail_filament = 4)
+{
+    TriangleMesh plate = mesh(TestMesh::cube_20x20x20);
+    plate.scale(Vec3f(1.f, 1.f, 0.1f));
+    TriangleMesh detail = mesh(TestMesh::cube_20x20x20);
+    detail.scale(Vec3f(0.2f, 0.2f, 0.1f));
+    detail.translate(30.f, 0.f, 0.f);
+    ModelObject *object = model.add_object();
+    object->name = "plate_and_detail";
+    object->add_volume(std::move(plate))->config.set("extruder", plate_filament);
+    object->add_volume(std::move(detail))->config.set("extruder", detail_filament);
+    object->add_instance();
+    for (ModelObject *mo : model.objects) {
+        mo->center_around_origin();
+        mo->translate(120., 120., 0.);
+        mo->ensure_on_bed();
+    }
+    print.apply(model, config);
+    print.set_status_silent();
+}
+
+static std::vector<unsigned int> first_layer_tools(Print &print)
+{
+    print.process();
+    const ToolOrdering &ordering = print.tool_ordering();
+    REQUIRE(! ordering.layer_tools().empty());
+    return ordering.layer_tools().front().extruders; // 0-based
+}
+
+TEST_CASE("Mixed nozzle sizes print the finest nozzle first on the first layer", "[MultiNozzleLayerHeight][FirstLayer]")
+{
+    SECTION("0.4 plate and 0.2 detail: the 0.2 head starts") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.14));
+        Print print;
+        Model model;
+        init_plate_and_detail(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        const std::vector<unsigned int> expected { 3, 2 };
+        CHECK(first_layer_tools(print) == expected);
+    }
+    SECTION("Same nozzle sizes keep the stock order: the smallest island last") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.4 });
+        Print print;
+        Model model;
+        init_plate_and_detail(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        const std::vector<unsigned int> expected { 2, 3 };
+        CHECK(first_layer_tools(print) == expected);
+    }
+    SECTION("A custom first layer sequence still wins") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.14));
+        config.set_key_value("first_layer_print_sequence", new ConfigOptionInts({ 3, 4, 1, 2 }));
+        Print print;
+        Model model;
+        init_plate_and_detail(print, model, config);
+        REQUIRE(print.validate().string.empty());
+        const std::vector<unsigned int> expected { 2, 3 };
+        CHECK(first_layer_tools(print) == expected);
+    }
+}
+
+TEST_CASE("One first layer for all heads is checked against every printing head's limits", "[MultiNozzleLayerHeight][FirstLayer]")
+{
+    auto first_layer_warnings = [](const DynamicPrintConfig &config, int detail_filament, std::string &error) {
+        Print print;
+        Model model;
+        init_plate_and_detail(print, model, config, 3, detail_filament);
+        std::vector<StringObjectException> warnings;
+        error = print.validate(&warnings).string;
+        std::string out;
+        for (const StringObjectException &w : warnings)
+            if (w.opt_key == "initial_layer_print_height")
+                out += w.string + "\n";
+        return out;
+    };
+    std::string error;
+    SECTION("Above the 0.2 head's maximum") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        const std::string warned = first_layer_warnings(config, 4, error);
+        CHECK(error.empty());
+        CAPTURE(warned);
+        CHECK(warned.find("maximum layer height of tool head 4") != std::string::npos);
+        CHECK(warned.find("0.14") != std::string::npos);
+    }
+    SECTION("At the 0.2 head's maximum: quiet") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.14));
+        CHECK(first_layer_warnings(config, 4, error).empty());
+        CHECK(error.empty());
+    }
+    SECTION("The 0.2 head prints nothing: quiet") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        CHECK(first_layer_warnings(config, 2, error).empty());
+        CHECK(error.empty());
+    }
+    SECTION("Below the 0.8 head's minimum") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.8 });
+        config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.14));
+        const std::string warned = first_layer_warnings(config, 4, error);
+        CHECK(error.empty());
+        CAPTURE(warned);
+        CHECK(warned.find("minimum layer height of tool head 4") != std::string::npos);
+    }
+    SECTION("Taller than the 0.2 nozzle: still refused") {
+        DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+        config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.25));
+        first_layer_warnings(config, 4, error);
+        CHECK(error.find("cannot exceed nozzle diameter") != std::string::npos);
+    }
+}
+
+TEST_CASE("Elephant foot compensation slices regions of different nozzle sizes", "[MultiNozzleLayerHeight][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+    config.set_key_value("initial_layer_print_height", new ConfigOptionFloat(0.14));
+    config.set_key_value("elefant_foot_compensation", new ConfigOptionFloat(0.2));
+    Print print;
+    Model model;
+    // The detail inside the plate's footprint row, so both share the layer's merged outline.
+    init_plate_and_detail(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    const int plate = region_of_filament(po, 3), detail = region_of_filament(po, 4);
+    REQUIRE(plate >= 0);
+    REQUIRE(detail >= 0);
+    // Both regions keep their first layer, each compensated with its own outer wall flow.
+    CHECK(! po.layers().front()->regions()[size_t(plate)]->slices.empty());
+    CHECK(! po.layers().front()->regions()[size_t(detail)]->slices.empty());
+}
+
+TEST_CASE("Every head's first layer under a strategy", "[MultiNozzleLayerHeight][Strategy][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.2, 0.4, 0.6, 0.8 });
+    const struct { MultiNozzleLayerHeights strategy; double first[4]; } table[] = {
+        { mnlhUltraFine,   { 0.10, 0.20, 0.30, 0.40 } },
+        { mnlhFine,        { 0.08, 0.16, 0.24, 0.32 } },
+        { mnlhNormal,      { 0.10, 0.20, 0.30, 0.40 } },
+        { mnlhCoarse,      { 0.12, 0.24, 0.36, 0.48 } },
+        { mnlhSuperCoarse, { 0.14, 0.28, 0.42, 0.56 } },
+    };
+    for (const auto &row : table) {
+        CAPTURE(int(row.strategy));
+        config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(row.strategy));
+        const ExtruderLayerHeightPlan plan = effective_extruder_layer_heights(config);
+        REQUIRE(plan.first_layers.size() == 4);
+        for (size_t i = 0; i < 4; ++ i)
+            CHECK(plan.first_layers[i] == Catch::Approx(row.first[i]).margin(1e-9));
+        // The bed row is the finest head's first layer.
+        CHECK(plan.bed_row == Catch::Approx(row.first[0]).margin(1e-9));
+        DynamicPrintConfig planned = config;
+        apply_extruder_layer_height_plan(planned);
+        CHECK(planned.opt_float("initial_layer_print_height") == Catch::Approx(row.first[0]).margin(1e-9));
+    }
+    // Without a 0.2 head the bed row is the 0.4 head's first layer.
+    DynamicPrintConfig coarse = u1_nozzle_config({ 0.4, 0.4, 0.8, 0.8 });
+    coarse.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhNormal));
+    CHECK(effective_extruder_layer_heights(coarse).bed_row == Catch::Approx(0.2).margin(1e-9));
+    // Off: one first layer as configured.
+    DynamicPrintConfig off = u1_nozzle_config({ 0.2, 0.4, 0.6, 0.8 });
+    apply_extruder_layer_height_plan(off);
+    CHECK(off.opt_float("initial_layer_print_height") == Catch::Approx(0.2).margin(1e-9));
+}
+
+TEST_CASE("A coarse head lays its first layer as one run from the bed", "[MultiNozzleLayerHeight][Strategy][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhNormal));
+    config.set_key_value("initial_layer_line_width", new ConfigOptionFloatsOrPercentsNullable{ FloatOrPercent(0.6, false) });
+    config.set_key_value("nozzle_temperature_initial_layer", new ConfigOptionInts({ 250, 250, 250, 250 }));
+    apply_extruder_layer_height_plan(config);
+    REQUIRE(config.opt_float("layer_height") == Catch::Approx(0.1).margin(1e-9));
+    REQUIRE(config.opt_float("initial_layer_print_height") == Catch::Approx(0.1).margin(1e-9));
+    Print print;
+    Model model;
+    init_plate_and_detail(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    const std::string gcode = Slic3r::Test::gcode(print);
+    REQUIRE(! gcode.empty());
+    const PrintObject &po = *print.objects().front();
+    CHECK(po.per_head_first_layers());
+    CHECK(po.ladder_base() == 1);
+    const int plate = region_of_filament(po, 3), detail = region_of_filament(po, 4);
+    REQUIRE(plate >= 0);
+    REQUIRE(detail >= 0);
+    REQUIRE(po.layers().size() > 4);
+    const Layer *row0 = po.layers()[0], *row1 = po.layers()[1], *row3 = po.layers()[3];
+    CHECK(row0->print_z == Catch::Approx(0.1).margin(1e-6));
+    // The 0.2 detail prints the bed row itself, 0.10 high; the 0.4 plate nothing there.
+    CHECK(! row0->regions()[size_t(detail)]->slices.empty());
+    CHECK(row0->regions()[size_t(plate)]->slices.empty());
+    CHECK(row0->regions()[size_t(plate)]->combined_layer_count() == 0);
+    // The plate's first layer: one run from the bed to 0.20, with the first layer width.
+    const LayerRegion *first_run = row1->regions()[size_t(plate)];
+    CHECK(first_run->combined_layer_count() == 2);
+    CHECK(first_run->combined_height() == Catch::Approx(0.2).margin(1e-6));
+    CHECK(first_run->first_layer_flow(frExternalPerimeter));
+    CHECK(first_run->flow(frExternalPerimeter).width() == Catch::Approx(0.6).margin(1e-6));
+    // It stands on the bed: no overhang walls.
+    bool overhang = false;
+    for_each_path(first_run->perimeters, [&overhang](const ExtrusionPath &path) { overhang |= path.role() == erOverhangPerimeter; });
+    CHECK(! overhang);
+    // Its underside is the bed: bottom surfaces.
+    bool bottom = false;
+    for (const Surface &surface : first_run->fill_surfaces.surfaces)
+        bottom |= surface.surface_type == stBottom;
+    CHECK(bottom);
+    // The next run of the plate tops at 0.40, on the 0.4 head's steps from the bed.
+    CHECK(row3->print_z == Catch::Approx(0.4).margin(1e-6));
+    CHECK(row3->regions()[size_t(plate)]->combined_layer_count() == 2);
+    CHECK(! row3->regions()[size_t(plate)]->first_layer_flow(frExternalPerimeter));
+    // The ladders of 0.4 and 0.8 heads meet at 0.40.
+    CHECK(po.ends_on_rung(3, 2));
+    CHECK(po.ends_on_rung(3, 4));
+    CHECK(! po.ends_on_rung(2, 2));
+    // Only the 0.2 head prints the bed row.
+    const std::vector<unsigned int> bed_row_tools { 3 };
+    CHECK(print.tool_ordering().layer_tools().front().extruders == bed_row_tools);
+    // The 0.4 head keeps its first layer temperature through its first layer: its normal temperature
+    // follows at 0.30, the 0.2 head's at 0.20.
+    auto first_after = [&gcode](const std::string &needle) {
+        const size_t at = gcode.find(needle);
+        if (at == std::string::npos)
+            return -1.;
+        const size_t z = gcode.rfind(";Z:", at);
+        return z == std::string::npos ? 0. : std::atof(gcode.c_str() + z + 3);
+    };
+    std::string temperatures; // every nozzle temperature command with the layer it is on, for the report
+    {
+        std::istringstream lines(gcode);
+        std::string        line;
+        double             z = 0.;
+        while (std::getline(lines, line)) {
+            if (line.rfind(";Z:", 0) == 0)
+                z = std::atof(line.c_str() + 3);
+            else if (line.rfind("M104", 0) == 0 || line.rfind("M109", 0) == 0)
+                temperatures += std::to_string(z) + " " + line + "\n";
+        }
+    }
+    CAPTURE(temperatures);
+    CHECK(first_after("M104 S240 T2") == Catch::Approx(0.3).margin(1e-6));
+    CHECK(first_after("M104 S240 T3") == Catch::Approx(0.2).margin(1e-6));
+}
+
+TEST_CASE("Ultra fine doubles a head's first layer", "[MultiNozzleLayerHeight][Strategy][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhUltraFine));
+    apply_extruder_layer_height_plan(config);
+    REQUIRE(config.opt_float("layer_height") == Catch::Approx(0.05).margin(1e-9));
+    REQUIRE(config.opt_float("initial_layer_print_height") == Catch::Approx(0.1).margin(1e-9));
+    Print print;
+    Model model;
+    init_plate_and_detail(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    CHECK(po.ladder_base() == 2);
+    const int plate = region_of_filament(po, 3);
+    REQUIRE(plate >= 0);
+    // Bed row 0.10, then 0.15 and 0.20: the plate's first run spans all three, 0.20 high.
+    const LayerRegion *first_run = po.layers()[2]->regions()[size_t(plate)];
+    CHECK(po.layers()[2]->print_z == Catch::Approx(0.2).margin(1e-6));
+    CHECK(first_run->combined_layer_count() == 3);
+    CHECK(first_run->combined_height() == Catch::Approx(0.2).margin(1e-6));
+    // Then runs of 0.10 on the 0.4 head's steps: 0.30.
+    CHECK(po.layers()[4]->regions()[size_t(plate)]->combined_layer_count() == 2);
+    CHECK(po.layers()[4]->print_z == Catch::Approx(0.3).margin(1e-6));
+}
+
+TEST_CASE("Off keeps the stock first layer and ladder", "[MultiNozzleLayerHeight][Strategy][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.4 });
+    apply_extruder_layer_height_plan(config);
+    Print print;
+    Model model;
+    init_plate_and_detail(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    print.process();
+    const PrintObject &po = *print.objects().front();
+    CHECK(! po.per_head_first_layers());
+    CHECK(po.first_run_layer_idx() == PrintObject::first_combined_layer_idx);
+    CHECK(po.layers().front()->print_z == Catch::Approx(0.2).margin(1e-6));
+}
+
+TEST_CASE("A brim goes with its head's first layer from the bed", "[MultiNozzleLayerHeight][Strategy][FirstLayer]")
+{
+    DynamicPrintConfig config = u1_nozzle_config({ 0.4, 0.4, 0.4, 0.2 });
+    config.set_key_value("multi_nozzle_layer_heights", new ConfigOptionEnum<MultiNozzleLayerHeights>(mnlhNormal));
+    config.set_deserialize_strict({ { "brim_type", "outer_only" }, { "brim_width", "3" } });
+    apply_extruder_layer_height_plan(config);
+    Print print;
+    Model model;
+    init_plate_and_detail(print, model, config);
+    REQUIRE(print.validate().string.empty());
+    const std::string gcode = Slic3r::Test::gcode(print);
+    REQUIRE(! gcode.empty());
+    // The brim of the object prints with the plate's 0.4 head (its largest nozzle), on that head's first
+    // layer: at 0.20 mm, 0.20 high.
+    const size_t brim = gcode.find(";TYPE:Brim");
+    REQUIRE(brim != std::string::npos);
+    const size_t z      = gcode.rfind(";Z:", brim);
+    const size_t height = gcode.find(";HEIGHT:", brim);
+    const size_t tool   = gcode.rfind("\nT", brim);
+    REQUIRE(z != std::string::npos);
+    REQUIRE(height != std::string::npos);
+    REQUIRE(tool != std::string::npos);
+    CHECK(std::atof(gcode.c_str() + z + 3) == Catch::Approx(0.2).margin(1e-6));
+    CHECK(std::atof(gcode.c_str() + height + 8) == Catch::Approx(0.2).margin(1e-6));
+    CHECK(gcode.compare(tool, 3, "\nT2") == 0);
 }

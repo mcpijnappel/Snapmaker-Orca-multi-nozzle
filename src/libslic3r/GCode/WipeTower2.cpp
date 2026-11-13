@@ -1492,19 +1492,19 @@ WipeTower::ToolChangeResult WipeTower2::emit_planned_tool_change(const WipeTower
         // then fills it completely so adjacent purge blocks stay contiguous. Uses the
         // old tool (m_current_tool before toolchange_Change).
         const bool fill_box = !tool_ramming_enabled(m_current_tool) || boundary_wipe_start_enabled(m_current_tool);
-        auto new_tool_temp = is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature;
+        auto new_tool_temp = tool_first_layer(tool) ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature;
         toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material,
-                          (is_first_layer() ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature),
+                          (tool_first_layer(m_current_tool) ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature),
                           new_tool_temp, tool);
         // Wait-at-tower target: the interface temp when an interface boost applies on this layer,
         // otherwise the print temp (nozzle_temperature == 0 means "use the first layer temp").
         int wait_for_temp = interface_layer && m_filpar[tool].interface_print_temperature > 0 ?
                                 m_filpar[tool].interface_print_temperature :
-                                (is_first_layer() || m_filpar[tool].temperature == 0 ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature);
+                                (tool_first_layer(tool) || m_filpar[tool].temperature == 0 ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature);
         toolchange_Change(writer, tool, m_filpar[tool].material, wait_for_temp, true); // Change the tool, set a speed override for soluble and flex materials.
         toolchange_Load(writer, cleaning_box);
         writer.travel(writer.x(), writer.y()-m_perimeter_width); // cooling and loading were done a bit down the road
-        int base_temp = is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature;
+        int base_temp = tool_first_layer(tool) ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature;
         if (interface_layer) {
             int interface_temp = m_filpar[tool].interface_print_temperature;
             // With wait-for-temp-on-wipe-tower the toolchange already blocked for the interface temp.
@@ -1646,8 +1646,8 @@ WipeTower::ToolChangeResult WipeTower2::local_z_tool_change(size_t new_tool,
     if (m_set_extruder_trimpot)
         writer.set_extruder_trimpot(750);
 
-    const int old_tool_temp = is_first_layer() ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature;
-    const int new_tool_temp = is_first_layer() ? m_filpar[new_tool].first_layer_temperature : m_filpar[new_tool].temperature;
+    const int old_tool_temp = tool_first_layer(m_current_tool) ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature;
+    const int new_tool_temp = tool_first_layer(new_tool) ? m_filpar[new_tool].first_layer_temperature : m_filpar[new_tool].temperature;
 
     toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material, old_tool_temp, new_tool_temp, new_tool);
     toolchange_Change(writer, new_tool, m_filpar[new_tool].material, new_tool_temp, true);

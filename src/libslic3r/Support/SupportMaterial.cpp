@@ -2909,7 +2909,7 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
             }
             // Emit all intermediate support layers synchronized with object layers up to extr2z.
             // Snapmaker Orca Max ("preferred" step, support_pitch > 1): one support layer per rung of
-            // the parts' ladder (run tops at first_combined_layer_idx - 1 + n * pitch), spanning the
+            // the parts' ladder (PrintObject::ends_on_rung()), spanning the
             // object layers since the previous one; the last layer below extr2z still ends exactly
             // there, so the gap to the contact stays as configured.
             const size_t pitch        = m_support_params.support_pitch;
@@ -2930,8 +2930,8 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                     short_remainder = remaining > 0 && remaining < m_support_params.support_min_rows &&
                                       through <= m_slicing_params.max_suport_layer_height + EPSILON;
                 }
-                if (pitch > 1 && ! last && idx_layer_object >= PrintObject::first_combined_layer_idx &&
-                    ((idx_layer_object - PrintObject::first_combined_layer_idx) % pitch != pitch - 1 || short_remainder)) {
+                if (pitch > 1 && ! last && idx_layer_object >= object.first_run_layer_idx() &&
+                    (! object.ends_on_rung(idx_layer_object, pitch) || short_remainder)) {
                     if (piece_bottom < 0.)
                         piece_bottom = own_bottom;
                     continue;

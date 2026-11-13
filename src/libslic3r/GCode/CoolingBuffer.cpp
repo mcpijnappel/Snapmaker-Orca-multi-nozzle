@@ -730,12 +730,15 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int  supp_interface_fan_speed = 0;
     bool ironing_fan_control= false; // ORCA: Add support for ironing fan speed control
     int  ironing_fan_speed   = 0; // ORCA: Add support for ironing fan speed control
-    auto change_extruder_set_fan = [ this, layer_id, layer_time, &new_gcode, part_cooling_fan_min_pwm,
+    auto change_extruder_set_fan = [ this, layer_id_in = layer_id, layer_time, &new_gcode, part_cooling_fan_min_pwm,
         &overhang_fan_control, &overhang_fan_speed,
         &internal_bridge_fan_control, &internal_bridge_fan_speed,
         &supp_interface_fan_control, &supp_interface_fan_speed,
         &ironing_fan_control, &ironing_fan_speed
     ](bool immediately_apply) {
+        // Snapmaker Orca Max: a head still on its first layer (per-head first layers) cools as on the first layer.
+        const size_t layer_id = layer_id_in > 0 && m_current_extruder < m_first_layer_extruders.size() &&
+                                m_first_layer_extruders[m_current_extruder] ? 0 : layer_id_in;
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
 // The fan speeds of a filament hold one value per filament variant column. This filter runs beside
 // the G-code generator, so the column comes from the config alone.

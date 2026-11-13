@@ -237,8 +237,7 @@ struct SupportParameters {
         }
 
         // Snapmaker Orca Max ("preferred" step): support layers at the support nozzle's preferred
-        // layer height, on the ladder the parts of that nozzle size use (run tops at
-        // first_combined_layer_idx - 1 + n * pitch). Read by tree supports (grid-aligned heights)
+        // layer height, on the ladder the parts of that nozzle size use (PrintObject::ends_on_rung()). Read by tree supports (grid-aligned heights)
         // and by the classic generator (layers synchronized with the object). A support filament
         // printing the object grid (no preference) keeps whole object layers.
         support_pitch = 1;

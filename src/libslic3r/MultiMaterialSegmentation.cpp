@@ -1150,18 +1150,19 @@ static void cut_segmented_layers(const std::vector<ExPolygons>        &input_exp
                                  const float                           cut_width,
                                  const float                           interlocking_depth,
                                  const std::vector<unsigned int>      &colour_multipliers,
+                                 const PrintObject                    &print_object,
                                  const std::function<void()>          &throw_on_cancel_callback)
 {
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - cutting segmented layers in parallel - begin";
     // The interlocking depth alternates with the cut width per row. ORCA: a colour printing runs
     // of N rows alternates per run on the run ladder (PrintObject::apply_extruder_layer_heights),
     // so a run keeps one cut and the interlock survives; other colours keep the row parity.
-    auto colour_cut_width = [cut_width, interlocking_depth, &colour_multipliers](size_t layer_idx, size_t extruder_idx) -> float {
+    auto colour_cut_width = [cut_width, interlocking_depth, &colour_multipliers, &print_object](size_t layer_idx, size_t extruder_idx) -> float {
         if (interlocking_depth == 0.f)
             return cut_width;
         size_t parity_idx = layer_idx;
         if (const unsigned int n = extruder_idx < colour_multipliers.size() ? colour_multipliers[extruder_idx] : 1u; n > 1)
-            parity_idx = layer_idx >= PrintObject::first_combined_layer_idx ? (layer_idx - PrintObject::first_combined_layer_idx) / n : 0;
+            parity_idx = layer_idx >= print_object.first_run_layer_idx() ? print_object.ladder_rows_below(layer_idx) / n : 0;
         return parity_idx % 2 == 0 ? interlocking_depth : cut_width;
     };
     tbb::parallel_for(tbb::blocked_range<size_t>(0, segmented_regions.size()),
@@ -2495,7 +2496,7 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
         const std::vector<unsigned int> colour_multipliers = segmentation_interlocking_depth > 0.f ?
             painted_colour_layer_height_multipliers(print_object, num_facets_states) :
             std::vector<unsigned int>(num_facets_states, 1u);
-        cut_segmented_layers(input_expolygons, segmented_regions, float(scale_(segmentation_max_width)), float(scale_(segmentation_interlocking_depth)), colour_multipliers, throw_on_cancel_callback);
+        cut_segmented_layers(input_expolygons, segmented_regions, float(scale_(segmentation_max_width)), float(scale_(segmentation_interlocking_depth)), colour_multipliers, print_object, throw_on_cancel_callback);
         throw_on_cancel_callback();
     }
 
