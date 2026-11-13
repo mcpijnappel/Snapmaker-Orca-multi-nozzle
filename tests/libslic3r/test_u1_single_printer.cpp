@@ -330,6 +330,37 @@ TEST_CASE("Max writes the U1 under the name of Snapmaker Orca and reads it back"
         }
 }
 
+TEST_CASE("The U1 printer preset names no nozzle size; files for Snapmaker Orca name the 0.4 mm one", "[U1Printer][FileBoundary]")
+{
+    auto bundle = load_snapmaker_bundle();
+    select_u1(*bundle, { 0.6, 0.6, 0.6, 0.6 });
+    const Preset &u1 = bundle->printers.get_selected_preset();
+    CHECK(u1.config.opt_string("printer_variant") == "U1");
+    CHECK(NozzleFilament::parse_nozzle_size(u1.config.opt_string("printer_variant")) == 0.);
+    const DynamicPrintConfig written = bundle->full_config_secure();
+    CHECK(written.opt_string("printer_settings_id") == U1_04_OLD);
+    CHECK(written.opt_string("printer_variant") == "0.4");
+    // The edited printer keeps its own.
+    CHECK(bundle->printers.get_edited_preset().config.opt_string("printer_variant") == "U1");
+}
+
+TEST_CASE("An installation with any U1 nozzle size installed has the U1 installed", "[U1Printer][Profiles]")
+{
+    auto bundle = load_snapmaker_bundle();
+    AppConfig config;
+    config.set_variant(PresetBundle::SM_BUNDLE, U1, "0.2", true);
+    CHECK_FALSE(config.get_variant(PresetBundle::SM_BUNDLE, U1, "U1"));
+    bundle->migrate_renamed_printer_settings(config);
+    CHECK(config.get_variant(PresetBundle::SM_BUNDLE, U1, "U1"));
+    // Settings remembered under the old name in use last are taken over.
+    AppConfig selections;
+    selections.set("presets", PRESET_PRINTER_NAME, std::string("Snapmaker U1 (0.6 nozzle)"));
+    selections.set_printer_setting("Snapmaker U1 (0.6 nozzle)", PRESET_PRINT_NAME, "0.30mm Standard @Snapmaker U1 (0.6 nozzle)");
+    selections.set_printer_setting(U1_04_OLD, PRESET_PRINT_NAME, PROCESS_04);
+    bundle->migrate_renamed_printer_settings(selections);
+    CHECK(selections.get_printer_setting(U1, PRESET_PRINT_NAME) == "0.30mm Standard @Snapmaker U1 (0.6 nozzle)");
+}
+
 TEST_CASE("An installation that chose any U1 nozzle size shows the U1", "[U1Printer][Profiles]")
 {
     auto    bundle = load_snapmaker_bundle();

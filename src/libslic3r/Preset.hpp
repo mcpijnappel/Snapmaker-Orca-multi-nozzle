@@ -81,6 +81,7 @@
 #define BBL_JSON_KEY_HOTEND_MODEL               "hotend_model"
 // Snapmaker Orca Max: the nozzle size table of a printer model (VendorProfile::PrinterModel::nozzle_sizes).
 #define ORCA_JSON_KEY_NOZZLE_SIZES              "nozzle_sizes"
+#define ORCA_JSON_KEY_FILE_PRINTER              "file_printer"
 #define BBL_JSON_KEY_DEFAULT_MATERIALS          "default_materials"
 #define BBL_JSON_KEY_NOT_SUPPORT_BED_TYPE       "not_support_bed_type"
 #define BBL_JSON_KEY_MODEL_ID                   "model_id"
@@ -189,6 +190,9 @@ public:
         // Snapmaker Orca Max: the nozzle sizes of a model with one size-less printer preset; empty
         // for a model with a printer preset per size.
         std::vector<NozzleSize>     nozzle_sizes;
+        // Snapmaker Orca Max: the per-size printer preset of Snapmaker's layout whose name and variant
+        // files written for Snapmaker Orca carry for the size-less one (the size's NozzleSize::printer).
+        std::string                 file_printer;
         PrinterVariant*       variant(const std::string &name) {
             for (auto &v : this->variants)
                 if (v.name == name)
@@ -206,7 +210,7 @@ public:
                not_support_bed_types, bed_model, bed_texture, image_bed_type,
                bottom_texture_end_name, use_double_extruder_default_texture,
                bottom_texture_rect, bottom_texture_rect_longer, middle_texture_rect,
-               hotend_model, nozzle_sizes);
+               hotend_model, nozzle_sizes, file_printer);
         }
     };
     std::vector<PrinterModel>          models;

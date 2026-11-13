@@ -522,6 +522,7 @@ DynamicPrintConfig PresetBundle::construct_full_config(
     out.option<ConfigOptionStrings>("filament_settings_id", true)->values = filamnet_preset_names;
     // Snapmaker Orca Max: a printer preset for every size under the name Snapmaker Orca knows.
     out.option<ConfigOptionString>("printer_settings_id", true)->value    = NozzleFilament::file_printer_name(in_printer_preset);
+    out.option<ConfigOptionString>("printer_variant", true)->value        = NozzleFilament::file_printer_variant(in_printer_preset);
     out.option<ConfigOptionStrings>("filament_ids", true)->values         = filament_ids;
     out.option<ConfigOptionInts>("filament_map", true)->values            = filament_maps;
     out.option<ConfigOptionInts>("filament_volume_map", true)->values     = filament_volume_maps;
@@ -5224,6 +5225,19 @@ Preset *PresetBundle::get_similar_printer_preset(std::string printer_model, std:
         printer_model = printers.get_selected_preset().config.opt_string("printer_model");
     if (printer_model.empty()) // ORCA ensure a compatible model exist. fixes switches to blank preset if preset has no inherited value
         return nullptr;
+    // Snapmaker Orca Max: a model with one printer preset for every nozzle size: the preset in use, else
+    // its system preset, whatever size is asked for.
+    for (const auto &[vendor_id, vendor] : this->vendors)
+        for (const VendorProfile::PrinterModel &model : vendor.models)
+            if (model.id == printer_model && !model.nozzle_sizes.empty()) {
+                Preset &selected = printers.get_selected_preset();
+                if (selected.config.opt_string("printer_model") == printer_model)
+                    return &selected;
+                for (Preset &preset : printers.m_presets)
+                    if (preset.is_system && preset.config.opt_string("printer_model") == printer_model)
+                        return &preset;
+                return nullptr;
+            }
     auto printer_variant_old = printers.get_selected_preset().config.opt_string("printer_variant");
     std::map<std::string, Preset*> printer_presets;
     for (auto &preset : printers.m_presets) {
@@ -5761,6 +5775,7 @@ DynamicPrintConfig PresetBundle::full_fff_config(bool apply_extruder, std::optio
     out.option<ConfigOptionStrings>("filament_settings_id", true)->values = this->filament_presets;
     // Snapmaker Orca Max: a printer preset for every size under the name Snapmaker Orca knows.
     out.option<ConfigOptionString >("printer_settings_id",  true)->value  = NozzleFilament::file_printer_name(*this, this->printers.get_selected_preset_name());
+    out.option<ConfigOptionString >("printer_variant",      true)->value  = NozzleFilament::file_printer_variant(*this, this->printers.get_edited_preset());
     out.option<ConfigOptionStrings>("filament_ids", true)->values = filament_ids;
     out.option<ConfigOptionInts>("filament_map", true)->values = filament_maps;
     // Serialize the collected "compatible_printers_condition" and "inherits" fields.
@@ -7663,7 +7678,8 @@ PresetBundle::PresetInstall PresetBundle::resolve_vendor_preset(const CachedPres
         // modes, IDEX copy/mirror, or different control boards), so only the diameter is
         // validated, not variant uniqueness. Validation-only so the app keeps loading existing
         // profiles unchanged.
-        if (validation_mode && entry.instantiation == "true") {
+        // Snapmaker Orca Max: a printer preset for every nozzle size names no size in its variant.
+        if (validation_mode && entry.instantiation == "true" && it_model->nozzle_sizes.empty()) {
             const auto *nd = out.config.option<ConfigOptionFloats>("nozzle_diameter");
             std::set<double> nozzles, variant_nozzles;
             if (nd != nullptr)
@@ -8183,6 +8199,9 @@ void PresetBundle::parse_vendor_json(VendorRead& read)
                 }
                 else if (boost::iequals(it.key(), BBL_JSON_KEY_HOTEND_MODEL)) {
                     model.hotend_model = it.value();
+                }
+                else if (boost::iequals(it.key(), ORCA_JSON_KEY_FILE_PRINTER)) {
+                    model.file_printer = it.value();
                 }
                 else if (boost::iequals(it.key(), ORCA_JSON_KEY_NOZZLE_SIZES)) {
                     // Snapmaker Orca Max: {"0.6": {"printer": ..., "default_print_profile": ...,
@@ -8886,6 +8905,18 @@ void PresetBundle::migrate_renamed_printer_settings(AppConfig &config) const
     for (const Preset &printer : this->printers) {
         if (!printer.is_system || printer.renamed_from.empty())
             continue;
+        // The installed variant of a printer preset for every size: any size of its model installed it.
+        if (printer.vendor != nullptr)
+            for (const VendorProfile::PrinterModel &model : printer.vendor->models)
+                if (model.id == printer.config.opt_string("printer_model") && !model.nozzle_sizes.empty()) {
+                    const std::string variant = printer.config.opt_string("printer_variant");
+                    if (!config.get_variant(printer.vendor->id, model.id, variant))
+                        for (const VendorProfile::NozzleSize &size : model.nozzle_sizes)
+                            if (config.get_variant(printer.vendor->id, model.id, size.size)) {
+                                config.set_variant(printer.vendor->id, model.id, variant, true);
+                                break;
+                            }
+                }
         std::vector<std::string> old_names;
         if (std::find(printer.renamed_from.begin(), printer.renamed_from.end(), last_machine) != printer.renamed_from.end())
             old_names.emplace_back(last_machine);
@@ -9538,37 +9569,51 @@ bool PresetBundle::check_duplicate_filament_subtypes() const
             continue;
 
         const PresetWithVendorProfile active_printer = printers.get_preset_with_vendor_profile(printer);
-        // std::map keeps the reported errors in a deterministic (sorted) order.
-        std::map<std::string, std::vector<const Preset *>> by_filament_id;
-        for (const Preset *fil : vendor_filaments)
-            if (is_compatible_with_printer(filaments.get_preset_with_vendor_profile(*fil), active_printer))
-                by_filament_id[fil->filament_id].push_back(fil);
-        if (&vendor_filaments != &library_filaments)
-            for (const Preset *fil : library_filaments)
-                if (is_compatible_with_printer(filaments.get_preset_with_vendor_profile(*fil), active_printer))
-                    by_filament_id[fil->filament_id].push_back(fil);
-
-        for (const auto &entry : by_filament_id) {
-            if (entry.second.size() < 2)
-                continue;
-            found_duplicates = true;
-            // List each conflicting preset with a clickable file:// URI on its own
-            // line, so the profile author can jump straight to the files to fix.
-            // A preset from another bundle (the Orca Filament Library) is tagged with
-            // its vendor so the source bundle is obvious.
-            std::string presets;
-            for (const Preset *p : entry.second) {
-                presets += "\n    - " + p->name;
-                if (p->vendor != nullptr && p->vendor->name != printer.vendor->name)
-                    presets += " [" + p->vendor->name + "]";
-                presets += "\n      " + preset_file_uri(p->file);
+        // Snapmaker Orca Max: a printer preset for every nozzle size matches a spool for the size of the
+        // tool head that loads it: the presets of one size, and those made for no size, per size.
+        std::vector<std::string> head_sizes { std::string() };
+        for (const VendorProfile::PrinterModel &model : printer.vendor->models)
+            if (model.id == printer.config.opt_string("printer_model") && !model.nozzle_sizes.empty()) {
+                head_sizes.clear();
+                for (const VendorProfile::NozzleSize &size : model.nozzle_sizes)
+                    head_sizes.emplace_back(size.size);
             }
-            BOOST_LOG_TRIVIAL(error)
-                << "Ambiguous AMS filament match: " << entry.second.size()
-                << " filament presets share filament_id \"" << entry.first
-                << "\" and are all compatible with printer \"" << printer.name
-                << "\". When matching an AMS spool the slicer cannot tell them apart and"
-                   " silently picks whichever loads first." << presets;
+        for (const std::string &head_size : head_sizes) {
+            auto fits_head = [&head_size](const Preset *fil) { return head_size.empty() || fil->nozzle_size.empty() || fil->nozzle_size == head_size; };
+            // std::map keeps the reported errors in a deterministic (sorted) order.
+            std::map<std::string, std::vector<const Preset *>> by_filament_id;
+            for (const Preset *fil : vendor_filaments)
+                if (fits_head(fil) && is_compatible_with_printer(filaments.get_preset_with_vendor_profile(*fil), active_printer))
+                    by_filament_id[fil->filament_id].push_back(fil);
+            if (&vendor_filaments != &library_filaments)
+                for (const Preset *fil : library_filaments)
+                    if (fits_head(fil) && is_compatible_with_printer(filaments.get_preset_with_vendor_profile(*fil), active_printer))
+                        by_filament_id[fil->filament_id].push_back(fil);
+
+            for (const auto &entry : by_filament_id) {
+                if (entry.second.size() < 2)
+                    continue;
+                found_duplicates = true;
+                // List each conflicting preset with a clickable file:// URI on its own
+                // line, so the profile author can jump straight to the files to fix.
+                // A preset from another bundle (the Orca Filament Library) is tagged with
+                // its vendor so the source bundle is obvious.
+                std::string presets;
+                for (const Preset *p : entry.second) {
+                    presets += "\n    - " + p->name;
+                    if (p->vendor != nullptr && p->vendor->name != printer.vendor->name)
+                        presets += " [" + p->vendor->name + "]";
+                    presets += "\n      " + preset_file_uri(p->file);
+                }
+                BOOST_LOG_TRIVIAL(error)
+                    << "Ambiguous AMS filament match: " << entry.second.size()
+                    << " filament presets share filament_id \"" << entry.first
+                    << "\" and are all compatible with printer \"" << printer.name
+                    << (head_size.empty() ? std::string() : "\" on a " + head_size + " mm tool head")
+                    << (head_size.empty() ? "\"" : "")
+                    << ". When matching an AMS spool the slicer cannot tell them apart and"
+                       " silently picks whichever loads first." << presets;
+            }
         }
     }
 

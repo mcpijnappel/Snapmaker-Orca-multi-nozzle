@@ -8,11 +8,12 @@ Snapmaker's layout into Max's:
 
 - machine/Snapmaker U1 printer.json: the entry preset "Snapmaker U1", the content of the 0.4 mm preset
   (the one with the High Flow columns), its setting_id kept, renamed_from the four old names so that
-  projects and user presets naming them load onto it.
-- machine/Snapmaker U1.json (the printer model): "nozzle_diameter" names the entry's one variant, and
+  projects and user presets naming them load onto it. Its printer_variant is "U1", no nozzle size.
+- machine/Snapmaker U1.json (the printer model): "nozzle_diameter" names the entry's one variant ("U1"),
   "nozzle_sizes" holds per size the values a tool head of that size takes (the keys in which the four
   presets differ), the size's default process preset, whether it has High Flow values, and the old
-  printer name (what a project of Snapmaker Orca names for that size).
+  printer name (what a project of Snapmaker Orca names for that size), and "file_printer" names the
+  per-size preset whose name and variant files for Snapmaker Orca carry (the 0.4 mm one).
 - Process and filament presets: "compatible_printers" names "Snapmaker U1"; a preset made for one size
   says so in "nozzle_size". A preset for every size (the multi-nozzle presets) gets no tag.
 - The four per-size machine files are deleted and Snapmaker.json lists the entry.
@@ -35,6 +36,8 @@ ENTRY = "Snapmaker U1"
 ENTRY_FILE = "machine/Snapmaker U1 printer.json"
 SIZES = ["0.2", "0.4", "0.6", "0.8"]
 ENTRY_SIZE = "0.4"
+# The variant of the entry: the loader wants one per printer preset, and it names no nozzle size.
+ENTRY_VARIANT = "U1"
 OLD_NAME = "Snapmaker U1 ({} nozzle)"
 OLD_PATTERN = re.compile(r"Snapmaker U1 \((0\.[0-9]+) nozzle\)")
 # Keys that are no per-head value even where the presets differ: identity, the variant layout of the
@@ -113,12 +116,14 @@ def convert_machines(write):
         if key == "name":
             entry["name"] = ENTRY
             entry["renamed_from"] = ";".join(OLD_NAME.format(size) for size in SIZES)
+    entry["printer_variant"] = ENTRY_VARIANT
     entry_path = VENDOR_DIR / ENTRY_FILE
 
     model_path = machine_dir / f"{MODEL}.json"
     model = load(model_path)
-    model["nozzle_diameter"] = ENTRY_SIZE
+    model["nozzle_diameter"] = ENTRY_VARIANT
     model["nozzle_sizes"] = build_table(machines)
+    model["file_printer"] = OLD_NAME.format(ENTRY_SIZE)
 
     print(f"write {entry_path.relative_to(ROOT)} (from {paths[ENTRY_SIZE].name})")
     print(f"write {model_path.relative_to(ROOT)}: nozzle_sizes {', '.join(model['nozzle_sizes'])}, "
@@ -204,9 +209,29 @@ def convert_index(write):
     return True
 
 
+def size_less_variant(write):
+    """A layout converted before the entry lost its nozzle size: its variant becomes ENTRY_VARIANT."""
+    entry_path = VENDOR_DIR / ENTRY_FILE
+    model_path = VENDOR_DIR / "machine" / f"{MODEL}.json"
+    if not entry_path.exists():
+        return False
+    entry, model = load(entry_path), load(model_path)
+    if entry.get("printer_variant") == ENTRY_VARIANT and model.get("nozzle_diameter") == ENTRY_VARIANT and "file_printer" in model:
+        return False
+    entry["printer_variant"] = ENTRY_VARIANT
+    model["nozzle_diameter"] = ENTRY_VARIANT
+    model["file_printer"] = OLD_NAME.format(ENTRY_SIZE)
+    print(f"write {entry_path.relative_to(ROOT)} and {model_path.relative_to(ROOT)}: variant {ENTRY_VARIANT}, no nozzle size")
+    if write:
+        entry_path.write_text(dump(entry), encoding="utf-8")
+        model_path.write_text(dump(model), encoding="utf-8")
+    return True
+
+
 def main():
     write = "--write" in sys.argv[1:]
     changed = convert_machines(write)
+    changed = size_less_variant(write) or changed
     for kind in ("process", "filament"):
         for path in sorted((VENDOR_DIR / kind).glob("*.json")):
             changed = convert_preset(path, write) or changed

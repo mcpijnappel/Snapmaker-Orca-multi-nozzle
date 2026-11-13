@@ -75,6 +75,10 @@ std::optional<DynamicPrintConfig>  size_config(const PresetBundle &bundle, doubl
 std::string file_printer_name(const PresetBundle &bundle, const std::string &name);
 // The same for a printer preset at hand (a system preset knows its vendor).
 std::string file_printer_name(const Preset &printer);
+// The "printer_variant" files carry for printer preset `printer` (a user preset: its system parent's):
+// the size of that per-size preset for a printer preset for every size, else its own.
+std::string file_printer_variant(const PresetBundle &bundle, const Preset &printer);
+std::string file_printer_variant(const Preset &printer);
 // The table says `size` has High Flow values (any size for a `size` <= 0); false without a table.
 bool                               size_has_high_flow_values(const PresetBundle &bundle, double size);
 

@@ -4281,13 +4281,12 @@ Sidebar::Sidebar(Plater *parent)
                     // are collected up front, so cancelled or no-op steps still get their pass.
                     Plater::NozzleFollowScope follow_scope(wxGetApp().plater());
                     wxGetApp().plater()->follow_nozzle_sizes({}, Plater::FollowReason::PrinterSync);
-                    // Keeps the printer preset in use (e.g. "* Snapmaker U1" or a user preset from it)
-                    // when NozzleFilament::sync_keeps_printer_preset allows; otherwise selects the
+                    // Keeps the printer preset in use (the U1, one preset for every size, or a user preset
+                    // from it) when NozzleFilament::sync_keeps_printer_preset allows; otherwise selects the
                     // machine preset of the reference size.
                     const Preset &edited = bundle->printers.get_edited_preset();
                     if (NozzleFilament::sync_keeps_printer_preset(edited, *preset))
-                        BOOST_LOG_TRIVIAL(info) << "nozzle sync: printer preset \"" << edited.name << "\" kept, it is made for the "
-                                                << preset->config.opt_string("printer_variant") << " mm nozzle of the reference extruder";
+                        BOOST_LOG_TRIVIAL(info) << "nozzle sync: printer preset \"" << edited.name << "\" kept; the sync sets the nozzle sizes of its tool heads";
                     else
                         wxGetApp().get_tab(Preset::TYPE_PRINTER)->select_preset(preset->name);
                     Sidebar &sidebar = wxGetApp().plater()->sidebar();
@@ -32359,8 +32358,8 @@ static Plater::NozzleFollowResult nozzle_follow_report(const PresetBundle *bundl
     else if (switched.size() > 1)
         result.lines.emplace_back(GUI::format(_u8L("Filaments %1% now use the presets for the size of their nozzles."), join_numbers(switched)));
     for (const auto &[size, materials] : no_version) {
-        result.lines.emplace_back(GUI::format(_u8L("No %1% mm preset exists for: %2%. The presets of the printer's nozzle size are used; check flow "
-                                                   "ratio, pressure advance and maximum volumetric speed."),
+        result.lines.emplace_back(GUI::format(_u8L("No %1% mm preset exists for: %2%. The plate does not slice with a preset of another size; "
+                                                   "save your own %1% mm version from the filament's slot."),
                                               size, boost::algorithm::join(materials, ", ")));
         result.review = true;
     }

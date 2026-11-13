@@ -1389,6 +1389,14 @@ bool GuideFrame::BuildProfileJson(const PresetBundle& bundle, bool require_all_r
                 entry["name"]            = model.name;
                 entry["vendor"]          = vp.id;
                 entry["nozzle_diameter"] = nozzle_str;
+                // Snapmaker Orca Max: a printer preset for every size shows the sizes its heads take,
+                // not its variant (which names no size).
+                if (!model.nozzle_sizes.empty()) {
+                    std::string sizes;
+                    for (const auto& size : model.nozzle_sizes)
+                        sizes += (sizes.empty() ? "" : ";") + size.size;
+                    entry["nozzle_info"] = sizes;
+                }
                 entry["materials"]       = materials_str;
                 entry["cover"]           = into_u8(file_url_from_path(cover_path));
                 entry["nozzle_selected"] = "";
@@ -1851,6 +1859,13 @@ int GuideFrame::LoadProfileFamily(std::string strVendor, std::string strFilePath
                 StringReplace(NozzleOpt, " ", "");
                 OneModel["nozzle_diameter"] = NozzleOpt;
                 OneModel["materials"]       = pm["default_materials"];
+                // Snapmaker Orca Max: a printer preset for every size shows the sizes its heads take.
+                if (pm.contains("nozzle_sizes") && pm["nozzle_sizes"].is_object()) {
+                    std::string sizes;
+                    for (auto size = pm["nozzle_sizes"].begin(); size != pm["nozzle_sizes"].end(); ++size)
+                        sizes += (sizes.empty() ? "" : ";") + size.key();
+                    OneModel["nozzle_info"] = sizes;
+                }
 
                 std::string             cover_file = s1 + "_cover.png";
                 // Orca: the vendor directory comes first, so that a vendor installed by the updater

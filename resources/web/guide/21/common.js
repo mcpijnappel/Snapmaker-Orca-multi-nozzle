@@ -317,7 +317,7 @@ function CreatePrinterBlock(OneModel)
 			'	<div class="PrinterInfoMark">?</div>'+
 			'	<div class="PrinterInfo">'+
 			'		<div class="title trans">Nozzle</div>'+
-			'		<div class="value">' + OneModel['nozzle_diameter'].replaceAll(";", " · ") + '</div>'+
+			'		<div class="value">' + (OneModel['nozzle_info'] || OneModel['nozzle_diameter']).replaceAll(";", " · ") + '</div>'+
 			'	</div>'+
 			'	<div style="display: flex;">'+
 			'		<div class="ModelCheckBox" vendor="' +vendor+ '" model="'+OneModel['model']+'"></div>'+

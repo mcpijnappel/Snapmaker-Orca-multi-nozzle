@@ -8,7 +8,7 @@
     "default_materials": "Snapmaker PLA SnapSpeed @U1 0.2 nozzle;Snapmaker PLA SnapSpeed @U1;Snapmaker PLA SnapSpeed @U1 0.6 nozzle;Snapmaker PLA SnapSpeed @U1 0.8 nozzle",
     "bed_model": "Snapmaker U1_bed.stl",
     "bed_texture": "Snapmaker U1_texture.svg",
-    "nozzle_diameter": "0.4",
+    "nozzle_diameter": "U1",
     "nozzle_sizes": {
         "0.2": {
             "printer": "Snapmaker U1 (0.2 nozzle)",
@@ -54,5 +54,6 @@
             "retraction_minimum_travel": "1",
             "wipe_distance": "2"
         }
-    }
+    },
+    "file_printer": "Snapmaker U1 (0.4 nozzle)"
 }

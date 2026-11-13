@@ -249,18 +249,37 @@ std::optional<DynamicPrintConfig> size_config(const PresetBundle &bundle, double
     return machine == nullptr ? std::nullopt : std::optional<DynamicPrintConfig>(machine->config);
 }
 
-std::string file_printer_name(const Preset &printer)
+// The size table entry whose printer the files written for Snapmaker Orca name (PrinterModel::file_printer).
+static const VendorProfile::NozzleSize* file_printer_entry(const Preset &printer)
 {
     if (!printer.is_system || printer.vendor == nullptr)
-        return printer.name;
+        return nullptr;
     const std::string model = printer.config.opt_string("printer_model");
-    const double      own   = machine_nozzle_size(printer);
     for (const VendorProfile::PrinterModel &candidate : printer.vendor->models)
-        if (candidate.id == model)
+        if (candidate.id == model && !candidate.file_printer.empty())
             for (const VendorProfile::NozzleSize &entry : candidate.nozzle_sizes)
-                if (same_size(parse_nozzle_size(entry.size), own) && !entry.printer.empty())
-                    return entry.printer;
-    return printer.name;
+                if (entry.printer == candidate.file_printer)
+                    return &entry;
+    return nullptr;
+}
+
+std::string file_printer_name(const Preset &printer)
+{
+    const VendorProfile::NozzleSize *entry = file_printer_entry(printer);
+    return entry == nullptr ? printer.name : entry->printer;
+}
+
+std::string file_printer_variant(const Preset &printer)
+{
+    const VendorProfile::NozzleSize *entry = file_printer_entry(printer);
+    return entry == nullptr ? printer.config.opt_string("printer_variant") : entry->size;
+}
+
+std::string file_printer_variant(const PresetBundle &bundle, const Preset &printer)
+{
+    const Preset *base = printer.is_system ? &printer : bundle.printers.get_preset_parent(printer);
+    return base == nullptr || base == &printer ? file_printer_variant(printer) :
+           file_printer_entry(*base) != nullptr ? file_printer_variant(*base) : printer.config.opt_string("printer_variant");
 }
 
 std::string file_printer_name(const PresetBundle &bundle, const std::string &name)

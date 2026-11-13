@@ -4055,7 +4055,7 @@ bool TabPrint::head_display_source(const std::string &opt_key, int opt_index, co
     if (size_t(head) >= m_head_sources.size() || !m_head_sources[size_t(head)].derived || m_head_sources[size_t(head)].preset == nullptr)
         return false;
     // A speed comes from the head's speeds source at the flow it prints; a line width from its width
-    // source's Standard shared column (the selected preset, -1, for a home-size head and for a High
+    // source's Standard shared column (the selected preset, -1, for a head of its size and for a High
     // Flow head whose speeds were re-picked).
     const PerHeadProcess::Source &source = m_head_sources[size_t(head)];
     const Preset                 *from   = nullptr;
