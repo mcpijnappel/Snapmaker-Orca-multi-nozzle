@@ -30,6 +30,7 @@
 	"support_threshold_angle": "40",
 	"support_type": "tree(auto)",
 	"compatible_printers": [
-		"Snapmaker U1 (0.8 nozzle)"
-	]
+		"Snapmaker U1"
+	],
+	"nozzle_size": "0.8"
 }

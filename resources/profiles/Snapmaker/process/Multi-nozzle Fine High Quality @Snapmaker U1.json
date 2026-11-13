@@ -57,9 +57,6 @@
 	"bridge_density": "80%",
 	"bridge_flow": "0.8",
 	"compatible_printers": [
-		"Snapmaker U1 (0.2 nozzle)",
-		"Snapmaker U1 (0.4 nozzle)",
-		"Snapmaker U1 (0.6 nozzle)",
-		"Snapmaker U1 (0.8 nozzle)"
+		"Snapmaker U1"
 	]
 }

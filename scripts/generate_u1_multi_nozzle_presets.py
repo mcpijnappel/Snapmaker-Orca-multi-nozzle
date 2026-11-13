@@ -58,7 +58,10 @@ NEAREST_STANDARD = {
 
 # Keys of a preset that are not settings.
 META_KEYS = {"type", "name", "inherits", "from", "setting_id", "instantiation", "compatible_printers",
-             "description", "renamed_from", "print_settings_id"}
+             "nozzle_size", "description", "renamed_from", "print_settings_id"}
+# The one U1 printer preset; a preset for one nozzle size says so in "nozzle_size"
+# (scripts/convert_u1_single_printer.py).
+U1_PRINTER = "Snapmaker U1"
 
 # High Flow speeds of the 0.4 mm presets (the High Flow column of 0.20mm Standard, the only one
 # Snapmaker ships). Ultra fine builds on the slow 0.12mm Standard: its High Flow column keeps the
@@ -111,17 +114,16 @@ def nearest_base(size, height):
 
 
 def machine_limits(size):
-    """min / max layer height of the U1 machine preset of `size`, through its parents."""
-    name, out = f"Snapmaker U1 ({size} nozzle)", {}
-    chain = []
-    while name:
-        with open(MACHINE_DIR / f"{name}.json", encoding="utf-8-sig") as f:
-            preset = json.load(f)
-        chain.append(preset)
-        name = preset.get("inherits", "")
-    for preset in reversed(chain):
-        out.update(preset)
-    return float(scalar(out["min_layer_height"])), float(scalar(out["max_layer_height"]))
+    """min / max layer height of a U1 tool head of `size`: the nozzle size table of the printer model."""
+    with open(MACHINE_DIR / "Snapmaker U1.json", encoding="utf-8-sig") as f:
+        table = json.load(f)["nozzle_sizes"][size]
+    return float(table["min_layer_height"]), float(table["max_layer_height"])
+
+
+def for_size(preset, size):
+    """The preset serves the U1 tool heads of `size`."""
+    preset["compatible_printers"] = [U1_PRINTER]
+    preset["nozzle_size"] = size
 
 
 def step_heights(size):
@@ -164,7 +166,6 @@ def write(name, preset):
 
 def size_preset(strategy, size, height):
     name = f"Multi-nozzle {strategy} @Snapmaker U1 ({size} nozzle)"
-    machine = f"Snapmaker U1 ({size} nozzle)"
     exact = f"{height}mm Standard @Snapmaker U1 ({size} nozzle)"
     preset = {"type": "process", "name": name, "from": "system", "instantiation": "true"}
     # Keep the id orca_profile_tool.py generate-id gave the preset.
@@ -187,7 +188,7 @@ def size_preset(strategy, size, height):
         # A base of another height: the layer height the strategy prints this size at.
         if base_height != height:
             preset["layer_height"] = height
-    preset["compatible_printers"] = [machine]
+    for_size(preset, size)
     write(name, preset)
 
 
@@ -205,7 +206,6 @@ def add_high_flow_column(strategy, faster):
 
 def height_preset(size, height):
     name = f"{height}mm Multi-nozzle @Snapmaker U1 ({size} nozzle)"
-    machine = f"Snapmaker U1 ({size} nozzle)"
     exact = f"{height}mm Standard @Snapmaker U1 ({size} nozzle)"
     preset = {"type": "process", "name": name, "from": "system", "instantiation": "true"}
     if (PROCESS_DIR / f"{name}.json").exists():
@@ -233,7 +233,7 @@ def height_preset(size, height):
                 preset[key] = value
         if base_height != height:
             preset["layer_height"] = height
-    preset["compatible_printers"] = [machine]
+    for_size(preset, size)
     # A 0.4 mm High Flow nozzle: a High Flow column where the parent has none, faster from 0.16 mm on
     # (as the strategy presets).
     if size == "0.4":
@@ -300,7 +300,7 @@ def high_quality_presets(strategy):
             sibling["inherits"] = standard_size
             sibling["description"] = f"{size} mm nozzle, Multi-nozzle {strategy} with High Quality speeds."
             sibling.update(high_quality(resolved(standard_size), 1))
-        sibling["compatible_printers"] = [f"Snapmaker U1 ({size} nozzle)"]
+        for_size(sibling, size)
         write(size_name, sibling)
         written.append(size_name)
     return written

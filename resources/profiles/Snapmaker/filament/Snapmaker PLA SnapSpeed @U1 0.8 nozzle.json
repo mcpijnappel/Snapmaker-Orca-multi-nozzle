@@ -6,8 +6,9 @@
     "setting_id": "1195313935018",
     "inherits": "Snapmaker PLA SnapSpeed @U1 base",
     "compatible_printers": [
-        "Snapmaker U1 (0.8 nozzle)"
+        "Snapmaker U1"
     ],
+    "nozzle_size": "0.8",
     "filament_multitool_ramming_flow": [
         "30"
     ],

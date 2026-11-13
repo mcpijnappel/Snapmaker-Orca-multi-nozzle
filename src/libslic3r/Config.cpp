@@ -1044,6 +1044,8 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
                 key_values.emplace(BBL_JSON_KEY_INCLUDES, it.value().dump());
             } else if (ascii_iequals(it.key(), ORCA_JSON_KEY_RENAMED_FROM)) {
                 key_values.emplace(ORCA_JSON_KEY_RENAMED_FROM, it.value());
+            } else if (ascii_iequals(it.key(), ORCA_JSON_KEY_NOZZLE_SIZE)) {
+                key_values.emplace(ORCA_JSON_KEY_NOZZLE_SIZE, it.value());
             } else {
                 t_config_option_key opt_key = it.key();
                 std::string value_str;

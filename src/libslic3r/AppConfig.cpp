@@ -1774,6 +1774,24 @@ std::string AppConfig::get_nozzle_volume_types_from_config(const std::string& pr
     return nozzle_volume_types;
 }
 
+void AppConfig::save_nozzle_diameters_to_config(const std::string& printer_name, const std::string& nozzle_diameters)
+{
+    std::map<std::string, std::string> data;
+    if (has_section("nozzle_diameters"))
+        data = get_section("nozzle_diameters");
+    data[printer_name] = nozzle_diameters;
+    set_section("nozzle_diameters", data);
+}
+
+std::string AppConfig::get_nozzle_diameters_from_config(const std::string& printer_name)
+{
+    if (!has_section("nozzle_diameters"))
+        return {};
+    const auto &data = get_section("nozzle_diameters");
+    auto        it   = data.find(printer_name);
+    return it == data.end() ? std::string() : it->second;
+}
+
 std::string AppConfig::get_network_plugin_version() const
 {
     return get(SETTING_NETWORK_PLUGIN_VERSION);

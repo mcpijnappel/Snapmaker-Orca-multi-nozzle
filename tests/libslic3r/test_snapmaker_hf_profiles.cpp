@@ -10,6 +10,7 @@
 #include <boost/filesystem.hpp>
 #include <nlohmann/json.hpp>
 
+#include "libslic3r/NozzleFilamentPresets.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
@@ -190,16 +191,18 @@ TEST_CASE("The U1 0.4 machine preset carries a Standard and a High Flow column p
     }
 }
 
-TEST_CASE("The other U1 machine presets declare no flow variants", "[Profiles][HighFlow][hf_profiles_machine]")
+TEST_CASE("The other U1 nozzle sizes have no High Flow values", "[Profiles][HighFlow][hf_profiles_machine]")
 {
+    // The one U1 printer preset declares the High Flow columns; its size table says which sizes
+    // have values for them (Snapmaker ships them for 0.4 mm only).
     const auto    loaded = load_snapmaker_bundle();
     PresetBundle &bundle = *loaded;
-    for (const char *name : {"Snapmaker U1 (0.2 nozzle)", "Snapmaker U1 (0.6 nozzle)", "Snapmaker U1 (0.8 nozzle)"}) {
-        INFO(name);
-        const DynamicPrintConfig &machine = system_config(bundle.printers, name);
-        for (const std::string &entry : machine.option<ConfigOptionStrings>("extruder_variant_list")->values)
-            CHECK(entry.find("High Flow") == std::string::npos);
-        CHECK(vector_size(machine, "retraction_length") == HEADS);
+    REQUIRE(bundle.printers.select_preset_by_name("Snapmaker U1", true));
+    const VendorProfile::PrinterModel *table = NozzleFilament::size_table(bundle);
+    REQUIRE(table != nullptr);
+    for (const VendorProfile::NozzleSize &size : table->nozzle_sizes) {
+        INFO(size.size);
+        CHECK(size.high_flow == (size.size == "0.4"));
     }
 }
 

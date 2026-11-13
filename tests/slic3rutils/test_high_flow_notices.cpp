@@ -607,9 +607,10 @@ TEST_CASE("The reason names the nozzle size of the tool head", "[HighFlow][FlowR
 TEST_CASE("The vendor data says which nozzle sizes offer High Flow", "[HighFlow][Notices][Profiles]")
 {
     const auto loaded = load_snapmaker_bundle();
+    REQUIRE(loaded->printers.select_preset_by_name("Snapmaker U1", true));
     const HighFlowNotices::SizeOffersHighFlow shipped = HighFlowNotices::size_offers_high_flow(*loaded);
 
-    SECTION("the shipped vendor: the U1 0.4 mm machine preset declares High Flow for every tool head, the other sizes do not") {
+    SECTION("the shipped vendor: the U1 size table has High Flow values for 0.4 mm, not for the other sizes") {
         // Snapmaker ships High Flow values for the 0.4 mm nozzle only; the 0.2 / 0.6 / 0.8 mm
         // presets keep their Standard values until Snapmaker ships theirs.
         for (size_t head = 0; head < 4; ++head) {
@@ -623,13 +624,13 @@ TEST_CASE("The vendor data says which nozzle sizes offer High Flow", "[HighFlow]
         loaded->printers.get_edited_preset().config.set_key_value("printer_model", new ConfigOptionString(""));
         CHECK_FALSE(shipped(0.4, 0));
     }
-    SECTION("a vendor update that declares High Flow on the 0.6 mm preset offers the size, one that withdraws it rules the size out again") {
+    SECTION("a vendor update that gives 0.6 mm High Flow values offers the size, one that withdraws them rules the size out again") {
         const DynamicPrintConfig printer = u1_like_printer({ 0.4, 0.6 });
         std::vector<int>         types{ int(nvtHighFlow), int(nvtHighFlow) };
         CHECK(HighFlowNotices::flow_row_state(printer, 1, shipped) == HighFlowNotices::FlowRowState::RuledOut);
 
-        // The 0.6 mm machine preset in the layout of the 0.4 mm one (the fixture).
-        Preset &machine = Slic3r::Test::u1_0_6_declares_high_flow(*loaded);
+        // The 0.6 mm entry of the size table with High Flow values (the fixture).
+        VendorProfile::NozzleSize &size_0_6 = Slic3r::Test::u1_0_6_declares_high_flow(*loaded);
         for (size_t head = 0; head < 4; ++head)
             CHECK(shipped(0.6, head));
         CHECK_FALSE(shipped(0.8, 0));
@@ -637,8 +638,8 @@ TEST_CASE("The vendor data says which nozzle sizes offer High Flow", "[HighFlow]
         CHECK(HighFlowNotices::sanitize(printer, types, shipped).empty());
         CHECK(types == std::vector<int>{ int(nvtHighFlow), int(nvtHighFlow) });
 
-        // The shape of Snapmaker's 0.6 mm machine preset: no variant list.
-        machine.config.erase("extruder_variant_list");
+        // Withdrawn again.
+        size_0_6.high_flow = false;
         CHECK_FALSE(shipped(0.6, 0));
         CHECK(HighFlowNotices::flow_row_state(printer, 1, shipped) == HighFlowNotices::FlowRowState::RuledOut);
         CHECK(HighFlowNotices::sanitize(printer, types, shipped) == std::vector<size_t>{ 1 });
@@ -813,9 +814,13 @@ TEST_CASE("Every tool head of a U1 shows its Flow row", "[FirstRun][HighFlow][Fl
     const auto loaded = load_snapmaker_bundle();
     const HighFlowNotices::SizeOffersHighFlow shipped = HighFlowNotices::size_offers_high_flow(*loaded);
 
+    // The one U1 preset with every head of one size (the names of Snapmaker's per-size presets lead to it).
     for (const char *name : { "Snapmaker U1 (0.2 nozzle)", "Snapmaker U1 (0.6 nozzle)", "Snapmaker U1 (0.8 nozzle)" }) {
         REQUIRE(loaded->printers.select_preset_by_name(name, true));
-        const DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+        DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+        const std::string   label   = name;
+        const double        size    = std::stod(label.substr(label.find('(') + 1));
+        printer.set_key_value("nozzle_diameter", new ConfigOptionFloats(std::vector<double>(4, size)));
         REQUIRE(printer.option<ConfigOptionFloats>("nozzle_diameter")->size() == 4);
         for (size_t head = 0; head < 4; ++head) {
             INFO(name << ", tool head " << head + 1);
@@ -826,7 +831,8 @@ TEST_CASE("Every tool head of a U1 shows its Flow row", "[FirstRun][HighFlow][Fl
     }
 
     REQUIRE(loaded->printers.select_preset_by_name("Snapmaker U1 (0.4 nozzle)", true));
-    const DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+    DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+    printer.set_key_value("nozzle_diameter", new ConfigOptionFloats(std::vector<double>(4, 0.4)));
     for (size_t head = 0; head < 4; ++head) {
         INFO("Snapmaker U1 (0.4 nozzle), tool head " << head + 1);
         CHECK(HighFlowNotices::flow_row_state(printer, head, shipped) == HighFlowNotices::FlowRowState::Choice);
@@ -863,7 +869,8 @@ TEST_CASE("A 0.4 mm tool head offers High Flow on the 0.2, 0.6 and 0.8 mm U1 pre
 
     // The 0.4 mm preset: every 0.4 mm head a choice, as before.
     REQUIRE(loaded->printers.select_preset_by_name("Snapmaker U1 (0.4 nozzle)", true));
-    const DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+    DynamicPrintConfig &printer = loaded->printers.get_edited_preset().config;
+    printer.set_key_value("nozzle_diameter", new ConfigOptionFloats(std::vector<double>(4, 0.4)));
     for (size_t head = 0; head < 4; ++head) {
         CHECK(HighFlowNotices::offered_volume_types(printer, head, shipped) == both);
         CHECK(HighFlowNotices::head_can_use_high_flow(printer, head, shipped));

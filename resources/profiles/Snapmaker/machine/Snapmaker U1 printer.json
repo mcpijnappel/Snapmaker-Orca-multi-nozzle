@@ -1,7 +1,8 @@
 {
     "type": "machine",
     "setting_id": "SM_U1",
-    "name": "Snapmaker U1 (0.4 nozzle)",
+    "name": "Snapmaker U1",
+    "renamed_from": "Snapmaker U1 (0.2 nozzle);Snapmaker U1 (0.4 nozzle);Snapmaker U1 (0.6 nozzle);Snapmaker U1 (0.8 nozzle)",
     "from": "system",
     "instantiation": "true",
     "inherits": "fdm_U1",

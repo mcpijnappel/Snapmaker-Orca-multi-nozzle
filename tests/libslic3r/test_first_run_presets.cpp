@@ -10,6 +10,7 @@
 #include <boost/filesystem.hpp>
 
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/NozzleFilamentPresets.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
@@ -89,6 +90,17 @@ std::map<std::string, std::string> default_materials()
     for (const std::string &name : u1_model().default_materials)
         out[name] = "true";
     return out;
+}
+
+// The U1 with every tool head on nozzle size `size`, as the sidebar sets one head after the other
+// (NozzleFilament::head_setup_config), after the printer preset `printer` is selected.
+void set_u1_heads(PresetBundle &bundle, double size)
+{
+    const VendorProfile::PrinterModel *table = NozzleFilament::size_table(bundle);
+    REQUIRE(table != nullptr);
+    DynamicPrintConfig &edited = bundle.printers.get_edited_preset().config;
+    const size_t        heads  = edited.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+    edited = NozzleFilament::head_setup_config(edited, *table, std::vector<double>(heads, size));
 }
 
 // The variant the wizard selects among ticked U1 variants (PresetBundle::wizard_printer_variant).
@@ -254,18 +266,18 @@ TEST_CASE("After the setup wizard the U1 has four filament slots of one PLA and 
     }
     SECTION("every filament ticked, the 0.4 mm variant") {
         run.finish(every_filament(), "0.4");
-        CHECK(run.bundle.printers.get_edited_preset().name == "Snapmaker U1 (0.4 nozzle)");
+        CHECK(run.bundle.printers.get_edited_preset().name == "Snapmaker U1");
         run.check_first_run_state();
     }
 }
 
-TEST_CASE("Selecting a U1 printer preset without an edit leaves it clean", "[FirstRun][Preset][fr1_clean_selection]")
+TEST_CASE("Selecting the U1 printer preset without an edit leaves it clean", "[FirstRun][Preset][fr1_clean_selection]")
 {
     auto bundle = std::make_unique<PresetBundle>();
     bundle->load_vendor_configs_from_json(PROFILES_DIR, SNAPMAKER, PresetBundle::LoadSystem,
                                           ForwardCompatibilitySubstitutionRule::EnableSilent, nullptr, /*allow_cache=*/false);
-    const std::string name = GENERATE(std::string("Snapmaker U1 (0.2 nozzle)"), std::string("Snapmaker U1 (0.4 nozzle)"),
-                                      std::string("Snapmaker U1 (0.6 nozzle)"), std::string("Snapmaker U1 (0.8 nozzle)"));
+    // The one U1 preset, by its name and by the names of Snapmaker's per-size presets it replaced.
+    const std::string name = GENERATE(std::string("Snapmaker U1"), std::string("Snapmaker U1 (0.2 nozzle)"), std::string("Snapmaker U1 (0.6 nozzle)"));
     REQUIRE(bundle->printers.select_preset_by_name(name, true));
     bundle->update_compatible(PresetSelectCompatibleType::Always);
     INFO(name);
@@ -275,55 +287,66 @@ TEST_CASE("Selecting a U1 printer preset without an edit leaves it clean", "[Fir
         INFO("dirty options: " << joined(bundle->printers.current_dirty_options(true)));
         CHECK_FALSE(bundle->printers.current_is_dirty());
     }
-    SECTION("a sidebar edit of tool head 1 shows in the unsaved changes dialog") {
+    SECTION("a nozzle size set in the sidebar is the head setup, no edit; another value of the head is one") {
         bundle->on_extruders_count_changed(4);
         DynamicPrintConfig &edited = bundle->printers.get_edited_preset().config;
         auto *nozzles = edited.option<ConfigOptionFloats>("nozzle_diameter");
         REQUIRE(nozzles != nullptr);
-        nozzles->values[0] = nozzles->values[0] > 0.3 ? 0.2 : 0.4;
+        // As Sidebar::apply_nozzle_diameter sets it: the size with its values.
+        std::vector<double> sizes = nozzles->values;
+        sizes[0] = sizes[0] > 0.3 ? 0.2 : 0.4;
+        const VendorProfile::PrinterModel *table = NozzleFilament::size_table(*bundle);
+        REQUIRE(table != nullptr);
+        edited = NozzleFilament::head_setup_config(edited, *table, sizes);
+        bundle->printers.update_dirty();
+        INFO("dirty options: " << joined(bundle->printers.current_dirty_options(true)));
+        CHECK_FALSE(bundle->printers.current_is_dirty());
+
+        auto *lengths = edited.option<ConfigOptionFloats>("retraction_length");
+        REQUIRE(lengths != nullptr);
+        lengths->values[0] += 0.3;
         bundle->printers.update_dirty();
         const std::vector<std::string> dirty = bundle->printers.current_dirty_options(true);
         INFO("dirty options: " << joined(dirty));
         CHECK(bundle->printers.current_is_dirty());
-        CHECK(std::find(dirty.begin(), dirty.end(), "nozzle_diameter#0") != dirty.end());
+        CHECK(std::find(dirty.begin(), dirty.end(), "retraction_length#0") != dirty.end());
         CHECK(std::any_of(dirty.begin(), dirty.end(), listable));
     }
 }
 
-TEST_CASE("A printer switch selects the default process of the new printer preset", "[FirstRun][Preset][fr1_default_process]")
+TEST_CASE("A size change of every tool head selects the default process of the new size", "[FirstRun][Preset][fr1_default_process]")
 {
-    // PresetBundle::update_compatible, PreferedPrintProfileMatch: for a Snapmaker printer the new
-    // preset's "default_print_profile" beats a process of the selected layer height; only the twin
-    // (same alias) of the selected process beats it. Other vendors keep mainline's order.
+    // PresetBundle::update_compatible, PreferedPrintProfileMatch: for a Snapmaker printer the default
+    // process of the heads' size (the U1's size table) beats a process of the selected layer height;
+    // only the twin (same alias) of the selected process beats it. Other vendors keep mainline's order.
     auto bundle = std::make_unique<PresetBundle>();
     bundle->load_vendor_configs_from_json(PROFILES_DIR, SNAPMAKER, PresetBundle::LoadSystem,
                                           ForwardCompatibilitySubstitutionRule::EnableSilent, nullptr, /*allow_cache=*/false);
-    const char *const u1_0_2 = "Snapmaker U1 (0.2 nozzle)";
-    const char *const u1_0_4 = "Snapmaker U1 (0.4 nozzle)";
-    REQUIRE(bundle->printers.select_preset_by_name(u1_0_2, true));
+    REQUIRE(bundle->printers.select_preset_by_name("Snapmaker U1", true));
+    set_u1_heads(*bundle, 0.2);
     bundle->update_compatible(PresetSelectCompatibleType::Always);
-    const std::string default_0_4 = bundle->printers.find_preset(u1_0_4, false)->config.opt_string("default_print_profile");
+    const std::string default_0_4 = NozzleFilament::size_default_process(*bundle, 0.4);
     REQUIRE(default_0_4 == "0.20mm Standard @Snapmaker U1 (0.4 nozzle)");
 
-    SECTION("a process without a twin for the new size: the default of the new printer, not the layer height") {
+    SECTION("a process without a twin for the new size: the default of the new size, not the layer height") {
         // The state a Snapmaker Orca 2.4 data directory leaves for the 0.2 mm preset.
         REQUIRE(bundle->prints.select_preset_by_name("0.08mm High Quality @Snapmaker U1 (0.2 nozzle)", true));
-        REQUIRE(bundle->printers.select_preset_by_name(u1_0_4, true));
+        set_u1_heads(*bundle, 0.4);
         bundle->update_compatible(PresetSelectCompatibleType::Always);
         INFO("process: " << bundle->prints.get_edited_preset().name);
         CHECK(bundle->prints.get_edited_preset().name == default_0_4);
     }
     SECTION("the twin of the selected process for the new size stays the user's choice") {
         REQUIRE(bundle->prints.select_preset_by_name("0.12mm Standard @Snapmaker U1 (0.2 nozzle)", true));
-        REQUIRE(bundle->printers.select_preset_by_name(u1_0_4, true));
+        set_u1_heads(*bundle, 0.4);
         bundle->update_compatible(PresetSelectCompatibleType::Always);
         CHECK(bundle->prints.get_edited_preset().name == "0.12mm Standard @Snapmaker U1 (0.4 nozzle)");
     }
     SECTION("the default process itself, selected, stays") {
-        REQUIRE(bundle->printers.select_preset_by_name(u1_0_4, true));
+        set_u1_heads(*bundle, 0.4);
         bundle->update_compatible(PresetSelectCompatibleType::Always);
         REQUIRE(bundle->prints.select_preset_by_name(default_0_4, true));
-        REQUIRE(bundle->printers.select_preset_by_name(u1_0_2, true));
+        set_u1_heads(*bundle, 0.2);
         bundle->update_compatible(PresetSelectCompatibleType::Always);
         CHECK(bundle->prints.get_edited_preset().name == "0.10mm High Quality @Snapmaker U1 (0.2 nozzle)");
     }
@@ -417,7 +440,7 @@ TEST_CASE("The default material rule ranks the filaments of a Snapmaker printer"
     SECTION("a chosen material is kept, the rule only breaks ties") {
         REQUIRE(bundle->filaments.select_preset_by_name("Snapmaker ABS @U1 0.4 nozzle", true));
         bundle->filament_presets.assign(4, "Snapmaker ABS @U1 0.4 nozzle");
-        REQUIRE(bundle->printers.select_preset_by_name("Snapmaker U1 (0.6 nozzle)", true));
+        set_u1_heads(*bundle, 0.6);
         bundle->update_compatible(PresetSelectCompatibleType::Always);
         INFO("slots: " << joined(bundle->filament_presets));
         for (const std::string &slot : bundle->filament_presets)

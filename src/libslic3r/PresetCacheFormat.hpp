@@ -136,6 +136,7 @@ struct CachedPreset
     std::string              setting_id;
     std::string              filament_id;
     std::vector<std::string> renamed_from;
+    std::string              nozzle_size;    // Snapmaker Orca Max: Preset::nozzle_size
 };
 
 // What one per-vendor cache file carries besides its stamps: the vendor profile

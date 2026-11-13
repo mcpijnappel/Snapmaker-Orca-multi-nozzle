@@ -9146,6 +9146,10 @@ bool Tab::select_preset(
                 wxTheApp->CallAfter([weak_sidebar]() {
                     if (Sidebar* sidebar = weak_sidebar.get())
                         sidebar->update_nozzle_settings();
+                    // Snapmaker Orca Max: the head setup the user last chose for this printer.
+                    if (weak_sidebar.get() != nullptr)
+                        if (Plater *plater = wxGetApp().plater())
+                            plater->apply_remembered_head_setup();
                 });
             }
         }
@@ -9644,6 +9648,9 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach, bool save_to_proje
         const bool           other_size          = head_size > 0. && made_for > 0. && std::abs(head_size - made_for) > EPSILON;
         if (compatible_printers != nullptr && ((compatible_printers->values.empty() && edited_preset.is_system) || other_size))
             compatible_printers->values = { NozzleFilament::printer_to_pin(*m_preset_bundle, slot) };
+        // A printer for every size: the size is the preset's tag, not a printer of that size.
+        if (other_size && NozzleFilament::size_table(*m_preset_bundle) != nullptr)
+            m_presets->get_edited_preset().nozzle_size = float_to_string_decimal_point(head_size);
     }
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.json
     m_presets->save_current_preset(name, detach, save_to_project, nullptr);

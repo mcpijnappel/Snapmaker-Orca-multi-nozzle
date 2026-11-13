@@ -7,10 +7,13 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "Preset.hpp"
 
 namespace Slic3r {
 
@@ -48,6 +51,32 @@ const Preset* head_machine_preset(const PrinterPresetCollection &printers, const
 // that size. The one place a tool head's size is mapped onto the vendor's per-size printer
 // profiles; every rule below asks it with the head's own size, never with the printer's.
 const Preset* size_machine(const PresetBundle &bundle, double size);
+
+// Snapmaker Orca Max: a printer model with one printer preset for every nozzle size carries a size
+// table (VendorProfile::NozzleSize). The table of the edited printer preset's model; nullptr for a
+// model with a printer preset per size.
+const VendorProfile::PrinterModel* size_table(const PresetBundle &bundle);
+// The entry of the table for `size`; nullptr without a table or for a size it has no values for.
+const VendorProfile::NozzleSize*   size_entry(const PresetBundle &bundle, double size);
+// The sizes of the table, as it spells them ("0.2"); empty without a table.
+std::vector<std::string>           printer_nozzle_sizes(const PresetBundle &bundle);
+// The process preset a head of `size` starts with: the table's, else the size's printer preset's.
+std::string                        size_default_process(const PresetBundle &bundle, double size);
+// `printer_config` with tool head i set to nozzle size sizes[i] and the values the table holds for
+// it, in every column of the head. A head whose size the table lacks keeps its values.
+DynamicPrintConfig                 head_setup_config(const DynamicPrintConfig &printer_config, const VendorProfile::PrinterModel &model,
+                                                     const std::vector<double> &sizes);
+// The printer values of `size` on every head: head_setup_config() of the selected printer preset with
+// a table, else the printer preset of that size. nullopt for a size without values.
+std::optional<DynamicPrintConfig>  size_config(const PresetBundle &bundle, double size);
+// The name projects and G-code store for printer preset `name`: a printer preset for every size is
+// written as the per-size preset of its own variant ("Snapmaker U1" -> "Snapmaker U1 (0.4 nozzle)"),
+// which Snapmaker Orca knows; every other name as it is.
+std::string file_printer_name(const PresetBundle &bundle, const std::string &name);
+// The same for a printer preset at hand (a system preset knows its vendor).
+std::string file_printer_name(const Preset &printer);
+// The table says `size` has High Flow values (any size for a `size` <= 0); false without a table.
+bool                               size_has_high_flow_values(const PresetBundle &bundle, double size);
 
 struct State
 {

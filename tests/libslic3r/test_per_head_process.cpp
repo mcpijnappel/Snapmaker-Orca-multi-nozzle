@@ -495,20 +495,12 @@ TEST_CASE("On the shipped U1 presets each off-size tool head follows the process
         CHECK(chosen->name == STD_012_02);
         CHECK(reason == PerHeadProcess::Reason::NotInstalled);
 
-        // A size whose printer profile no process preset lists: the default named by that profile, when installed, else nothing.
-        DynamicPrintConfig odd_config = machine(*bundle, U1_04).config;
-        odd_config.option<ConfigOptionString>("inherits", true)->value               = "";
-        odd_config.option<ConfigOptionString>("printer_variant", true)->value        = "0.5";
-        odd_config.option<ConfigOptionString>("default_print_profile", true)->value  = STD_012_02;
-        Preset &odd = bundle->printers.load_preset(std::string(), "Snapmaker U1 (0.5 nozzle)", std::move(odd_config), false);
-        chosen = PerHeadProcess::source_for_head(*bundle, 0.5, 0.12, selected, std::string(), reason);
-        REQUIRE(chosen != nullptr);
-        CHECK(chosen->name == STD_012_02);
-        CHECK(reason == PerHeadProcess::Reason::Derived);
-        odd.config.option<ConfigOptionString>("default_print_profile", true)->value = "0.12mm Standard @Snapmaker U1 (0.5 nozzle)";
+        // A size the U1's size table lacks: no preset and no default.
         chosen = PerHeadProcess::source_for_head(*bundle, 0.5, 0.12, selected, std::string(), reason);
         CHECK(chosen == nullptr);
         CHECK(reason == PerHeadProcess::Reason::NoProcessPreset);
+        // A size the table has, whose process presets were removed: the default the table names.
+        CHECK(NozzleFilament::size_default_process(*bundle, 0.2) == HQ_010_02);
     }
 
     SECTION("a tool head of a size without a machine preset and a detached process preset are not derived") {
@@ -642,10 +634,12 @@ TEST_CASE("On the shipped U1 presets every tool head of another size prints with
         auto add_system = [&bundle](const char *name, const char *copy_of, bool select) -> Preset & {
             const Preset *source = bundle->prints.find_preset(copy_of, false);
             REQUIRE(source != nullptr);
-            DynamicPrintConfig config = source->config;
+            DynamicPrintConfig config      = source->config;
+            const std::string  nozzle_size = source->nozzle_size;   // the insert below moves `source`
             Preset &preset = bundle->prints.load_preset(std::string(), name, std::move(config), select);
-            preset.is_system  = true;
-            preset.is_visible = true;
+            preset.is_system   = true;
+            preset.is_visible  = true;
+            preset.nozzle_size = nozzle_size;
             return preset;
         };
         add_system("0.30mm @Snapmaker U1 (0.6 nozzle)", STD_030_06, false);

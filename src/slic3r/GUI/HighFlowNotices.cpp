@@ -103,6 +103,9 @@ SizeOffersHighFlow size_offers_high_flow(const PresetBundle &bundle)
         const std::string model = presets->printers.get_edited_preset().config.opt_string("printer_model");
         if (model.empty())
             return false;
+        // Snapmaker Orca Max: a printer for every size: its size table says.
+        if (NozzleFilament::size_table(*presets) != nullptr)
+            return NozzleFilament::size_has_high_flow_values(*presets, nozzle_size);
         if (nozzle_size <= 0.) {
             // Any size of the model: the Flow row of a Standard-only preset.
             for (const Preset &preset : presets->printers)

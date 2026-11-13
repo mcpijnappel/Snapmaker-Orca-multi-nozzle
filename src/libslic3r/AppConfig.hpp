@@ -357,6 +357,13 @@ public:
         m_printer_settings[printer][name] = value;
         m_dirty = true;
     }
+    // Snapmaker Orca Max: the settings of printer `from` become those of printer `to` (a renamed preset).
+    void copy_printer_settings(const std::string& from, const std::string& to) {
+        if (auto it = m_printer_settings.find(from); it != m_printer_settings.end()) {
+            m_printer_settings[to] = it->second;
+            m_dirty = true;
+        }
+    }
 
 	const std::map<std::string, BBLocalMachine>& get_local_machines() const { return m_local_machines; }
 	void erase_local_machine(std::string dev_id)
@@ -419,6 +426,10 @@ public:
 
     void save_nozzle_volume_types_to_config(const std::string& printer_name, const std::string& nozzle_volume_types);
     std::string get_nozzle_volume_types_from_config(const std::string& printer_name);
+    // Snapmaker Orca Max: the nozzle size of each tool head the user last set up for a printer preset
+    // with one preset for every size ("0.4,0.6,0.4,0.4"), keyed like the volume types.
+    void save_nozzle_diameters_to_config(const std::string& printer_name, const std::string& nozzle_diameters);
+    std::string get_nozzle_diameters_from_config(const std::string& printer_name);
 
 	// reset the current print / filament / printer selections, so that
 	// the  PresetBundle::load_selections(const AppConfig &config) call will select

@@ -1,16 +1,58 @@
 {
-  "type": "machine_model",
-  "machine_tech": "FFF",
-  "family": "Snapmaker",
-  "name": "Snapmaker U1",
-  "url": "https://github.com/macdylan",
-  "model_id": "SM_U1",
-  "default_materials": "Snapmaker PLA SnapSpeed @U1 0.2 nozzle;Snapmaker PLA SnapSpeed @U1;Snapmaker PLA SnapSpeed @U1 0.6 nozzle;Snapmaker PLA SnapSpeed @U1 0.8 nozzle",
-  "bed_model": "Snapmaker U1_bed.stl",
-  "bed_texture": "Snapmaker U1_texture.svg",
-  "nozzle_diameter": "0.2;0.4;0.6;0.8"
+    "type": "machine_model",
+    "machine_tech": "FFF",
+    "family": "Snapmaker",
+    "name": "Snapmaker U1",
+    "url": "https://github.com/macdylan",
+    "model_id": "SM_U1",
+    "default_materials": "Snapmaker PLA SnapSpeed @U1 0.2 nozzle;Snapmaker PLA SnapSpeed @U1;Snapmaker PLA SnapSpeed @U1 0.6 nozzle;Snapmaker PLA SnapSpeed @U1 0.8 nozzle",
+    "bed_model": "Snapmaker U1_bed.stl",
+    "bed_texture": "Snapmaker U1_texture.svg",
+    "nozzle_diameter": "0.4",
+    "nozzle_sizes": {
+        "0.2": {
+            "printer": "Snapmaker U1 (0.2 nozzle)",
+            "default_print_profile": "0.10mm High Quality @Snapmaker U1 (0.2 nozzle)",
+            "high_flow": "0",
+            "max_layer_height": "0.14",
+            "min_layer_height": "0.04",
+            "nozzle_type": "hardened_steel",
+            "retraction_length": "0.4",
+            "retraction_minimum_travel": "1",
+            "wipe_distance": "2"
+        },
+        "0.4": {
+            "printer": "Snapmaker U1 (0.4 nozzle)",
+            "default_print_profile": "0.20mm Standard @Snapmaker U1 (0.4 nozzle)",
+            "high_flow": "1",
+            "max_layer_height": "0.32",
+            "min_layer_height": "0.08",
+            "nozzle_type": "hardened_steel",
+            "retraction_length": "1.5",
+            "retraction_minimum_travel": "1",
+            "wipe_distance": "2"
+        },
+        "0.6": {
+            "printer": "Snapmaker U1 (0.6 nozzle)",
+            "default_print_profile": "0.30mm Standard @Snapmaker U1 (0.6 nozzle)",
+            "high_flow": "0",
+            "max_layer_height": "0.42",
+            "min_layer_height": "0.12",
+            "nozzle_type": "stainless_steel",
+            "retraction_length": "1.4",
+            "retraction_minimum_travel": "3",
+            "wipe_distance": "1"
+        },
+        "0.8": {
+            "printer": "Snapmaker U1 (0.8 nozzle)",
+            "default_print_profile": "0.40mm Standard @Snapmaker U1 (0.8 nozzle)",
+            "high_flow": "0",
+            "max_layer_height": "0.56",
+            "min_layer_height": "0.16",
+            "nozzle_type": "hardened_steel",
+            "retraction_length": "1.5",
+            "retraction_minimum_travel": "1",
+            "wipe_distance": "2"
+        }
+    }
 }
-
-
-    
-    

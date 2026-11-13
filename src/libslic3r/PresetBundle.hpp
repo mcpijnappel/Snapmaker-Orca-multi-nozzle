@@ -773,6 +773,19 @@ public:
     // preset to the current name, mirroring Preset::normalize_inherits for the "inherits" field.
     // Call after loading presets and before selection; requires update_system_maps() to have run.
     void                        normalize_compatible_presets();
+    // Snapmaker Orca Max: the head setup (nozzle size per tool head) the user last chose for the
+    // selected printer preset, when it is one for every size (NozzleFilament::size_table): applied to
+    // the edited printer preset with each size's values. Stored by the sidebar and the printer sync,
+    // never by a project. False when nothing was remembered or nothing changed.
+    bool                        apply_remembered_head_setup(AppConfig &config);
+    // Snapmaker Orca Max: what the application config remembers for a system printer preset under a
+    // name it was renamed from (the per-size U1 presets that became one) is taken over under its
+    // current name, once: the selections of process and filaments, the flow types. The old name in
+    // use last ("presets"/"machine") goes first, then the one of the preset's own variant.
+    void                        migrate_renamed_printer_settings(AppConfig &config) const;
+    // The key the head setup and the flow types of the selected printer preset are remembered under:
+    // the name of its system parent, or its own.
+    std::string                 head_setup_key() const;
 
     // Set the is_visible flag for printer vendors, printer models and printer variants
     // based on the user configuration.
@@ -982,6 +995,7 @@ private:
         std::string              alias;
         std::string              filament_id;
         std::vector<std::string> renamed_from;
+        std::string              nozzle_size;
         // Reported by commit, so resolving entries together leaves the log and
         // the error count as one entry at a time produces them.
         std::vector<std::string> errors;

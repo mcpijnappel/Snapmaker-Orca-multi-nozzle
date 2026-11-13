@@ -25,8 +25,9 @@
         "170"
     ],
     "compatible_printers": [
-        "Snapmaker U1 (0.4 nozzle)"
+        "Snapmaker U1"
     ],
+    "nozzle_size": "0.4",
     "filament_multitool_ramming": [
         "1"
     ],

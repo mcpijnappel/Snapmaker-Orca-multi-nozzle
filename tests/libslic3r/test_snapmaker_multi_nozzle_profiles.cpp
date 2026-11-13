@@ -116,8 +116,9 @@ TEST_CASE("Every multi-nozzle preset ships a hidden preset per other nozzle size
             CHECK_FALSE(preset->is_visible);
             const double nozzle = std::stod(size);
             CHECK_THAT(preset->config.opt_float("layer_height"), Catch::Matchers::WithinAbs(share * nozzle, 1e-6));
-            CHECK(preset->config.option<ConfigOptionStrings>("compatible_printers")->values ==
-                  std::vector<std::string>{std::string("Snapmaker U1 (") + size + " nozzle)"});
+            // The one U1 printer preset, for heads of this size.
+            CHECK(preset->config.option<ConfigOptionStrings>("compatible_printers")->values == std::vector<std::string>{"Snapmaker U1"});
+            CHECK(preset->nozzle_size == size);
             // Speeds and line widths of the size: no strategy of its own.
             const auto *own_strategy = preset->config.option<ConfigOptionEnum<MultiNozzleLayerHeights>>("multi_nozzle_layer_heights");
             CHECK((own_strategy == nullptr || own_strategy->value == mnlhOff));

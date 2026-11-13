@@ -6,8 +6,9 @@
   "inherits": "Snapmaker PLA Rainbow @U1 base",
   "filament_id": "SNPPRB001",
   "compatible_printers": [
-    "Snapmaker U1 (0.8 nozzle)"
+      "Snapmaker U1"
   ],
+  "nozzle_size": "0.8",
   "additional_cooling_fan_speed": [
     "100"
   ],

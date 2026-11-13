@@ -8,8 +8,9 @@
 	"description": "0.4 mm nozzle, 0.10 mm layers: 0.12mm Standard (nearest).",
 	"layer_height": "0.10",
 	"compatible_printers": [
-		"Snapmaker U1 (0.4 nozzle)"
+		"Snapmaker U1"
 	],
+	"nozzle_size": "0.4",
 	"outer_wall_speed": [
 		"60",
 		"60"

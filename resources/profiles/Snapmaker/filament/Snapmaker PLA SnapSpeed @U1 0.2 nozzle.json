@@ -27,8 +27,9 @@
         "0.2"
     ],
     "compatible_printers": [
-        "Snapmaker U1 (0.2 nozzle)"
+        "Snapmaker U1"
     ],
+    "nozzle_size": "0.2",
     "filament_flow_support": [
         "standard"
     ],

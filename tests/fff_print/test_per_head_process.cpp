@@ -1384,26 +1384,12 @@ std::unique_ptr<OwnerPlateSlice> offsize_plate_slice(const char *machine, const 
                                          ForwardCompatibilitySubstitutionRule::EnableSilent, nullptr, /*allow_cache=*/false);
     REQUIRE(bundle.printers.select_preset_by_name(machine, true));
     // As the sidebar sets a size (Sidebar::apply_nozzle_diameter): the diameter, the layer height
-    // limits and the per-extruder machine values of the machine preset of that size.
+    // limits and the per-extruder machine values of that size (the U1's size table).
     DynamicPrintConfig &printer = bundle.printers.get_edited_preset().config;
-    const Preset       *home    = bundle.printers.find_preset(machine, false, true);
-    REQUIRE(home != nullptr);
-    const double home_size = NozzleFilament::parse_nozzle_size(home->config.opt_string("printer_variant"));
-    printer.set_key_value("nozzle_diameter", new ConfigOptionFloats(OFFSIZE_DIAMETERS));
+    const VendorProfile::PrinterModel *table = NozzleFilament::size_table(bundle);
+    REQUIRE(table != nullptr);
+    printer = NozzleFilament::head_setup_config(printer, *table, OFFSIZE_DIAMETERS);
     printer.set_key_value("extruder_layer_height", new ConfigOptionFloats(std::vector<double>(HEADS, 0.)));
-    for (size_t head = 0; head < HEADS; ++head) {
-        if (std::abs(OFFSIZE_DIAMETERS[head] - home_size) < EPSILON)
-            continue;
-        const Preset *size_preset = NozzleFilament::head_machine_preset(bundle.printers, printer.opt_string("printer_model"), OFFSIZE_DIAMETERS[head]);
-        REQUIRE(size_preset != nullptr);
-        for (const char *key : {"min_layer_height", "max_layer_height"}) {
-            std::vector<double> limits = printer.option<ConfigOptionFloats>(key)->values;
-            limits.resize(HEADS, limits.empty() ? 0. : limits.back());
-            limits[head] = size_preset->config.option<ConfigOptionFloats>(key)->get_at(head);
-            printer.set_key_value(key, new ConfigOptionFloats(limits));
-        }
-        adopt_extruder_values_from_size_preset(printer, size_preset->config, &home->config, head, nozzle_size_extruder_options());
-    }
     REQUIRE(bundle.prints.select_preset_by_name(process, true));
     bundle.filament_presets = {MATTE_0_6, MATTE_0_4, MATTE_0_6, MATTE_0_6};
     REQUIRE(bundle.filaments.select_preset_by_name(bundle.filament_presets.front(), true));
@@ -1469,16 +1455,14 @@ int filament_column_int(const PresetBundle &bundle, const std::string &preset_na
 
 } // namespace
 
-TEST_CASE("A 0.4 mm High Flow tool head on the 0.6 mm printer preset prints the High Flow values of the 0.4 mm presets", "[PerHeadProcess][HighFlow][Profiles][hf_offsize_gcode]")
+TEST_CASE("A 0.4 mm High Flow tool head among 0.6 mm heads prints the High Flow values of the 0.4 mm presets", "[PerHeadProcess][HighFlow][Profiles][hf_offsize_gcode]")
 {
     const std::unique_ptr<OwnerPlateSlice> slice = offsize_plate_slice("Snapmaker U1 (0.6 nozzle)", "0.24mm Standard @Snapmaker U1 (0.6 nozzle)");
     const Preset *standard_020 = slice->bundle.prints.find_preset("0.20mm Standard @Snapmaker U1 (0.4 nozzle)", false);
     REQUIRE(standard_020 != nullptr);
-    // The printer preset declares no High Flow column; the machine preset of 0.4 mm does.
-    const auto *declared = slice->bundle.printers.get_edited_preset().config.option<ConfigOptionStrings>("extruder_variant_list");
-    REQUIRE(declared != nullptr);
-    for (const std::string &variants : declared->values)
-        REQUIRE(variants.find("High Flow") == std::string::npos);
+    // The U1 has High Flow values for 0.4 mm nozzles only (its size table).
+    REQUIRE(NozzleFilament::size_has_high_flow_values(slice->bundle, 0.4));
+    REQUIRE_FALSE(NozzleFilament::size_has_high_flow_values(slice->bundle, 0.6));
 
     // Process: the High Flow rule gives the 0.4 mm head the preset of its size with a High Flow column.
     REQUIRE(slice->sources.size() == HEADS);

@@ -11500,7 +11500,10 @@ static void fill_nozzle_combo(const NozzlePage &page, size_t head)
     const auto                size_offers    = HighFlowNotices::size_offers_high_flow(bundle);
     // Visible presets for this printer_model (system + user). Imported multi-nozzle variants are
     // usually non-system; diameters_for_same_printer_model() only counted system and kept the combo disabled.
-    std::vector<std::string> sizes = bundle.printers.diameters_of_selected_printer();
+    // Snapmaker Orca Max: a printer for every size offers the sizes of its table.
+    std::vector<std::string> sizes = NozzleFilament::printer_nozzle_sizes(bundle);
+    if (sizes.empty())
+        sizes = bundle.printers.diameters_of_selected_printer();
     if (sizes.empty())
         if (const auto *variant = printer_config.option<ConfigOptionString>("printer_variant"); variant != nullptr && !variant->value.empty())
             sizes.push_back(variant->value);
@@ -11608,14 +11611,18 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
     // Snapmaker Orca: the per-extruder machine keys of the tool head that followed the size preset.
     std::vector<std::string> adopted;
     {
-        const PrinterPresetCollection &printers = wxGetApp().preset_bundle->printers;
-        const std::string model   = new_conf.opt_string("printer_model");
-        const std::string variant = diameter_label.ToStdString();
-        const Preset *variant_preset = printers.find_system_preset_by_model_and_variant(model, variant);
-        if (variant_preset == nullptr)
-            variant_preset = printers.find_custom_preset_by_model_and_variant(model, variant);
-        const auto *v_min = variant_preset == nullptr ? nullptr : variant_preset->config.option<ConfigOptionFloats>("min_layer_height");
-        const auto *v_max = variant_preset == nullptr ? nullptr : variant_preset->config.option<ConfigOptionFloats>("max_layer_height");
+        // The printer values of the new size: the size table's, or the printer preset of that size.
+        const PresetBundle                     &bundle      = *wxGetApp().preset_bundle;
+        const std::string                       variant     = diameter_label.ToStdString();
+        const std::optional<DynamicPrintConfig> size_values = NozzleFilament::size_config(bundle, new_nd);
+        // Named in the notice: the printer preset of that size, or the size on this printer.
+        std::string size_source;
+        if (NozzleFilament::size_table(bundle) != nullptr)
+            size_source = GUI::format(_u8L("%1% mm nozzle"), variant);
+        else if (const Preset *machine = NozzleFilament::head_machine_preset(bundle.printers, new_conf.opt_string("printer_model"), new_nd); machine != nullptr)
+            size_source = machine->name;
+        const auto *v_min = size_values ? size_values->option<ConfigOptionFloats>("min_layer_height") : nullptr;
+        const auto *v_max = size_values ? size_values->option<ConfigOptionFloats>("max_layer_height") : nullptr;
         const auto *e_min = static_cast<const ConfigOptionFloats*>(new_conf.option("min_layer_height"));
         const auto *e_max = static_cast<const ConfigOptionFloats*>(new_conf.option("max_layer_height"));
         if (v_min != nullptr && !v_min->values.empty() && v_max != nullptr && !v_max->values.empty() &&
@@ -11629,20 +11636,12 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
             new_conf.set_key_value("min_layer_height", new ConfigOptionFloats(mins));
             new_conf.set_key_value("max_layer_height", new ConfigOptionFloats(maxs));
             notice = GUI::format(_u8L("Nozzle %1%: layer height limits set to %2%-%3% mm, from \"%4%\"."),
-                                 i + 1, mins[i], maxs[i], variant_preset->name);
+                                 i + 1, mins[i], maxs[i], size_source);
             // Snapmaker Orca: the head's other per-extruder machine values (U1: retraction length,
             // minimum travel, wipe distance, nozzle type) follow the size preset where it differs from
             // the previous size's preset; without that preset, every value the size preset differs in.
-            const Preset *previous_preset = nullptr;
-            for (const Preset &preset : printers)
-                if (preset.is_system && preset.config.opt_string("printer_model") == model)
-                    if (const auto *sizes = preset.config.option<ConfigOptionFloats>("nozzle_diameter");
-                        sizes != nullptr && !sizes->values.empty() && std::abs(sizes->values.front() - old_nd) < EPSILON) {
-                        previous_preset = &preset;
-                        break;
-                    }
-            adopted = adopt_extruder_values_from_size_preset(new_conf, variant_preset->config,
-                                                             previous_preset == nullptr ? nullptr : &previous_preset->config, i,
+            const std::optional<DynamicPrintConfig> previous_values = NozzleFilament::size_config(bundle, old_nd);
+            adopted = adopt_extruder_values_from_size_preset(new_conf, *size_values, previous_values ? &*previous_values : nullptr, i,
                                                              nozzle_size_extruder_options());
             if (!adopted.empty()) {
                 // "Retraction length 0.4 mm, Nozzle type Stainless steel": the label of the key and
@@ -11665,7 +11664,7 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
                     values += (values.empty() ? "" : ", ") + into_u8(_(def->label)) + " " + value;
                 }
                 notice += "\n";
-                notice += GUI::format(_u8L("Nozzle %1%: %2%, from \"%3%\"."), i + 1, values, variant_preset->name);
+                notice += GUI::format(_u8L("Nozzle %1%: %2%, from \"%3%\"."), i + 1, values, size_source);
             }
         } else {
             notice = GUI::format(_u8L("This printer has no profile for a %1% mm nozzle. Please review the "
@@ -11681,6 +11680,9 @@ void Sidebar::apply_nozzle_diameter(size_t i, const wxString &diameter_label)
     // load_config marks the printer preset modified and propagates the change without
     // rebuilding these combos or switching presets, so the other nozzles keep their sizes.
     printer_tab->load_config(new_conf);
+    // Snapmaker Orca Max: the head setup of a printer for every size is remembered for new projects.
+    if (const PresetBundle &bundle = *wxGetApp().preset_bundle; NozzleFilament::size_table(bundle) != nullptr)
+        wxGetApp().app_config->save_nozzle_diameters_to_config(bundle.head_setup_key(), ConfigOptionFloats(nozzle_diameters).serialize());
 
     // High Flow needs a nozzle size the vendor data has values for: a High Flow tool head that
     // got a size without them falls back to Standard, reported with this change.
@@ -23467,7 +23469,11 @@ int Plater::new_project(bool skip_confirm, bool silent, const wxString& project_
         // Snapmaker Orca: a non-silent new project resets the nozzle flow types to the preset defaults
         // (Standard) via the Flow row, which also resets the choice remembered for the printer. Silent
         // (app start) and BBL printers keep it. Runs before the "New Project" undo snapshot.
-        if (PresetBundle *bundle = wxGetApp().preset_bundle; !silent && bundle != nullptr && !bundle->is_bbl_vendor() &&
+        // Snapmaker Orca Max: a printer for every nozzle size starts with the head setup the user last
+        // chose for it instead.
+        if (PresetBundle *bundle = wxGetApp().preset_bundle; !silent && bundle != nullptr && NozzleFilament::size_table(*bundle) != nullptr)
+            apply_remembered_head_setup();
+        else if (PresetBundle *bundle = wxGetApp().preset_bundle; !silent && bundle != nullptr && !bundle->is_bbl_vendor() &&
             bundle->printers.get_edited_preset().printer_technology() == ptFFF) {
             const auto *defaults = bundle->printers.get_edited_preset().config.option<ConfigOptionEnumsGeneric>("default_nozzle_volume_type");
             const auto *current  = bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
@@ -32224,8 +32230,44 @@ static const char* follow_reason_name(Plater::FollowReason reason)
     case FollowReason::UserAction:    return "UserAction";
     case FollowReason::Preference:    return "Preference";
     case FollowReason::FlowType:      return "FlowType";
+    case FollowReason::HeadSetup:     return "HeadSetup";
     }
     return "Unknown";
+}
+
+void Plater::apply_remembered_head_setup()
+{
+    PresetBundle *bundle      = wxGetApp().preset_bundle;
+    AppConfig    *app_config  = wxGetApp().app_config;
+    Tab          *printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+    if (bundle == nullptr || app_config == nullptr || printer_tab == nullptr || NozzleFilament::size_table(*bundle) == nullptr)
+        return;
+    // The sizes: through the printer tab, which marks and propagates the change like a sidebar edit.
+    DynamicPrintConfig &edited = bundle->printers.get_edited_preset().config;
+    const DynamicPrintConfig before = edited;
+    if (bundle->apply_remembered_head_setup(*app_config)) {
+        DynamicPrintConfig after = edited;
+        edited                   = before;
+        printer_tab->load_config(after);
+        std::vector<size_t> heads;
+        const auto *old_sizes = before.option<ConfigOptionFloats>("nozzle_diameter");
+        const auto *new_sizes = after.option<ConfigOptionFloats>("nozzle_diameter");
+        for (size_t head = 0; old_sizes != nullptr && new_sizes != nullptr && head < new_sizes->values.size(); ++head)
+            if (head >= old_sizes->values.size() || std::abs(old_sizes->values[head] - new_sizes->values[head]) > EPSILON)
+                heads.emplace_back(head);
+        show_nozzle_follow_notice(follow_nozzle_sizes(heads, FollowReason::HeadSetup));
+    }
+    // The flow types remembered with it (TabPrinter::set_extruder_volume_type).
+    const std::string remembered = app_config->get_nozzle_volume_types_from_config(bundle->head_setup_key());
+    const auto       *current    = bundle->project_config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type");
+    ConfigOptionEnumsGeneric types(current != nullptr ? current->keys_map : nullptr);
+    if (current != nullptr && !remembered.empty() && types.deserialize(remembered))
+        for (size_t head = 0; head < types.values.size() && head < current->values.size(); ++head)
+            if (current->values[head] != types.values[head])
+                apply_nozzle_flow_type(head, NozzleVolumeType(types.values[head]));
+    sanitize_nozzle_flow_types();
+    sidebar().update_nozzle_flow_values();
+    sidebar().update_nozzle_settings();
 }
 
 // The log line of a trigger that makes no pass: the rule does not apply to the printer preset, or

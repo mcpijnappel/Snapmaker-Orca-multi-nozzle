@@ -1,6 +1,6 @@
 {
   "name": "Snapmaker",
-  "version": "02.03.03.18",
+  "version": "02.03.03.19",
   "force_update": "0",
   "description": "Snapmaker configurations",
   "machine_model_list": [
@@ -2351,20 +2351,8 @@
       "sub_path": "machine/Snapmaker A350 Dual QS+B Kit (0.8 nozzle).json"
     },
     {
-      "name": "Snapmaker U1 (0.4 nozzle)",
-      "sub_path": "machine/Snapmaker U1 (0.4 nozzle).json"
-    },
-    {
-      "name": "Snapmaker U1 (0.2 nozzle)",
-      "sub_path": "machine/Snapmaker U1 (0.2 nozzle).json"
-    },
-    {
-      "name": "Snapmaker U1 (0.6 nozzle)",
-      "sub_path": "machine/Snapmaker U1 (0.6 nozzle).json"
-    },
-    {
-      "name": "Snapmaker U1 (0.8 nozzle)",
-      "sub_path": "machine/Snapmaker U1 (0.8 nozzle).json"
+      "name": "Snapmaker U1",
+      "sub_path": "machine/Snapmaker U1 printer.json"
     },
     {
       "name": "Snapmaker Artisan (0.2 nozzle)",

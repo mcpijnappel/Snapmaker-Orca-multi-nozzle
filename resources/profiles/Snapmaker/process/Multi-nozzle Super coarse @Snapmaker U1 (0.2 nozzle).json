@@ -24,6 +24,7 @@
 	"initial_layer_print_height": "0.14",
 	"sparse_infill_pattern": "gyroid",
 	"compatible_printers": [
-		"Snapmaker U1 (0.2 nozzle)"
-	]
+		"Snapmaker U1"
+	],
+	"nozzle_size": "0.2"
 }

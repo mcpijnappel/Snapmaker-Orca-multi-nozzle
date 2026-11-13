@@ -2937,7 +2937,8 @@ def build_index_sections(profiles_dir, vendor, profile_types=None):
             for key in ("inherits", "include"):
                 if profile.get(key):
                     entry[key] = profile[key]
-            by_name[name].append(entry["sub_path"])
+            # Names are unique per type: a printer preset may share its printer model's name.
+            by_name[(profile_type, name)].append(entry["sub_path"])
             entries.append(entry)
 
         # inherits/include were ordering input only; the index holds name and sub_path
@@ -2950,7 +2951,7 @@ def build_index_sections(profiles_dir, vendor, profile_types=None):
                         f'"python scripts/orca_profile_tool.py normalize" first')
 
     clashes = {name: subs for name, subs in by_name.items() if len(subs) > 1}
-    for name, subs in sorted(clashes.items()):
+    for (_, name), subs in sorted(clashes.items()):
         problems.append(f'{vendor}.json: {len(subs)} profiles are named "{name}" '
                         f'({", ".join(sorted(subs))}); only one can be indexed under '
                         f"that name, so delete or rename the others - "

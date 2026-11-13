@@ -79,12 +79,16 @@
 #define BBL_JSON_KEY_MIDDLE_TEXTURE_RECT        "middle_texture_rect"
 
 #define BBL_JSON_KEY_HOTEND_MODEL               "hotend_model"
+// Snapmaker Orca Max: the nozzle size table of a printer model (VendorProfile::PrinterModel::nozzle_sizes).
+#define ORCA_JSON_KEY_NOZZLE_SIZES              "nozzle_sizes"
 #define BBL_JSON_KEY_DEFAULT_MATERIALS          "default_materials"
 #define BBL_JSON_KEY_NOT_SUPPORT_BED_TYPE       "not_support_bed_type"
 #define BBL_JSON_KEY_MODEL_ID                   "model_id"
 
 // Orca extension
 #define ORCA_JSON_KEY_RENAMED_FROM              "renamed_from"
+// Snapmaker Orca Max: the nozzle size a process or filament preset is made for (Preset::nozzle_size).
+#define ORCA_JSON_KEY_NOZZLE_SIZE               "nozzle_size"
 
 
 static constexpr const char* GENERIC_PREFIX = "Generic ";
@@ -147,6 +151,20 @@ public:
         void serialize(Archive& ar) { ar(name); }                       // PrinterVariant
     };
 
+    // Snapmaker Orca Max: what a tool head of one nozzle size takes, on a printer model whose one
+    // printer preset carries any size per head ("nozzle_sizes" of the model file).
+    struct NozzleSize {
+        std::string                        size;                   // "0.6", as printer_variant spells it
+        std::string                        printer;                // the per-size printer preset of Snapmaker's layout
+        std::string                        default_print_profile;  // the process preset for heads of this size
+        bool                               high_flow { false };    // the size has High Flow values
+        std::map<std::string, std::string> values;                 // per-head printer keys -> one head's value
+
+        // All fields, declaration order — keep in sync; bump CACHE_VERSION on change.
+        template<class Archive>
+        void serialize(Archive& ar) { ar(size, printer, default_print_profile, high_flow, values); }   // NozzleSize
+    };
+
     struct PrinterModel {
         PrinterModel() {}
         std::string                 id;
@@ -168,6 +186,9 @@ public:
         std::string                 bottom_texture_rect_longer;
         std::string                 middle_texture_rect;
         std::string                 hotend_model;
+        // Snapmaker Orca Max: the nozzle sizes of a model with one size-less printer preset; empty
+        // for a model with a printer preset per size.
+        std::vector<NozzleSize>     nozzle_sizes;
         PrinterVariant*       variant(const std::string &name) {
             for (auto &v : this->variants)
                 if (v.name == name)
@@ -185,7 +206,7 @@ public:
                not_support_bed_types, bed_model, bed_texture, image_bed_type,
                bottom_texture_end_name, use_double_extruder_default_texture,
                bottom_texture_rect, bottom_texture_rect_longer, middle_texture_rect,
-               hotend_model);
+               hotend_model, nozzle_sizes);
         }
     };
     std::vector<PrinterModel>          models;
@@ -307,6 +328,11 @@ public:
     // This list is then used to match profiles by their names when loaded from .gcode, .3mf, .amf,
     // and to match the "inherits" field of user profiles with updated system profiles.
     std::vector<std::string> renamed_from;
+    // Snapmaker Orca Max: the nozzle size a process or filament preset is made for ("0.6"); empty for a
+    // preset of any size, and for a preset of a printer with a printer preset per size, whose
+    // compatible_printers says it (NozzleFilament::preset_nozzle_size). A user preset takes its parent's
+    // unless its file states its own.
+    std::string         nozzle_size;
 
     // Orca: maintain a list of printer models that are excluded from this preset, designed for filaments without compatible_printer defined
     // (hence they are visible to all printer models by default) in Orca Filament Library. However, we might have speciliazed filament for
@@ -343,7 +369,9 @@ public:
 
     //BBS: add logic for only difference save
     //if parent_config is null, save all keys, otherwise, only save difference
-    void                save(DynamicPrintConfig* parent_config);
+    // `parent_nozzle_size`: Preset::nozzle_size of the parent; a size of its own is written to the file
+    // (always without a parent).
+    void                save(DynamicPrintConfig* parent_config, const std::string *parent_nozzle_size = nullptr);
     void                reload(Preset const & parent);
 
     // Return a label of this preset, consisting of a name and a "(modified)" suffix, if this preset is dirty.
@@ -756,11 +784,9 @@ public:
         return (idx == m_idx_selected) ? m_edited_preset : m_presets[idx];
     }
     const Preset&   preset(size_t idx) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
-    void            discard_current_changes() {
-        m_presets[m_idx_selected].reset_dirty();
-        m_edited_preset = m_presets[m_idx_selected];
-//        update_saved_preset_from_current_preset();
-    }
+    // Snapmaker Orca Max: a printer preset for every nozzle size keeps its tool heads' sizes; they are
+    // the head setup, not a change of the preset (dirty_reference).
+    void            discard_current_changes();
 
     // Return a preset by its name. If the preset is active, a temporary copy is returned.
     // If a preset is not found by its name, null is returned.
@@ -861,13 +887,19 @@ public:
 
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return true if they differ.
     bool                        current_is_dirty() const
-        { return is_dirty(&this->get_edited_preset(), &this->get_selected_preset()); }
+        { Preset storage; return is_dirty(&this->get_edited_preset(), this->dirty_reference(&this->get_selected_preset(), storage)); }
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return the list of keys where they differ.
     std::vector<std::string>    current_dirty_options(const bool deep_compare = false) const
-        { return dirty_options(&this->get_edited_preset(), &this->get_selected_preset(), deep_compare); }
+        { Preset storage; return dirty_options(&this->get_edited_preset(), this->dirty_reference(&this->get_selected_preset(), storage), deep_compare); }
     // Compare the content of get_selected_preset() with get_edited_preset() configs, return the list of keys where they differ.
     std::vector<std::string>    current_different_from_parent_options(const bool deep_compare = false) const
-        { return dirty_options(&this->get_edited_preset(), this->get_selected_preset_parent(), deep_compare); }
+        { Preset storage; return dirty_options(&this->get_edited_preset(), this->dirty_reference(this->get_selected_preset_parent(), storage), deep_compare); }
+    // Snapmaker Orca Max: what the edited preset is compared with to tell its changes. For a printer
+    // preset for every nozzle size (a model with a size table), `reference` with the edited preset's
+    // head sizes and their values applied (NozzleFilament::head_setup_config), held in `storage`: a
+    // nozzle size is the head setup of the project, never a change of the printer. `reference`
+    // itself for every other preset.
+    const Preset*               dirty_reference(const Preset *reference, Preset &storage) const;
 
     // Compare the content of get_saved_preset() with get_edited_preset() configs, return true if they differ.
     bool                        saved_is_dirty() const

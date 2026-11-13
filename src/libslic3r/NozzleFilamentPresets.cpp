@@ -65,6 +65,19 @@ const PresetCollection* collection_of(const PresetBundle &bundle, const Preset &
     }
 }
 
+// The nozzle size table of the printer model of `printer`; nullptr for a model with a preset per size.
+const VendorProfile::PrinterModel* table_of(const PresetBundle &bundle, const Preset &printer)
+{
+    const VendorProfile *vendor = bundle.printers.get_preset_with_vendor_profile(printer).vendor;
+    const std::string    model  = printer.config.opt_string("printer_model");
+    if (vendor == nullptr || model.empty())
+        return nullptr;
+    for (const VendorProfile::PrinterModel &candidate : vendor->models)
+        if (candidate.id == model)
+            return candidate.nozzle_sizes.empty() ? nullptr : &candidate;
+    return nullptr;
+}
+
 // fits() against the printer preset that stands for a tool head.
 bool fits_machine(const PresetBundle &bundle, const Preset &filament, const Preset &machine)
 {
@@ -86,14 +99,17 @@ bool fits_machine(const PresetBundle &bundle, const Preset &filament, const Pres
 }
 
 // version_for() against the printer preset that stands for a tool head.
-const Preset* version_for_machine(const PresetCollection &filaments, const Preset &system_preset, const Preset &machine)
+const Preset* version_for_machine(const PresetBundle &bundle, const Preset &system_preset, const Preset &machine, double size)
 {
+    const PresetCollection &filaments = bundle.filaments;
     if (!system_preset.is_system || system_preset.system_inherits.empty() || system_preset.alias.empty())
         return nullptr;
     const PresetWithVendorProfile machine_with_vendor(machine, machine.vendor);
     const Preset                 *version = nullptr;
     for (const Preset &candidate : filaments) {
         if (!is_family_member(candidate, system_preset) || !restricts_printers(candidate))
+            continue;
+        if (const double made = preset_nozzle_size(bundle, candidate); made > 0. && !same_size(made, size))
             continue;
         if (!is_compatible_with_printer(filaments.get_preset_with_vendor_profile(candidate), machine_with_vendor))
             continue;
@@ -154,9 +170,125 @@ const Preset* head_machine_preset(const PrinterPresetCollection &printers, const
     return find_machine_preset(printers, model, [nozzle_size](const std::string &variant) { return same_size(parse_nozzle_size(variant), nozzle_size); });
 }
 
+const VendorProfile::PrinterModel* size_table(const PresetBundle &bundle)
+{
+    return table_of(bundle, bundle.printers.get_edited_preset());
+}
+
+const VendorProfile::NozzleSize* size_entry(const PresetBundle &bundle, double size)
+{
+    if (const VendorProfile::PrinterModel *model = size_table(bundle); model != nullptr)
+        for (const VendorProfile::NozzleSize &entry : model->nozzle_sizes)
+            if (same_size(parse_nozzle_size(entry.size), size))
+                return &entry;
+    return nullptr;
+}
+
+std::vector<std::string> printer_nozzle_sizes(const PresetBundle &bundle)
+{
+    std::vector<std::string> out;
+    if (const VendorProfile::PrinterModel *model = size_table(bundle); model != nullptr)
+        for (const VendorProfile::NozzleSize &entry : model->nozzle_sizes)
+            out.emplace_back(entry.size);
+    return out;
+}
+
+std::string size_default_process(const PresetBundle &bundle, double size)
+{
+    if (size_table(bundle) != nullptr) {
+        const VendorProfile::NozzleSize *entry = size_entry(bundle, size);
+        return entry == nullptr ? std::string() : entry->default_print_profile;
+    }
+    const Preset *machine = size_machine(bundle, size);
+    return machine == nullptr ? std::string() : machine->config.opt_string("default_print_profile");
+}
+
+DynamicPrintConfig head_setup_config(const DynamicPrintConfig &printer_config, const VendorProfile::PrinterModel &model, const std::vector<double> &sizes)
+{
+    DynamicPrintConfig out = printer_config;
+    auto *diameters = out.option<ConfigOptionFloats>("nozzle_diameter");
+    if (diameters == nullptr)
+        return out;
+    for (size_t head = 0; head < sizes.size() && head < diameters->values.size(); ++head) {
+        const VendorProfile::NozzleSize *entry = nullptr;
+        for (const VendorProfile::NozzleSize &candidate : model.nozzle_sizes)
+            if (same_size(parse_nozzle_size(candidate.size), sizes[head]))
+                entry = &candidate;
+        if (entry == nullptr)
+            continue;   // a size without values keeps the head's own
+        diameters->values[head] = sizes[head];
+        for (const auto &[key, value] : entry->values) {
+            ConfigOption *dst_opt = out.option(key);
+            if (dst_opt == nullptr || !dst_opt->is_vector())
+                continue;
+            // One value in an option of the key's own type.
+            std::unique_ptr<ConfigOption> one(dst_opt->clone());
+            if (!one->deserialize(value) || static_cast<ConfigOptionVectorBase *>(one.get())->size() != 1)
+                continue;
+            auto *dst = static_cast<ConfigOptionVectorBase *>(dst_opt);
+            for (size_t column : extruder_option_columns(out, key, head))
+                if (column < dst->size())
+                    dst->set_at(one.get(), column, 0);
+        }
+    }
+    return out;
+}
+
+std::optional<DynamicPrintConfig> size_config(const PresetBundle &bundle, double size)
+{
+    if (const VendorProfile::PrinterModel *model = size_table(bundle); model != nullptr) {
+        if (size_entry(bundle, size) == nullptr)
+            return std::nullopt;
+        const DynamicPrintConfig &printer = bundle.printers.get_selected_preset().config;
+        const auto               *heads   = printer.option<ConfigOptionFloats>("nozzle_diameter");
+        return head_setup_config(printer, *model, std::vector<double>(heads == nullptr ? 0 : heads->values.size(), size));
+    }
+    const Preset *machine = size_machine(bundle, size);
+    if (machine == nullptr || machine == &bundle.printers.get_edited_preset())
+        machine = head_machine_preset(bundle.printers, bundle.printers.get_edited_preset().config.opt_string("printer_model"), size);
+    return machine == nullptr ? std::nullopt : std::optional<DynamicPrintConfig>(machine->config);
+}
+
+std::string file_printer_name(const Preset &printer)
+{
+    if (!printer.is_system || printer.vendor == nullptr)
+        return printer.name;
+    const std::string model = printer.config.opt_string("printer_model");
+    const double      own   = machine_nozzle_size(printer);
+    for (const VendorProfile::PrinterModel &candidate : printer.vendor->models)
+        if (candidate.id == model)
+            for (const VendorProfile::NozzleSize &entry : candidate.nozzle_sizes)
+                if (same_size(parse_nozzle_size(entry.size), own) && !entry.printer.empty())
+                    return entry.printer;
+    return printer.name;
+}
+
+std::string file_printer_name(const PresetBundle &bundle, const std::string &name)
+{
+    const Preset *printer = bundle.printers.find_preset(name, false);
+    return printer == nullptr || printer->name != name ? name : file_printer_name(*printer);
+}
+
+bool size_has_high_flow_values(const PresetBundle &bundle, double size)
+{
+    if (size_table(bundle) == nullptr)
+        return false;
+    if (size <= 0.) {
+        for (const VendorProfile::NozzleSize &entry : size_table(bundle)->nozzle_sizes)
+            if (entry.high_flow)
+                return true;
+        return false;
+    }
+    const VendorProfile::NozzleSize *entry = size_entry(bundle, size);
+    return entry != nullptr && entry->high_flow;
+}
+
 const Preset* size_machine(const PresetBundle &bundle, double size)
 {
     const Preset &printer = bundle.printers.get_edited_preset();
+    // One printer preset for every size: it stands for each size its model has values for.
+    if (size_table(bundle) != nullptr)
+        return size_entry(bundle, size) != nullptr ? &printer : nullptr;
     const double  own     = machine_nozzle_size(printer);
     if (own <= 0. || same_size(own, size))
         return &printer;
@@ -209,8 +341,14 @@ State head_state(const PresetBundle &bundle)
 
 bool sync_keeps_printer_preset(const Preset &edited, const Preset &picked)
 {
-    return edited.config.opt_string("printer_model") == picked.config.opt_string("printer_model") &&
-           edited.config.opt_string("printer_variant") == picked.config.opt_string("printer_variant");
+    if (edited.config.opt_string("printer_model") != picked.config.opt_string("printer_model"))
+        return false;
+    // Snapmaker Orca Max: one printer preset for every size: the sync sets the sizes of its heads.
+    if (picked.vendor != nullptr)
+        for (const VendorProfile::PrinterModel &model : picked.vendor->models)
+            if (model.id == picked.config.opt_string("printer_model") && !model.nozzle_sizes.empty())
+                return true;
+    return edited.config.opt_string("printer_variant") == picked.config.opt_string("printer_variant");
 }
 
 const Preset* system_ancestor(const PresetCollection &filaments, const Preset &preset)
@@ -236,23 +374,32 @@ bool restricts_printers(const Preset &preset)
 const Preset* version_for(const PresetBundle &bundle, const Preset &system_preset, double size)
 {
     const Preset *machine = size_machine(bundle, size);
-    return machine == nullptr ? nullptr : version_for_machine(bundle.filaments, system_preset, *machine);
+    return machine == nullptr ? nullptr : version_for_machine(bundle, system_preset, *machine, size);
 }
 
 double preset_nozzle_size(const PresetBundle &bundle, const Preset &preset)
 {
-    // The preset's own list: a user preset saved for a tool head of another size than its system
-    // preset carries that size (Tab::save_preset).
-    if (collection_of(bundle, preset) == nullptr)
+    const PresetCollection *collection = collection_of(bundle, preset);
+    if (collection == nullptr)
         return 0.;
+    // The size tag of a printer with one preset for every size (Preset::nozzle_size); a user preset
+    // without one of its own (made in this session, or kept in a project) has its system parent's.
+    if (!preset.nozzle_size.empty())
+        return parse_nozzle_size(preset.nozzle_size);
+    if (!preset.is_system)
+        if (const Preset *system = system_ancestor(*collection, preset); system != nullptr && !system->nozzle_size.empty())
+            return parse_nozzle_size(system->nozzle_size);
+    // A printer with a preset per size: the size of the printer presets the preset's own list names.
+    // A user preset saved for a tool head of another size than its system preset is pinned to the
+    // preset of that size (Tab::save_preset).
     const auto *list = preset.config.option<ConfigOptionStrings>("compatible_printers");
     if (list == nullptr || list->values.empty())
         return 0.;
     double size = 0.;
     for (const std::string &name : list->values) {
         const Preset *machine = bundle.printers.find_preset(name, false);
-        if (machine == nullptr)
-            continue;
+        if (machine == nullptr || table_of(bundle, *machine) != nullptr)
+            continue;   // a printer for every size says nothing about one
         const double machine_size = machine_nozzle_size(*machine);
         if (machine_size <= 0. || (size > 0. && !same_size(size, machine_size)))
             return 0.;
@@ -263,6 +410,17 @@ double preset_nozzle_size(const PresetBundle &bundle, const Preset &preset)
 
 bool fits(const PresetBundle &bundle, const Preset &filament, double size)
 {
+    if (const double made = preset_nozzle_size(bundle, filament); made > 0. && !same_size(made, size))
+        return false;
+    // A printer for every size: a compatibility condition is evaluated with every head of `size`, as it
+    // was against the printer preset of that size.
+    if (size_table(bundle) != nullptr && !filament.compatible_printers_condition().empty())
+        if (const auto *list = filament.config.option<ConfigOptionStrings>("compatible_printers"); list == nullptr || list->values.empty())
+            if (std::optional<DynamicPrintConfig> sized = size_config(bundle, size); sized) {
+                Preset machine = bundle.printers.get_edited_preset();
+                machine.config = std::move(*sized);
+                return fits_machine(bundle, filament, machine);
+            }
     if (const Preset *machine = size_machine(bundle, size); machine != nullptr)
         return fits_machine(bundle, filament, *machine);
     // A size the printer model has no profile for: only a preset made for no size.
@@ -446,13 +604,16 @@ void remember_user_preset(PresetBundle &bundle, size_t slot, const std::string &
     const std::string family = family_key(bundle.filaments, *preset);
     if (family.empty() || state.head_of(slot) == no_head || fits(bundle, *preset, state.size_of(slot)))
         return;
-    // The nozzle sizes of this printer model: the edited preset's and those of its system presets.
+    // The nozzle sizes of this printer model: its table's, else the edited preset's and those of its
+    // system presets.
     const Preset     &printer = bundle.printers.get_edited_preset();
     const std::string model   = printer.config.opt_string("printer_model");
     std::set<double>  sizes;
-    if (const double own = machine_nozzle_size(printer); own > 0.)
+    for (const std::string &size : printer_nozzle_sizes(bundle))
+        sizes.insert(parse_nozzle_size(size));
+    if (const double own = machine_nozzle_size(printer); own > 0. && size_table(bundle) == nullptr)
         sizes.insert(own);
-    if (!model.empty())
+    if (!model.empty() && size_table(bundle) == nullptr)
         for (const Preset &machine : bundle.printers)
             if (machine.is_system && machine.config.opt_string("printer_model") == model)
                 if (const double size = machine_nozzle_size(machine); size > 0.)

@@ -1067,7 +1067,8 @@ public:
         SlotsWritten,       // presets were written into the slots without regard to the tool heads
         UserAction,         // the action of the persistent notice
         Preference,         // the option "filament_follows_nozzle" was turned on
-        FlowType            // the Standard / High Flow choice of a tool head was changed by the user
+        FlowType,           // the Standard / High Flow choice of a tool head was changed by the user
+        HeadSetup           // the head setup remembered for the printer was applied (new project, printer selected)
     };
     struct NozzleFollowResult
     {
@@ -1084,6 +1085,10 @@ public:
     // Shows the sentences of a pass as one notice of the Prepare view; the warning level when a
     // user preset or unsaved changes were kept. Nothing for a pass without sentences.
     void show_nozzle_follow_notice(const NozzleFollowResult &result);
+    // Snapmaker Orca Max: the head setup (nozzle size and flow type per tool head) the user last chose
+    // for the selected printer preset, when it is one for every size: on a new project and when the
+    // printer preset is selected. The filaments of the heads that change follow.
+    void apply_remembered_head_setup();
     // Persistent, non-blocking warnings, refreshed at every apply and pass: filaments on a preset for
     // another nozzle size although one for their head exists (action: run the pass), and filaments the
     // plate map sends to a head of another size than the project map. Replaced only on text change.

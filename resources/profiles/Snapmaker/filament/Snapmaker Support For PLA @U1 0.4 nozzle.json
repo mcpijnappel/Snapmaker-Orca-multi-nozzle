@@ -6,8 +6,9 @@
   "setting_id": "41460000000",
   "inherits": "Snapmaker Support For PLA @U1 base",
   "compatible_printers": [
-    "Snapmaker U1 (0.4 nozzle)"
+      "Snapmaker U1"
   ],
+  "nozzle_size": "0.4",
   "enable_pressure_advance": [
     "1",
     "1"

@@ -27,6 +27,7 @@
 #endif /* L */
 
 #include <algorithm>
+#include "NozzleFilamentPresets.hpp"
 #include <fstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -866,7 +867,7 @@ static DynamicPrintConfig preset_diff_to_write(Preset::Type type, DynamicPrintCo
     return temp_config;
 }
 
-void Preset::save(DynamicPrintConfig* parent_config)
+void Preset::save(DynamicPrintConfig* parent_config, const std::string *parent_nozzle_size)
 {
     //BBS: add project embedded preset logic
     if (this->is_project_embedded)
@@ -888,13 +889,25 @@ void Preset::save(DynamicPrintConfig* parent_config)
     boost::filesystem::create_directories(fs::path(this->file).parent_path());
     const std::string bare_name = get_preset_bare_name(this->name);
 
+    // Snapmaker Orca Max: a nozzle size of its own is written; one it shares with its parent is not.
+    const bool own_nozzle_size  = !this->nozzle_size.empty() && (parent_nozzle_size == nullptr || *parent_nozzle_size != this->nozzle_size);
+    auto       with_nozzle_size = [this, own_nozzle_size](DynamicPrintConfig &out) {
+        if (own_nozzle_size)
+            out.set_key_value(ORCA_JSON_KEY_NOZZLE_SIZE, new ConfigOptionString(this->nozzle_size));
+    };
     //BBS: only save difference if it has parent
     if (parent_config) {
         DynamicPrintConfig temp_config = preset_diff_to_write(type, config, *parent_config);
+        with_nozzle_size(temp_config);
         temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
     } else if (!filament_id.empty() && inherits().empty()) {
         DynamicPrintConfig temp_config = config;
         temp_config.set_key_value(BBL_JSON_KEY_FILAMENT_ID, new ConfigOptionString(filament_id));
+        with_nozzle_size(temp_config);
+        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+    } else if (own_nozzle_size) {
+        DynamicPrintConfig temp_config = config;
+        with_nozzle_size(temp_config);
         temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
     } else {
         this->config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
@@ -1054,6 +1067,12 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
         if (model.empty() || variant.empty())
         	return;
         is_visible = app_config.get_variant(vendor->id, model, variant);
+        // Snapmaker Orca Max: one printer preset for every nozzle size is installed with any size of
+        // its model (an installation that chose the model's sizes before the presets were joined).
+        for (const VendorProfile::PrinterModel &printer_model : vendor->models)
+            if (printer_model.id == model)
+                for (const VendorProfile::NozzleSize &size : printer_model.nozzle_sizes)
+                    is_visible = is_visible || app_config.get_variant(vendor->id, model, size.size);
     } else if (type == TYPE_FILAMENT || type == TYPE_SLA_MATERIAL) {
     	const std::string &section_name = (type == TYPE_FILAMENT) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS;
     	if (app_config.has_section(section_name)) {
@@ -1973,6 +1992,8 @@ PresetCollection::UserPresetLoad PresetCollection::resolve_user_preset(
 
         if (key_values.find(BBL_JSON_KEY_FILAMENT_ID) != key_values.end())
             preset.filament_id = key_values[BBL_JSON_KEY_FILAMENT_ID];
+        // Snapmaker Orca Max: a size of its own (saved for a tool head of another size); else the parent's, below.
+        const auto own_nozzle_size = key_values.find(ORCA_JSON_KEY_NOZZLE_SIZE);
         if (key_values.find(BBL_JSON_KEY_DESCRIPTION) != key_values.end())
             preset.description = key_values[BBL_JSON_KEY_DESCRIPTION];
         if (key_values.find(BBL_JSON_KEY_INSTANTIATION) != key_values.end())
@@ -1997,6 +2018,7 @@ PresetCollection::UserPresetLoad PresetCollection::resolve_user_preset(
         if (inherit_preset) {
             preset.config = inherit_preset->config;
             preset.filament_id = inherit_preset->filament_id;
+            preset.nozzle_size = inherit_preset->nozzle_size;
             extend_default_config_length(config, false, {});
             preset.config.update_diff_values_to_child_config(config, extruder_id_name, extruder_variant_name, *key_set1, *key_set2);
             // Snapmaker Orca: the layout of a process preset with values set per extruder.
@@ -2016,6 +2038,8 @@ PresetCollection::UserPresetLoad PresetCollection::resolve_user_preset(
             extend_default_config_length(preset.config, true, default_preset.config);
         }
 
+        if (own_nozzle_size != key_values.end())
+            preset.nozzle_size = own_nozzle_size->second;
         Preset::normalize(preset.config);
         // Report configuration fields, which are misplaced into a wrong group.
         std::string incorrect_keys = Preset::remove_invalid_keys(preset.config, default_preset.config);
@@ -2880,6 +2904,33 @@ static bool profile_print_params_same(const DynamicPrintConfig &cfg_old, const D
     return diff.empty();
 }
 
+// Snapmaker Orca Max: a printer of a project with one column per tool head (Snapmaker Orca's per-size
+// U1 presets other than 0.4 mm) states no variant layout, or one that does not describe its columns.
+// It gets its own: one Standard column per head, so that merging it into a printer preset with more
+// columns per head (update_non_diff_values_to_base_config) matches each column with its head's.
+static void give_per_head_printer_layout(DynamicPrintConfig &config)
+{
+    const auto *diameters = config.option<ConfigOptionFloats>("nozzle_diameter");
+    const auto *lengths   = config.option<ConfigOptionFloats>("retraction_length");
+    if (diameters == nullptr || lengths == nullptr || diameters->values.size() < 2 || lengths->values.size() != diameters->values.size())
+        return;
+    const size_t heads    = diameters->values.size();
+    const auto  *variants = config.option<ConfigOptionStrings>("printer_extruder_variant");
+    const auto  *ids      = config.option<ConfigOptionInts>("printer_extruder_id");
+    if (variants != nullptr && ids != nullptr && variants->values.size() == heads && ids->values.size() == heads)
+        return;
+    const auto              *types = config.option<ConfigOptionEnumsGeneric>("extruder_type");
+    std::vector<int>         head_ids;
+    std::vector<std::string> head_variants;
+    for (size_t head = 0; head < heads; ++head) {
+        head_ids.emplace_back(int(head) + 1);
+        const ExtruderType type = types != nullptr && !types->values.empty() ? ExtruderType(types->get_at(head)) : etDirectDrive;
+        head_variants.emplace_back(get_extruder_variant_string(type, nvtStandard));
+    }
+    config.set_key_value("printer_extruder_id", new ConfigOptionInts(head_ids));
+    config.set_key_value("printer_extruder_variant", new ConfigOptionStrings(head_variants));
+}
+
 // Load a preset from an already parsed config file, insert it into the sorted sequence of presets
 // and select it, losing previous modifications.
 // Only a single profile could be edited at at the same time, which introduces complexity when loading
@@ -2908,9 +2959,50 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
         found = it != m_presets.end();
     }
 
+    // Snapmaker Orca Max: a printer preset for every nozzle size (a model with a size table) is the base
+    // of a project with the file's head sizes applied: a project of Snapmaker's layout names the
+    // per-size preset, whose values are those of the size, and every head of Max's carries its own
+    // size. The settings the file does not list as changed come from that base, in its layout, so
+    // a project with one column per head opens in the preset's columns; nozzle_diameter always comes
+    // from the file.
+    const auto nozzle_size_table = [](const Preset &base) -> const VendorProfile::PrinterModel * {
+        if (base.type != Preset::TYPE_PRINTER || base.vendor == nullptr)
+            return nullptr;
+        const std::string model = base.config.opt_string("printer_model");
+        for (const VendorProfile::PrinterModel &candidate : base.vendor->models)
+            if (candidate.id == model && !candidate.nozzle_sizes.empty())
+                return &candidate;
+        return nullptr;
+    };
+    DynamicPrintConfig sized_base;
+    auto base_of = [&combined_config, &sized_base, &nozzle_size_table](Preset &base) -> DynamicPrintConfig * {
+        const VendorProfile::PrinterModel *table = nozzle_size_table(base);
+        const auto                        *sizes = combined_config.option<ConfigOptionFloats>("nozzle_diameter");
+        if (table == nullptr || sizes == nullptr)
+            return &base.config;
+        sized_base = NozzleFilament::head_setup_config(base.config, *table, sizes->values);
+        return &sized_base;
+    };
+    std::set<std::string> different_settings = different_settings_list;
+    DynamicPrintConfig    project_config;   // combined_config with the per-head layout, for a printer for every size
+    bool                  per_head_layout = false;
+    if (m_type == Preset::TYPE_PRINTER) {
+        const auto   *file_inherits = combined_config.option<ConfigOptionString>("inherits");
+        const Preset *base          = found ? &*it : nullptr;
+        if (file_inherits != nullptr && !file_inherits->value.empty())
+            base = this->find_preset(file_inherits->value, false);
+        if (base != nullptr && nozzle_size_table(*base) != nullptr) {
+            different_settings.insert("nozzle_diameter");
+            project_config = combined_config;
+            give_per_head_printer_layout(project_config);
+            per_head_layout = true;
+        }
+    }
+    const DynamicPrintConfig &source_config = per_head_layout ? project_config : combined_config;
+
     t_config_option_keys keys;
-    DynamicPrintConfig cfg = Preset::load_external_config(m_type, this->default_preset_for(combined_config).config, combined_config, different_settings_list,
-        [this, &original_name, &path, found, it](const std::string &inherits) -> DynamicPrintConfig * {
+    DynamicPrintConfig cfg = Preset::load_external_config(m_type, this->default_preset_for(combined_config).config, source_config, different_settings,
+        [this, &original_name, &path, found, it, &base_of](const std::string &inherits) -> DynamicPrintConfig * {
             if (!inherits.empty()) {
                 auto iter = this->find_preset_internal(inherits);
                 if (iter == m_presets.end() || iter->name != inherits)
@@ -2918,11 +3010,11 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
                 if (iter == m_presets.end())
                     return nullptr;
                 BOOST_LOG_TRIVIAL(info) << "load_external_preset" << boost::format(": change preset %1% inherit %2% 's value to %3% 's values")%original_name %inherits %path;
-                return &iter->config;
+                return base_of(*iter);
             }
             if (found && it->is_system) {
                 BOOST_LOG_TRIVIAL(info) << "load_external_preset" << boost::format(": change preset %1% 's value to %2% 's values")%original_name %path;
-                return &it->config;
+                return base_of(*it);
             }
             return nullptr;
         }, &keys);
@@ -3382,7 +3474,7 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
         }
     }
     if (parent_preset)
-        this->get_selected_preset().save(&(parent_preset->config));
+        this->get_selected_preset().save(&(parent_preset->config), &parent_preset->nozzle_size);
     else
         this->get_selected_preset().save(nullptr);
 
@@ -3834,6 +3926,19 @@ void PresetCollection::set_default_suppressed(bool default_suppressed)
     }
 }
 
+// Snapmaker Orca Max: a preset made for one nozzle size (Preset::nozzle_size) serves a printer that
+// carries a nozzle of that size on one of its tool heads.
+static bool nozzle_size_on_printer(const std::string &nozzle_size, const Preset &printer)
+{
+    if (nozzle_size.empty())
+        return true;
+    const auto *diameters = printer.config.option<ConfigOptionFloats>("nozzle_diameter");
+    if (diameters == nullptr)
+        return true;
+    const double size = string_to_double_decimal_point(nozzle_size);
+    return std::any_of(diameters->values.begin(), diameters->values.end(), [size](double head) { return std::abs(head - size) < EPSILON; });
+}
+
 size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfile &active_printer, const PresetWithVendorProfile *active_print, PresetSelectCompatibleType unselect_if_incompatible, bool keep_selected)
 {
     DynamicPrintConfig config;
@@ -3854,7 +3959,12 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
 
         const PresetWithVendorProfile this_preset_with_vendor_profile = this->get_preset_with_vendor_profile(preset_edited);
         bool    was_compatible  = preset_edited.is_compatible;
-        preset_edited.is_compatible = is_compatible_with_printer(this_preset_with_vendor_profile, active_printer, &config);
+        // A user preset without a size of its own has its system parent's.
+        const Preset *sized = &preset_edited;
+        for (int depth = 0; sized != nullptr && sized->nozzle_size.empty() && !sized->is_system && !sized->inherits().empty() && depth < 32; ++depth)
+            sized = this->get_preset_parent(*sized);
+        preset_edited.is_compatible = is_compatible_with_printer(this_preset_with_vendor_profile, active_printer, &config) &&
+                                      nozzle_size_on_printer(sized != nullptr ? sized->nozzle_size : std::string(), active_printer.preset);
         if (preset_edited.is_compatible)
             some_compatible++;
 	    if (active_print != nullptr)
@@ -4065,6 +4175,47 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
 
 static constexpr const std::initializer_list<const char*> optional_keys { "compatible_prints", "compatible_printers" };
 
+// The nozzle size table of the printer model of printer preset `printer` (through the vendor of its
+// system parent); nullptr for a model with a printer preset per size.
+static const VendorProfile::PrinterModel *nozzle_size_table_of(const PresetCollection &printers, const Preset &printer)
+{
+    const VendorProfile *vendor = printers.get_preset_with_vendor_profile(printer).vendor;
+    const auto          *model  = printer.config.option<ConfigOptionString>("printer_model");
+    if (vendor == nullptr || model == nullptr)
+        return nullptr;
+    for (const VendorProfile::PrinterModel &candidate : vendor->models)
+        if (candidate.id == model->value)
+            return candidate.nozzle_sizes.empty() ? nullptr : &candidate;
+    return nullptr;
+}
+
+const Preset* PresetCollection::dirty_reference(const Preset *reference, Preset &storage) const
+{
+    if (m_type != Preset::TYPE_PRINTER || reference == nullptr)
+        return reference;
+    const VendorProfile::PrinterModel *table = nozzle_size_table_of(*this, *reference);
+    const auto                        *sizes = this->get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter");
+    if (table == nullptr || sizes == nullptr)
+        return reference;
+    storage        = *reference;
+    storage.config = NozzleFilament::head_setup_config(reference->config, *table, sizes->values);
+    return &storage;
+}
+
+void PresetCollection::discard_current_changes()
+{
+    m_presets[m_idx_selected].reset_dirty();
+    // The head setup stays: the sizes of the edited printer preset, with their values.
+    std::vector<double> sizes;
+    if (m_type == Preset::TYPE_PRINTER)
+        if (const auto *diameters = m_edited_preset.config.option<ConfigOptionFloats>("nozzle_diameter"); diameters != nullptr)
+            sizes = diameters->values;
+    m_edited_preset = m_presets[m_idx_selected];
+    if (const VendorProfile::PrinterModel *table = sizes.empty() ? nullptr : nozzle_size_table_of(*this, m_edited_preset); table != nullptr)
+        m_edited_preset.config = NozzleFilament::head_setup_config(m_edited_preset.config, *table, sizes);
+//        update_saved_preset_from_current_preset();
+}
+
 bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
 {
     if (edited != nullptr && reference != nullptr) {
@@ -4178,9 +4329,17 @@ bool PresetCollection::select_preset_by_name(const std::string &name_w_suffix, b
     //BBS: add config related logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": %1%, try to select by name %2%, force %3%")%Preset::get_type_string(m_type) %name_w_suffix %force;
     std::string name = Preset::remove_suffix_modified(name_w_suffix);
-    const std::string normalized_name = this->canonical_preset_name(name);
+    std::string normalized_name = this->canonical_preset_name(name);
     // 1) Try to find the preset by its name.
     auto it = this->find_preset_internal(normalized_name);
+    // Snapmaker Orca Max: a name a system preset was renamed from (a selection stored before the
+    // per-size U1 printer presets became one) selects that preset.
+    if (it == m_presets.end() || it->name != normalized_name)
+        if (const std::string *renamed = this->get_preset_name_renamed(name); renamed != nullptr) {
+            name            = *renamed;
+            normalized_name = this->canonical_preset_name(name);
+            it              = this->find_preset_internal(normalized_name);
+        }
     size_t idx = 0;
     if (it != m_presets.end() && it->name == normalized_name && it->is_visible)
         // Preset found by its name and it is visible.

@@ -51,6 +51,7 @@ add_executable(${_TEST_NAME}_tests
     test_sswcp_protocol.cpp # Snapmaker Orca: device protocol conversion (upstream #807)
     test_snapmaker_hf_profiles.cpp # Snapmaker Orca: High Flow columns of the shipped U1 profiles
     test_snapmaker_multi_nozzle_profiles.cpp # Snapmaker Orca Max: U1 process presets for mixed nozzle sizes
+    test_u1_single_printer.cpp # Snapmaker Orca Max: one size-less U1 printer preset and its file boundary
     test_obj.cpp
     test_step.cpp
     test_stl.cpp
@@ -104,3 +105,12 @@ set_property(TARGET ${_TEST_NAME}_tests PROPERTY FOLDER "tests")
 orcaslicer_copy_test_dlls()
 
 orcaslicer_discover_tests(${_TEST_NAME}_tests)
+
+# Snapmaker Orca Max: the shipped U1 profiles are in the converted layout, so a second run of the
+# converter (scripts/convert_u1_single_printer.py, run after every merge of Snapmaker's profiles)
+# finds nothing to do.
+find_package(Python3 COMPONENTS Interpreter)
+if (Python3_Interpreter_FOUND)
+    add_test(NAME u1_converter_idempotent COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/convert_u1_single_printer.py)
+    set_tests_properties(u1_converter_idempotent PROPERTIES PASS_REGULAR_EXPRESSION "nothing to convert" LABELS "U1Printer")
+endif()

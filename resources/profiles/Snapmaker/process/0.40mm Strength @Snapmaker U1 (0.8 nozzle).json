@@ -12,8 +12,9 @@
     "smooth_coefficient": "150",
     "overhang_totally_speed": "50",
     "compatible_printers": [
-        "Snapmaker U1 (0.8 nozzle)"
+        "Snapmaker U1"
     ],
+    "nozzle_size": "0.8",
     "filter_out_gap_fill": "1",
     "gap_fill_target": "topbottom",
     "internal_bridge_speed": "100%",

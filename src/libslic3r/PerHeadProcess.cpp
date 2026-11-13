@@ -91,12 +91,6 @@ double layer_height_of(const Preset &preset)
     return option == nullptr ? 0. : option->value;
 }
 
-std::string default_print_profile_of(const Preset &machine)
-{
-    const auto *option = machine.config.option<ConfigOptionString>("default_print_profile");
-    return option == nullptr ? std::string() : option->value;
-}
-
 // Snapmaker Orca Max: whether `preset` plans a multi-nozzle strategy (Custom plans none of its own).
 bool plans_strategy(const Preset &preset)
 {
@@ -130,12 +124,15 @@ bool compatible(const PresetBundle &bundle, const Preset &process, const Preset 
     return is_compatible_with_printer(bundle.prints.get_preset_with_vendor_profile(process), bundle.printers.get_preset_with_vendor_profile(machine));
 }
 
-// compatible() with the printer for a tool head of nozzle size `size`; false for a size the printer
-// has no profile for.
+// compatible() with the printer for a tool head of nozzle size `size`, and made for that size or for
+// none; false for a size the printer has no values for.
 bool compatible(const PresetBundle &bundle, const Preset &process, double size)
 {
     const Preset *machine = NozzleFilament::size_machine(bundle, size);
-    return machine != nullptr && compatible(bundle, process, *machine);
+    if (machine == nullptr || !compatible(bundle, process, *machine))
+        return false;
+    const double made = NozzleFilament::preset_nozzle_size(bundle, process);
+    return made <= 0. || same_height(made, size);
 }
 
 // The system process presets compatible with a head of nozzle size `size`, `selected` excluded,
@@ -143,11 +140,8 @@ bool compatible(const PresetBundle &bundle, const Preset &process, double size)
 std::vector<const Preset*> candidates_for(const PresetBundle &bundle, double size, const Preset &selected)
 {
     std::vector<const Preset*> out;
-    const Preset *machine = NozzleFilament::size_machine(bundle, size);
-    if (machine == nullptr)
-        return out;
     for (const Preset &preset : bundle.prints)
-        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, *machine) && !is_multi_nozzle_size(bundle, preset) &&
+        if (preset.is_system && preset.name != selected.name && compatible(bundle, preset, size) && !is_multi_nozzle_size(bundle, preset) &&
             !is_multi_nozzle_height_preset(preset))
             out.emplace_back(&preset);
     return out;
@@ -378,8 +372,7 @@ const Preset* source_for_head(const PresetBundle &bundle, double nozzle_size, do
     // not move the source).
     const double      target_height = target_height_mm > 0. ? target_height_mm : layer_height_of(selected);
     const std::string quality       = quality_class_of(bundle, selected);
-    const Preset     *machine       = NozzleFilament::size_machine(bundle, nozzle_size);
-    const std::string default_name  = machine == nullptr ? std::string() : default_print_profile_of(*machine);
+    const std::string default_name  = NozzleFilament::size_default_process(bundle, nozzle_size);
 
     for (const std::string &class_name : class_ladder(quality)) {
         std::vector<const Preset *> of_class;
@@ -748,7 +741,7 @@ bool fits(const PresetBundle &bundle, const Preset &preset, size_t head, std::st
         (list == nullptr || list->values.empty()) && preset.compatible_printers_condition().empty())
         if (const Preset *root = bundle.prints.get_preset_base(preset); root != nullptr && root->is_system)
             judged = root;
-    if (compatible(bundle, *judged, *machine)) {
+    if (compatible(bundle, *judged, state.head_size[head])) {
         // Snapmaker Orca Max: a height preset applies while the head can print its height.
         if (is_multi_nozzle_height_preset(preset) && chosen_layer_height(bundle, preset, head) <= 0.)
             return answer(false, "grid");
@@ -802,7 +795,7 @@ std::vector<Candidate> picker_candidates(const PresetBundle &bundle, size_t head
     // strategy height, by height; its own height is the automatic entry.
     const double own = strategy_layer_height(bundle, head);
     for (const Preset &preset : bundle.prints)
-        if (is_multi_nozzle_height_preset(preset) && compatible(bundle, preset, *machine)) {
+        if (is_multi_nozzle_height_preset(preset) && compatible(bundle, preset, state.head_size[head])) {
             const double height = chosen_layer_height(bundle, preset, head);
             if (height > 0. && std::abs(height - own) > EPSILON)
                 add(preset, Candidate::System);

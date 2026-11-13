@@ -14,6 +14,7 @@
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Preset.hpp"
+#include "libslic3r/NozzleFilamentPresets.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Semver.hpp"
@@ -164,6 +165,8 @@ namespace {
 namespace fs = boost::filesystem;
 
 const char *const U1_MACHINE = "Snapmaker U1 (0.4 nozzle)";
+// The one U1 printer preset the per-size names of Snapmaker's layout lead to.
+const char *const U1_PRINTER = "Snapmaker U1";
 const char *const U1_PROCESS = "0.20mm Standard @Snapmaker U1 (0.4 nozzle)";
 
 std::string fixture(const std::string &name) { return std::string(TEST_DATA_DIR) + "/snapmaker_2_4/" + name; }
@@ -339,7 +342,7 @@ TEST_CASE("A Snapmaker Orca 2.4 project loads with its High Flow tool head and t
     bundle.load_config_model("upstream_2_4.3mf", load_project_2_4(), Semver(2, 4, 0));
 
     CHECK(bundle.last_flow_import_report.empty());
-    CHECK(bundle.printers.get_edited_preset().name == U1_MACHINE);
+    CHECK(bundle.printers.get_edited_preset().name == U1_PRINTER);
     CHECK(bundle.prints.get_edited_preset().name == U1_PROCESS);
     CHECK(bundle.filament_presets == std::vector<std::string>{"Snapmaker PLA SnapSpeed @U1", "Snapmaker PETG HF", "Snapmaker PLA Basic @U1", "Snapmaker PLA Matte @U1"});
     check_head_2_prints_high_flow(bundle);
@@ -388,7 +391,7 @@ TEST_CASE("A Snapmaker Orca 2.4 project loads with its High Flow tool head and t
         Preset::normalize(dst_config);
         second.load_config_model("saved_here.3mf", std::move(dst_config), file_version);
         CHECK(second.last_flow_import_report.empty());
-        CHECK(second.printers.get_edited_preset().name == U1_MACHINE);
+        CHECK(second.printers.get_edited_preset().name == U1_PRINTER);
         CHECK(second.filament_presets == bundle.filament_presets);
         check_head_2_prints_high_flow(second);
 
@@ -764,6 +767,8 @@ std::unique_ptr<PresetBundle> load_bundle_with_0_6_high_flow()
 DynamicPrintConfig all_standard_0_6_project(PresetBundle &bundle)
 {
     REQUIRE(bundle.printers.select_preset_by_name(U1_MACHINE_0_6, true));
+    // Every tool head on 0.6 mm, with the values of that size.
+    bundle.printers.get_edited_preset().config = *NozzleFilament::size_config(bundle, 0.6);
     REQUIRE(bundle.prints.select_preset_by_name(U1_PROCESS_0_6, true));
     bundle.filament_presets = U1_FILAMENTS_0_6;
     REQUIRE(bundle.filaments.select_preset_by_name(bundle.filament_presets.front(), true));
@@ -822,7 +827,7 @@ TEST_CASE("A Snapmaker Orca 2.4 project of the 0.6 mm plate loads with every too
     bundle.load_config_model("u1_0_6_from_2_4.3mf", std::move(config), Semver(2, 4, 0));
 
     CHECK(bundle.last_flow_import_report.empty());
-    CHECK(bundle.printers.get_edited_preset().name == U1_MACHINE_0_6);
+    CHECK(bundle.printers.get_edited_preset().name == U1_PRINTER);
     CHECK(bundle.prints.get_edited_preset().name == U1_PROCESS_0_6);
     CHECK(bundle.filament_presets == U1_FILAMENTS_0_6);
     CHECK(head_flow_types(bundle.project_config) == std::vector<int>(4, int(nvtStandard)));
@@ -841,9 +846,11 @@ TEST_CASE("A 0.6 mm project saved with one printer column per tool head fills bo
     // The same situation as for the 0.4 mm plate above, on a 0.6 mm preset that declares High
     // Flow: a project saved before the declaration holds one column per tool head, with the
     // retraction of tool head 2 changed (2.0 against the preset's 1.4).
-    const auto    source = load_bundle_with_0_6_high_flow();
-    const Preset *system = source->printers.find_preset(U1_MACHINE_0_6, false, true);
-    REQUIRE(system != nullptr);
+    const auto source = load_bundle_with_0_6_high_flow();
+    REQUIRE(source->printers.select_preset_by_name(U1_PRINTER, true));
+    // The values of the 0.6 mm size on the one U1 preset.
+    struct { DynamicPrintConfig config; } sized { *NozzleFilament::size_config(*source, 0.6) };
+    const auto *system = &sized;
     REQUIRE(strings_of(system->config, "printer_extruder_variant").size() == 8);
     CHECK_THAT(system->config.option<ConfigOptionFloats>("retraction_length")->values, Catch::Matchers::Approx(std::vector<double>(8, 1.4)));
 

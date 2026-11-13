@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>
+#include <stdexcept>
 #include <set>
 #include <string>
 #include <utility>
@@ -57,14 +58,21 @@ inline void declare_high_flow_per_head(DynamicPrintConfig &machine)
     machine.set_key_value("printer_extruder_variant", new ConfigOptionStrings(variants));
 }
 
-// The U1 0.6 mm machine preset of `bundle` declares High Flow for every tool head, as a vendor
-// update of Snapmaker's would make it. Returns that system preset.
-inline Preset &u1_0_6_declares_high_flow(PresetBundle &bundle)
+// The U1 of `bundle` has High Flow values for 0.6 mm nozzles, as a vendor update of Snapmaker's would
+// give it: the 0.6 mm entry of its nozzle size table (the one U1 printer preset declares the High
+// Flow columns for every size). Returns that entry.
+inline VendorProfile::NozzleSize &u1_0_6_declares_high_flow(PresetBundle &bundle)
 {
-    Preset *machine = bundle.printers.find_preset("Snapmaker U1 (0.6 nozzle)", false, true);
-    REQUIRE(machine != nullptr);
-    declare_high_flow_per_head(machine->config);
-    return *machine;
+    for (auto &[id, vendor] : bundle.vendors)
+        for (VendorProfile::PrinterModel &model : vendor.models)
+            if (model.id == "Snapmaker U1")
+                for (VendorProfile::NozzleSize &size : model.nozzle_sizes)
+                    if (size.size == "0.6") {
+                        size.high_flow = true;
+                        return size;
+                    }
+    FAIL("the U1 has no 0.6 mm entry in its nozzle size table");
+    throw std::logic_error("unreachable");
 }
 
 // Gives the one-column filament preset `name` of `bundle` a High Flow column: every variant-aware

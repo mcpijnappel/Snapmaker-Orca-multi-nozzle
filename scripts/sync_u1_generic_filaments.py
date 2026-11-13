@@ -77,12 +77,13 @@ def resolved(name):
 
 
 def preset_for(product, size):
-    """The instantiated U1 preset of `product` for `size`, or None."""
-    machine = f"Snapmaker U1 ({size} nozzle)"
+    """The instantiated U1 preset of `product` for `size` (its "nozzle_size", the one U1 printer in its
+    compatible_printers; scripts/convert_u1_single_printer.py), or None."""
     for name, (path, data) in INDEX.items():
         if path.parent != FILAMENT_DIR or data.get("instantiation") != "true":
             continue
-        if (name == product or name.startswith(product + " @")) and machine in (data.get("compatible_printers") or []):
+        if ((name == product or name.startswith(product + " @")) and "Snapmaker U1" in (data.get("compatible_printers") or [])
+                and data.get("nozzle_size") == size):
             return name
     return None
 
